@@ -1,0 +1,190 @@
+package com.hoanghuy04.instagrambackend.service;
+
+import com.hoanghuy04.instagrambackend.dto.request.CreateCommentRequest;
+import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
+import com.hoanghuy04.instagrambackend.entity.Comment;
+import com.hoanghuy04.instagrambackend.entity.Post;
+import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
+import com.hoanghuy04.instagrambackend.repository.CommentRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Service class for comment operations.
+ * Handles comment creation, updates, and queries.
+ * 
+ * @author Instagram Backend Team
+ * @version 1.0.0
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class CommentService {
+    
+    private final CommentRepository commentRepository;
+    private final UserService userService;
+    private final PostService postService;
+    
+    /**
+     * Create a new comment on a post.
+     *
+     * @param request the comment creation request
+     * @param userId the user ID creating the comment
+     * @return CommentResponse
+     */
+    @Transactional
+    public CommentResponse createComment(CreateCommentRequest request, String userId) {
+        log.info("Creating comment for post: {}", request.getPostId());
+        
+        User author = userService.getUserEntityById(userId);
+        Post post = postService.getPostEntityById(request.getPostId());
+        
+        Comment comment = Comment.builder()
+                .post(post)
+                .author(author)
+                .text(request.getText())
+                .build();
+        
+        comment = commentRepository.save(comment);
+        
+        // Add comment ID to post's comments list
+        post.getComments().add(comment.getId());
+        
+        log.info("Comment created successfully: {}", comment.getId());
+        
+        return convertToCommentResponse(comment);
+    }
+    
+    /**
+     * Get comment by ID.
+     *
+     * @param commentId the comment ID
+     * @return CommentResponse
+     */
+    @Transactional(readOnly = true)
+    public CommentResponse getComment(String commentId) {
+        log.debug("Getting comment by ID: {}", commentId);
+        
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        return convertToCommentResponse(comment);
+    }
+    
+    /**
+     * Get comments for a post.
+     *
+     * @param postId the post ID
+     * @param pageable pagination information
+     * @return Page of CommentResponse
+     */
+    @Transactional(readOnly = true)
+    public Page<CommentResponse> getPostComments(String postId, Pageable pageable) {
+        log.debug("Getting comments for post: {}", postId);
+        
+        return commentRepository.findByPostId(postId, pageable)
+                .map(this::convertToCommentResponse);
+    }
+    
+    /**
+     * Update a comment.
+     *
+     * @param commentId the comment ID
+     * @param text the new comment text
+     * @param userId the user ID updating the comment
+     * @return updated CommentResponse
+     */
+    @Transactional
+    public CommentResponse updateComment(String commentId, String text, String userId) {
+        log.info("Updating comment: {}", commentId);
+        
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        // Check if user is the author
+        if (!comment.getAuthor().getId().equals(userId)) {
+            throw new UnauthorizedException("You are not authorized to update this comment");
+        }
+        
+        comment.setText(text);
+        comment = commentRepository.save(comment);
+        
+        log.info("Comment updated successfully: {}", commentId);
+        
+        return convertToCommentResponse(comment);
+    }
+    
+    /**
+     * Delete a comment.
+     *
+     * @param commentId the comment ID
+     * @param userId the user ID deleting the comment
+     */
+    @Transactional
+    public void deleteComment(String commentId, String userId) {
+        log.info("Deleting comment: {}", commentId);
+        
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        // Check if user is the author
+        if (!comment.getAuthor().getId().equals(userId)) {
+            throw new UnauthorizedException("You are not authorized to delete this comment");
+        }
+        
+        commentRepository.delete(comment);
+        log.info("Comment deleted successfully: {}", commentId);
+    }
+    
+    /**
+     * Reply to a comment.
+     *
+     * @param commentId the comment ID to reply to
+     * @param request the comment request
+     * @param userId the user ID creating the reply
+     * @return CommentResponse
+     */
+    @Transactional
+    public CommentResponse replyToComment(String commentId, CreateCommentRequest request, String userId) {
+        log.info("Creating reply to comment: {}", commentId);
+        
+        Comment parentComment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        CommentResponse reply = createComment(request, userId);
+        
+        // Add reply ID to parent comment's replies list
+        parentComment.getReplies().add(reply.getId());
+        commentRepository.save(parentComment);
+        
+        log.info("Reply created successfully");
+        
+        return reply;
+    }
+    
+    /**
+     * Convert Comment entity to CommentResponse DTO.
+     *
+     * @param comment the Comment entity
+     * @return CommentResponse DTO
+     */
+    private CommentResponse convertToCommentResponse(Comment comment) {
+        return CommentResponse.builder()
+                .id(comment.getId())
+                .postId(comment.getPost().getId())
+                .author(userService.convertToUserResponse(comment.getAuthor()))
+                .text(comment.getText())
+                .likesCount(comment.getLikes() != null ? comment.getLikes().size() : 0)
+                .repliesCount(comment.getReplies() != null ? comment.getReplies().size() : 0)
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt())
+                .build();
+    }
+}
+
