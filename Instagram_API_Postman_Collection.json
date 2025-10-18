@@ -1203,6 +1203,48 @@
 					}
 				},
 				{
+					"name": "Upload Multiple Post Media (Batch)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "files",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "files",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "files",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "userId",
+									"value": "{{userId}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/upload/post-media/batch",
+							"host": ["{{baseUrl}}"],
+							"path": ["upload", "post-media", "batch"]
+						}
+					}
+				},
+				{
 					"name": "Delete File",
 					"request": {
 						"method": "DELETE",
@@ -1223,5 +1265,6 @@
 		}
 	]
 }
+
 
 

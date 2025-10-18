@@ -3,6 +3,7 @@ package com.hoanghuy04.instagrambackend.service;
 import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.Conversation;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,7 @@ import java.util.Map;
 /**
  * Service class for message operations.
  * Handles direct messaging between users.
+ * Integrated with WebSocket for real-time messaging.
  * 
  * @author Instagram Backend Team
  * @version 1.0.0
@@ -33,9 +36,11 @@ public class MessageService {
     
     private final MessageRepository messageRepository;
     private final UserService userService;
+    private final SimpMessagingTemplate messagingTemplate;
     
     /**
      * Send a message to a user.
+     * Also pushes the message via WebSocket for real-time delivery.
      *
      * @param request the message send request
      * @param senderId the sender user ID
@@ -59,6 +64,34 @@ public class MessageService {
         message = messageRepository.save(message);
         
         log.info("Message sent successfully: {}", message.getId());
+        
+        // Push message via WebSocket for real-time delivery
+        try {
+            ChatMessage chatMessage = ChatMessage.builder()
+                    .id(message.getId())
+                    .type(ChatMessage.MessageType.CHAT)
+                    .senderId(sender.getId())
+                    .senderUsername(sender.getUsername())
+                    .senderProfileImage(sender.getProfile() != null ? sender.getProfile().getAvatar() : null)
+                    .receiverId(receiver.getId())
+                    .content(message.getContent())
+                    .mediaUrl(message.getMediaUrl())
+                    .timestamp(message.getCreatedAt())
+                    .status(ChatMessage.MessageStatus.SENT)
+                    .build();
+            
+            // Send to receiver
+            messagingTemplate.convertAndSendToUser(
+                    receiver.getId(),
+                    "/queue/messages",
+                    chatMessage
+            );
+            
+            log.debug("Message pushed via WebSocket to user: {}", receiver.getId());
+        } catch (Exception e) {
+            log.warn("Failed to push message via WebSocket: {}", e.getMessage());
+            // Don't fail the whole operation if WebSocket push fails
+        }
         
         return convertToMessageResponse(message);
     }
@@ -140,6 +173,7 @@ public class MessageService {
     
     /**
      * Mark a message as read.
+     * Also pushes read receipt via WebSocket.
      *
      * @param messageId the message ID
      */
@@ -154,6 +188,29 @@ public class MessageService {
         messageRepository.save(message);
         
         log.info("Message marked as read successfully");
+        
+        // Push read receipt via WebSocket
+        try {
+            ChatMessage readReceipt = ChatMessage.builder()
+                    .id(message.getId())
+                    .type(ChatMessage.MessageType.READ)
+                    .senderId(message.getReceiver().getId())
+                    .receiverId(message.getSender().getId())
+                    .status(ChatMessage.MessageStatus.READ)
+                    .timestamp(message.getCreatedAt())
+                    .build();
+            
+            // Notify sender that message was read
+            messagingTemplate.convertAndSendToUser(
+                    message.getSender().getId(),
+                    "/queue/read-receipts",
+                    readReceipt
+            );
+            
+            log.debug("Read receipt pushed via WebSocket to user: {}", message.getSender().getId());
+        } catch (Exception e) {
+            log.warn("Failed to push read receipt via WebSocket: {}", e.getMessage());
+        }
     }
     
     /**
