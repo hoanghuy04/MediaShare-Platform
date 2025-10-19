@@ -14,7 +14,7 @@ interface CommentSectionProps {
 }
 
 export const CommentSection: React.FC<CommentSectionProps> = ({
-  comments,
+  comments = [],
   onLikeComment,
   onDeleteComment,
   currentUserId,
@@ -23,22 +23,20 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
 
   const renderComment = ({ item }: { item: Comment }) => (
     <View style={styles.commentItem}>
-      <Avatar uri={item.user.profileImage} name={item.user.username} size={32} />
-      
+      <Avatar uri={item.author.profile?.avatar} name={item.author.username} size={32} />
+
       <View style={styles.commentContent}>
         <View style={styles.commentHeader}>
           <Text style={[styles.username, { color: theme.colors.text }]}>
-            {item.user.username}
+            {item.author.username}
           </Text>
           <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
             {formatDate(item.createdAt)}
           </Text>
         </View>
-        
-        <Text style={[styles.commentText, { color: theme.colors.text }]}>
-          {item.content}
-        </Text>
-        
+
+        <Text style={[styles.commentText, { color: theme.colors.text }]}>{item.text}</Text>
+
         <View style={styles.commentActions}>
           <TouchableOpacity onPress={() => onLikeComment?.(item.id)} style={styles.likeButton}>
             <Ionicons
@@ -52,8 +50,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
               </Text>
             )}
           </TouchableOpacity>
-          
-          {currentUserId === item.user.id && (
+
+          {currentUserId === item.author.id && (
             <TouchableOpacity onPress={() => onDeleteComment?.(item.id)}>
               <Ionicons name="trash-outline" size={16} color={theme.colors.danger} />
             </TouchableOpacity>
@@ -120,4 +118,3 @@ const styles = StyleSheet.create({
     height: 16,
   },
 });
-

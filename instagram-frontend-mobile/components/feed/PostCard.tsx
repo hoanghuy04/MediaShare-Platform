@@ -22,7 +22,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onS
   const router = useRouter();
 
   const handleUserPress = () => {
-    router.push(`/users/${post.user.id}`);
+    router.push(`/users/${post.author.id}`);
   };
 
   const handlePostPress = () => {
@@ -34,9 +34,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onS
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleUserPress} style={styles.userInfo}>
-          <Avatar uri={post.user.profileImage} name={post.user.username} size={32} />
+          <Avatar 
+            uri={post.author.profile?.avatar} 
+            name={post.author.username} 
+            size={32} 
+          />
           <Text style={[styles.username, { color: theme.colors.text }]}>
-            {post.user.username}
+            {post.author.username}
           </Text>
         </TouchableOpacity>
         
@@ -46,10 +50,10 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onS
       </View>
 
       {/* Media */}
-      {post.mediaFiles.length > 0 && (
+      {post.media && post.media.length > 0 && (
         <TouchableOpacity onPress={handlePostPress} activeOpacity={0.95}>
           <Image
-            source={{ uri: post.mediaFiles[0].url }}
+            source={{ uri: post.media[0].url }}
             style={styles.media}
             resizeMode="cover"
           />
@@ -68,7 +72,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onLike, onComment, onS
       {post.caption && (
         <View style={styles.captionContainer}>
           <Text style={{ color: theme.colors.text }}>
-            <Text style={styles.usernameText}>{post.user.username} </Text>
+            <Text style={styles.usernameText}>{post.author.username} </Text>
             <Text style={styles.captionText}>{post.caption}</Text>
           </Text>
         </View>

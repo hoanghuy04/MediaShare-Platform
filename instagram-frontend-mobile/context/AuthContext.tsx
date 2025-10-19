@@ -42,12 +42,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    console.log('Auth navigation check:', { user: !!user, inAuthGroup, segments });
 
     if (!user && !inAuthGroup) {
       // Redirect to login if not authenticated
+      console.log('Redirecting to login...');
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
       // Redirect to main app if authenticated
+      console.log('Redirecting to feed...');
       router.replace('/(tabs)/feed');
     }
   }, [user, segments, isLoading]);
@@ -58,12 +61,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (token) {
         const userData = await storage.getUserData<User>();
         if (userData) {
+          console.log('User loaded from storage:', userData.username);
           setUser(userData);
         } else {
-          // Fetch user data from API
-          const fetchedUser = await authAPI.getMe();
-          setUser(fetchedUser);
-          await storage.setUserData(fetchedUser);
+          // If token exists but no user data, clear token and redirect to login
+          console.log('Token exists but no user data, clearing...');
+          await secureStorage.removeToken();
         }
       }
     } catch (error) {
@@ -78,9 +81,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (credentials: LoginRequest) => {
     try {
       const response = await authAPI.login(credentials);
-      await secureStorage.setToken(response.token);
+      console.log('Login response:', response);
+
+      // Validate token before storing
+      if (!response.accessToken || typeof response.accessToken !== 'string') {
+        throw new Error('Invalid token received from server');
+      }
+
+      await secureStorage.setToken(response.accessToken);
       await storage.setUserData(response.user);
       setUser(response.user);
+
+      // Force navigation to feed after successful login
+      console.log('Login successful, navigating to feed...');
+      router.replace('/(tabs)/feed');
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -90,9 +104,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (data: RegisterRequest) => {
     try {
       const response = await authAPI.register(data);
-      await secureStorage.setToken(response.token);
+
+      // Validate token before storing
+      if (!response.accessToken || typeof response.accessToken !== 'string') {
+        throw new Error('Invalid token received from server');
+      }
+
+      await secureStorage.setToken(response.accessToken);
       await storage.setUserData(response.user);
       setUser(response.user);
+
+      // Force navigation to feed after successful registration
+      console.log('Registration successful, navigating to feed...');
+      router.replace('/(tabs)/feed');
     } catch (error) {
       console.error('Register error:', error);
       throw error;
@@ -133,4 +157,3 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

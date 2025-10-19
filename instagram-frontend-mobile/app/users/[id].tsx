@@ -54,10 +54,18 @@ export default function UserProfileScreen() {
     try {
       if (profile.isFollowing) {
         await userAPI.unfollowUser(id);
-        setProfile({ ...profile, isFollowing: false, followersCount: profile.followersCount - 1 });
+        setProfile({
+          ...profile,
+          isFollowing: false,
+          followersCount: (profile.followersCount || 0) - 1,
+        });
       } else {
         await userAPI.followUser(id);
-        setProfile({ ...profile, isFollowing: true, followersCount: profile.followersCount + 1 });
+        setProfile({
+          ...profile,
+          isFollowing: true,
+          followersCount: (profile.followersCount || 0) + 1,
+        });
       }
     } catch (error: any) {
       showAlert('Error', error.message);
@@ -80,12 +88,18 @@ export default function UserProfileScreen() {
 
   const isOwnProfile = currentUser?.id === id;
 
+  // Add postsCount to profile
+  const profileWithPosts = {
+    ...profile,
+    postsCount: posts?.length || profile.postsCount || 0,
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Header showBack title={profile.username} />
       <ScrollView>
         <ProfileHeader
-          profile={profile}
+          profile={profileWithPosts}
           isOwnProfile={isOwnProfile}
           onFollow={handleFollow}
           onMessage={handleMessage}

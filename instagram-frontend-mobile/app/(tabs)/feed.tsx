@@ -9,7 +9,7 @@ import { showAlert } from '@utils/helpers';
 
 export default function FeedScreen() {
   const { theme } = useTheme();
-  
+
   const {
     data: posts,
     isLoading,
@@ -67,4 +67,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

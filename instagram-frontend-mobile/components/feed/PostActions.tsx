@@ -20,16 +20,16 @@ export const PostActions: React.FC<PostActionsProps> = ({ post, onLike, onCommen
       <View style={styles.leftActions}>
         <TouchableOpacity onPress={onLike} style={styles.actionButton}>
           <Ionicons
-            name={post.isLiked ? 'heart' : 'heart-outline'}
+            name={post.isLikedByCurrentUser ? 'heart' : 'heart-outline'}
             size={28}
-            color={post.isLiked ? theme.colors.like : theme.colors.text}
+            color={post.isLikedByCurrentUser ? theme.colors.like : theme.colors.text}
           />
         </TouchableOpacity>
-        
+
         <TouchableOpacity onPress={onComment} style={styles.actionButton}>
           <Ionicons name="chatbubble-outline" size={26} color={theme.colors.text} />
         </TouchableOpacity>
-        
+
         <TouchableOpacity onPress={onShare} style={styles.actionButton}>
           <Ionicons name="paper-plane-outline" size={26} color={theme.colors.text} />
         </TouchableOpacity>
@@ -62,4 +62,3 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
 });
-

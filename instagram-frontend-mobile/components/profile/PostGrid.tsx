@@ -12,17 +12,13 @@ interface PostGridProps {
   onEndReached?: () => void;
 }
 
-export const PostGrid: React.FC<PostGridProps> = ({ posts, onEndReached }) => {
+export const PostGrid: React.FC<PostGridProps> = ({ posts = [], onEndReached }) => {
   const router = useRouter();
 
   const renderItem = ({ item }: { item: Post }) => (
     <TouchableOpacity style={styles.gridItem} onPress={() => router.push(`/posts/${item.id}`)}>
-      <Image
-        source={{ uri: item.mediaFiles[0]?.url }}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      {item.mediaFiles.length > 1 && (
+      <Image source={{ uri: item.media?.[0]?.url }} style={styles.image} resizeMode="cover" />
+      {item.media && item.media.length > 1 && (
         <View style={styles.multipleIcon}>
           <Ionicons name="copy-outline" size={18} color="white" />
         </View>
@@ -64,4 +60,3 @@ const styles = StyleSheet.create({
     right: 8,
   },
 });
-

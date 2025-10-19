@@ -55,9 +55,9 @@ export default function ProfileScreen() {
 
   const userProfile = {
     ...user,
-    postsCount: posts.length,
-    followersCount: 0,
-    followingCount: 0,
+    postsCount: posts?.length || 0,
+    followersCount: user.followersCount || 0,
+    followingCount: user.followingCount || 0,
   };
 
   return (
@@ -76,4 +76,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

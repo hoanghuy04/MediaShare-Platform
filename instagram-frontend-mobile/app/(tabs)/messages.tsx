@@ -38,7 +38,7 @@ export default function MessagesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Header title="Messages" rightIcon="create-outline" />
-      {conversations.length === 0 ? (
+      {conversations?.length === 0 || !conversations ? (
         <EmptyState
           icon="chatbubbles-outline"
           title="No Messages"

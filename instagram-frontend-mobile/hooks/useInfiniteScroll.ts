@@ -25,7 +25,7 @@ export const useInfiniteScroll = <T>({
   onError,
 }: UseInfiniteScrollOptions<T>): UseInfiniteScrollReturn<T> => {
   const [data, setData] = useState<T[]>([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -33,7 +33,7 @@ export const useInfiniteScroll = <T>({
 
   const loadData = useCallback(
     async (pageNum: number, isRefresh = false) => {
-      if (pageNum === 1) {
+      if (pageNum === 0) {
         setIsLoading(true);
       } else {
         setIsLoadingMore(true);
@@ -42,14 +42,14 @@ export const useInfiniteScroll = <T>({
 
       try {
         const response = await fetchFunc(pageNum, limit);
-        
-        if (isRefresh || pageNum === 1) {
-          setData(response.data);
+
+        if (isRefresh || pageNum === 0) {
+          setData(response.content);
         } else {
-          setData(prev => [...prev, ...response.data]);
+          setData(prev => [...prev, ...response.content]);
         }
-        
-        setHasMore(response.hasMore);
+
+        setHasMore(response.hasNext);
         setPage(pageNum);
       } catch (err) {
         const error = err as Error;
@@ -70,12 +70,12 @@ export const useInfiniteScroll = <T>({
 
   const refresh = useCallback(async () => {
     setHasMore(true);
-    await loadData(1, true);
+    await loadData(0, true);
   }, [loadData]);
 
   const reset = useCallback(() => {
     setData([]);
-    setPage(1);
+    setPage(0);
     setHasMore(true);
     setIsLoading(false);
     setIsLoadingMore(false);
@@ -94,4 +94,3 @@ export const useInfiniteScroll = <T>({
     reset,
   };
 };
-

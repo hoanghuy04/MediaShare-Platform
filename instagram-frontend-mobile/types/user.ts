@@ -1,15 +1,25 @@
+export interface ProfileData {
+  firstName?: string;
+  lastName?: string;
+  bio?: string;
+  avatar?: string;
+  coverImage?: string;
+  website?: string;
+  location?: string;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
   email: string;
-  fullName: string;
-  profileImage?: string;
-  coverImage?: string;
-  bio?: string;
-  website?: string;
-  followersCount: number;
-  followingCount: number;
-  postsCount: number;
+  profile?: ProfileData;
+  roles?: string[];
+  followersCount?: number;
+  followingCount?: number;
+  postsCount?: number;
+  isPrivate?: boolean;
+  isVerified?: boolean;
+  isActive?: boolean;
   isFollowing?: boolean;
   isFollowedBy?: boolean;
   createdAt: string;
@@ -35,4 +45,3 @@ export interface UserStats {
   followingCount: number;
   postsCount: number;
 }
-

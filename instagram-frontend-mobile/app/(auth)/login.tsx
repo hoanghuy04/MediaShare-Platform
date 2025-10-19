@@ -19,19 +19,20 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
   const { theme } = useTheme();
-  const [username, setUsername] = useState('');
+  const [usernameOrEmail, setusernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      showAlert('Error', 'Please enter username and password');
+    console.log('Attempting login with:', { usernameOrEmail, password });
+    if (!usernameOrEmail || !password) {
+      showAlert('Error', 'Please enter usernameOrEmail and password');
       return;
     }
 
     setIsLoading(true);
     try {
-      await login({ username, password });
+      await login({ usernameOrEmail, password });
     } catch (error: any) {
       showAlert('Login Failed', error.message || 'Invalid credentials');
     } finally {
@@ -51,10 +52,10 @@ export default function LoginScreen() {
 
         <View style={styles.formContainer}>
           <Input
-            label="Username or Email"
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Enter username or email"
+            label="username or Email"
+            value={usernameOrEmail}
+            onChangeText={setusernameOrEmail}
+            placeholder="Enter Username or email"
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -136,4 +137,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

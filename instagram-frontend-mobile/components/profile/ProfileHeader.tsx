@@ -23,46 +23,50 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   const { theme } = useTheme();
 
+  // Construct full name from profile data
+  const fullName =
+    profile.profile?.firstName && profile.profile?.lastName
+      ? `${profile.profile.firstName} ${profile.profile.lastName}`
+      : profile.profile?.firstName || profile.username;
+
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
-        <Avatar uri={profile.profileImage} name={profile.fullName} size={80} />
-        
+        <Avatar uri={profile.profile?.avatar} name={fullName} size={80} />
+
         <View style={styles.stats}>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.colors.text }]}>
-              {formatNumber(profile.postsCount)}
+              {formatNumber(profile.postsCount || 0)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Posts</Text>
           </View>
-          
+
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.colors.text }]}>
-              {formatNumber(profile.followersCount)}
+              {formatNumber(profile.followersCount || 0)}
             </Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-              Followers
-            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Followers</Text>
           </View>
-          
+
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: theme.colors.text }]}>
-              {formatNumber(profile.followingCount)}
+              {formatNumber(profile.followingCount || 0)}
             </Text>
-            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-              Following
-            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Following</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.infoSection}>
-        <Text style={[styles.fullName, { color: theme.colors.text }]}>{profile.fullName}</Text>
-        {profile.bio && (
-          <Text style={[styles.bio, { color: theme.colors.text }]}>{profile.bio}</Text>
+        <Text style={[styles.fullName, { color: theme.colors.text }]}>{fullName}</Text>
+        {profile.profile?.bio && (
+          <Text style={[styles.bio, { color: theme.colors.text }]}>{profile.profile.bio}</Text>
         )}
-        {profile.website && (
-          <Text style={[styles.website, { color: theme.colors.blue }]}>{profile.website}</Text>
+        {profile.profile?.website && (
+          <Text style={[styles.website, { color: theme.colors.blue }]}>
+            {profile.profile.website}
+          </Text>
         )}
       </View>
 
@@ -98,7 +102,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 {profile.isFollowing ? 'Following' : 'Follow'}
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.button, styles.messageButton, { borderColor: theme.colors.border }]}
               onPress={onMessage}
@@ -178,4 +182,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

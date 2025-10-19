@@ -19,7 +19,7 @@ interface FeedListProps {
 }
 
 export const FeedList: React.FC<FeedListProps> = ({
-  posts,
+  posts = [],
   isLoading,
   isRefreshing,
   hasMore,
@@ -60,10 +60,7 @@ export const FeedList: React.FC<FeedListProps> = ({
       data={posts}
       renderItem={renderPost}
       keyExtractor={item => item.id}
-      contentContainerStyle={[
-        styles.container,
-        posts.length === 0 && styles.emptyContainer,
-      ]}
+      contentContainerStyle={[styles.container, posts?.length === 0 && styles.emptyContainer]}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -91,4 +88,3 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
 });
-

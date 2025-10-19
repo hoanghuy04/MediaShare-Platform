@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.service;
 
 import com.hoanghuy04.instagrambackend.dto.request.UpdateUserRequest;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
 import com.hoanghuy04.instagrambackend.entity.User;
@@ -55,14 +56,16 @@ public class UserService {
      * Get all users with pagination.
      *
      * @param pageable pagination information
-     * @return Page of UserResponse
+     * @return PageResponse of UserResponse
      */
     @Transactional(readOnly = true)
-    public Page<UserResponse> getAllUsers(Pageable pageable) {
+    public PageResponse<UserResponse> getAllUsers(Pageable pageable) {
         log.debug("Getting all users");
         
-        return userRepository.findAll(pageable)
+        Page<UserResponse> page = userRepository.findAll(pageable)
                 .map(this::convertToUserResponse);
+        
+        return PageResponse.of(page);
     }
     
     /**
@@ -170,14 +173,22 @@ public class UserService {
      *
      * @param query the search query
      * @param pageable pagination information
-     * @return List of UserResponse
+     * @return PageResponse of UserResponse
      */
     @Transactional(readOnly = true)
-    public Page<UserResponse> searchUsers(String query, Pageable pageable) {
-        log.debug("Searching users with query: {}", query);
+    public PageResponse<UserResponse> searchUsers(String query, Pageable pageable) {
+        log.debug("Searching users with query: '{}', page: {}, size: {}", query, pageable.getPageNumber(), pageable.getPageSize());
         
-        return userRepository.searchUsers(query, query, query, pageable)
+        Page<UserResponse> page = userRepository.searchUsers(query, query, query, pageable)
                 .map(this::convertToUserResponse);
+        
+        log.debug("Found {} users on page {} of {} (total {} users)", 
+            page.getNumberOfElements(), 
+            page.getNumber(), 
+            Math.max(page.getTotalPages() - 1, 0),
+            page.getTotalElements());
+        
+        return PageResponse.of(page);
     }
     
     /**

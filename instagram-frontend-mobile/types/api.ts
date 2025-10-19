@@ -6,12 +6,16 @@ export interface ApiResponse<T = any> {
 }
 
 export interface PaginatedResponse<T = any> {
-  data: T[];
-  page: number;
-  limit: number;
-  total: number;
+  content: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
   totalPages: number;
-  hasMore: boolean;
+  first: boolean;
+  last: boolean;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  empty: boolean;
 }
 
 export interface ApiError {
@@ -44,4 +48,3 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
-

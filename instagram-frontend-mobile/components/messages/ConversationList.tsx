@@ -13,7 +13,7 @@ interface ConversationListProps {
 }
 
 export const ConversationList: React.FC<ConversationListProps> = ({
-  conversations,
+  conversations = [],
   onRefresh,
   isRefreshing,
 }) => {
@@ -21,16 +21,18 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const router = useRouter();
 
   const renderConversation = ({ item }: { item: Conversation }) => {
-    const otherParticipant = item.participants[0]; // Simplified for demo
-    const hasUnread = item.unreadCount > 0;
+    const otherParticipant = item.participants?.[0]; // Simplified for demo
+    const hasUnread = (item.unreadCount || 0) > 0;
+
+    if (!otherParticipant) return null;
 
     return (
       <TouchableOpacity
         style={[styles.conversationItem, { backgroundColor: theme.colors.background }]}
         onPress={() => router.push(`/messages/${item.id}`)}
       >
-        <Avatar uri={otherParticipant.profileImage} name={otherParticipant.username} size={56} />
-        
+        <Avatar uri={otherParticipant.profile?.avatar} name={otherParticipant.username} size={56} />
+
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
             <Text
@@ -47,7 +49,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               </Text>
             )}
           </View>
-          
+
           {item.lastMessage && (
             <View style={styles.messagePreview}>
               <Text
@@ -136,4 +138,3 @@ const styles = StyleSheet.create({
     marginLeft: 84,
   },
 });
-
