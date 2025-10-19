@@ -1,41 +1,33 @@
-export interface Conversation {
-  id: string;
-  participants: ConversationParticipant[];
-  lastMessage?: Message;
-  unreadCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import { UserProfile } from './user';
 
-export interface ConversationParticipant {
-  id: string;
-  username: string;
-  profileImage?: string;
-  fullName: string;
+export interface Conversation {
+  conversationId: string;
+  otherUser: UserProfile;
+  lastMessage?: Message;
+  unreadCount?: number;
+  lastMessageTime: string;
 }
 
 export interface Message {
   id: string;
-  conversationId: string;
-  senderId: string;
-  sender: {
-    id: string;
-    username: string;
-    profileImage?: string;
-  };
+  sender: UserProfile;
+  receiver: UserProfile;
   content: string;
   mediaUrl?: string;
-  mediaType?: 'IMAGE' | 'VIDEO';
   isRead: boolean;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface SendMessageRequest {
+  receiverId: string;
+  content: string;
+  mediaUrl?: string;
+}
+
+export interface SendMessageData {
   conversationId: string;
   content: string;
   mediaUrl?: string;
-  mediaType?: 'IMAGE' | 'VIDEO';
 }
 
 export interface CreateConversationRequest {
@@ -47,4 +39,3 @@ export interface WebSocketMessage {
   data: any;
   timestamp: string;
 }
-

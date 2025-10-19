@@ -9,6 +9,7 @@
       "@hooks/*": ["./hooks/*"],
       "@services/*": ["./services/*"],
       "@utils/*": ["./utils/*"],
+      "@types": ["./types/index.ts"],
       "@types/*": ["./types/*"],
       "@config/*": ["./config/*"],
       "@context/*": ["./context/*"],

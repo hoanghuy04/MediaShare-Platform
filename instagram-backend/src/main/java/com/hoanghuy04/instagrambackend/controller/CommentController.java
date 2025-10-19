@@ -3,6 +3,7 @@ package com.hoanghuy04.instagrambackend.controller;
 import com.hoanghuy04.instagrambackend.dto.request.CreateCommentRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.service.CommentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -10,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -72,16 +72,16 @@ public class CommentController {
      *
      * @param postId the post ID
      * @param pageable pagination information
-     * @return ResponseEntity with Page of CommentResponse
+     * @return ResponseEntity with PageResponse of CommentResponse
      */
     @GetMapping("/post/{postId}")
     @Operation(summary = "Get post comments")
-    public ResponseEntity<ApiResponse<Page<CommentResponse>>> getPostComments(
+    public ResponseEntity<ApiResponse<PageResponse<CommentResponse>>> getPostComments(
             @PathVariable String postId,
             Pageable pageable) {
         log.info("Get post comments request received for post: {}", postId);
         
-        Page<CommentResponse> response = commentService.getPostComments(postId, pageable);
+        PageResponse<CommentResponse> response = commentService.getPostComments(postId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -142,6 +142,42 @@ public class CommentController {
         CommentResponse response = commentService.replyToComment(id, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Reply created successfully", response));
+    }
+    
+    /**
+     * Like a comment.
+     *
+     * @param id the comment ID
+     * @param userId the user ID liking the comment
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/{id}/like")
+    @Operation(summary = "Like a comment")
+    public ResponseEntity<ApiResponse<Void>> likeComment(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        log.info("Like comment request received for comment: {}", id);
+        
+        commentService.likeComment(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Comment liked successfully", null));
+    }
+    
+    /**
+     * Unlike a comment.
+     *
+     * @param id the comment ID
+     * @param userId the user ID unliking the comment
+     * @return ResponseEntity with success message
+     */
+    @DeleteMapping("/{id}/like")
+    @Operation(summary = "Unlike a comment")
+    public ResponseEntity<ApiResponse<Void>> unlikeComment(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        log.info("Unlike comment request received for comment: {}", id);
+        
+        commentService.unlikeComment(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Comment unliked successfully", null));
     }
 }
 

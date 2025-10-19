@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@hooks/useTheme';
 import { useAuth } from '@hooks/useAuth';
@@ -44,7 +38,7 @@ export default function ConversationScreen() {
   const loadMessages = async () => {
     try {
       const response = await messageAPI.getMessages(conversationId);
-      setMessages(response.data.reverse()); // Reverse to show oldest first
+      setMessages(response.content.reverse()); // Reverse to show oldest first
     } catch (error: any) {
       showAlert('Error', error.message);
     } finally {
@@ -106,4 +100,3 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
 });
-

@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiConfig from './apiConfig';
 
 const axiosInstance = axios.create({
@@ -14,12 +15,59 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   async (config: any) => {
     try {
+      // Add Authorization token
       const token = await SecureStore.getItemAsync('authToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      // Auto-add userId/senderId/followerId to query params for endpoints that need it
+      // This is a workaround - ideally backend should extract userId from JWT token
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        const userId = userData.id;
+
+        // Initialize params if not exist
+        config.params = config.params || {};
+
+        // Get method and URL
+        const method = config.method?.toUpperCase();
+        const url = config.url || '';
+
+        // Endpoints that need userId (for all HTTP methods)
+        const needsUserId =
+          url.includes('/posts') ||
+          url.includes('/comments') ||
+          url.includes('/upload') ||
+          url.includes('/notifications') ||
+          url.includes('/auth/logout');
+
+        if (needsUserId && !config.params.userId) {
+          config.params.userId = userId;
+        }
+
+        // Endpoints that need senderId (specifically for messages)
+        if (url.includes('/messages')) {
+          // GET /messages needs userId for getConversations and getConversation
+          if (method === 'GET' && !config.params.userId) {
+            config.params.userId = userId;
+          }
+          // POST /messages needs senderId for sendMessage
+          if (method === 'POST' && !config.params.senderId) {
+            config.params.senderId = userId;
+          }
+        }
+
+        // Endpoints that need followerId
+        if (url.includes('/follow') && (method === 'POST' || method === 'DELETE')) {
+          if (!config.params.followerId) {
+            config.params.followerId = userId;
+          }
+        }
+      }
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error('Error in request interceptor:', error);
     }
     return config;
   },
@@ -48,4 +96,3 @@ axiosInstance.interceptors.response.use(
 );
 
 export default axiosInstance;
-

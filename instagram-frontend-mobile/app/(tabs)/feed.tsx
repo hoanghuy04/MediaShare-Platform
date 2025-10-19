@@ -1,15 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@hooks/useTheme';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
-import { Header } from '@components/common/Header';
+import { FeedHeader } from '@components/feed/FeedHeader';
 import { FeedList } from '@components/feed/FeedList';
-import { postAPI } from '@services/api';
+import { postAPI, userAPI } from '@services/api';
 import { showAlert } from '@utils/helpers';
 
 export default function FeedScreen() {
   const { theme } = useTheme();
-  
+  const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const {
     data: posts,
     isLoading,
@@ -27,6 +30,12 @@ export default function FeedScreen() {
     refresh();
   }, []);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refresh();
+    setIsRefreshing(false);
+  };
+
   const handleLike = async (postId: string) => {
     try {
       await postAPI.likePost(postId);
@@ -37,26 +46,66 @@ export default function FeedScreen() {
   };
 
   const handleComment = (postId: string) => {
-    // Navigate to post detail
+    router.push(`/posts/${postId}`);
   };
 
   const handleShare = (postId: string) => {
     // TODO: Implement share functionality
+    showAlert('Share', 'Share functionality coming soon');
+  };
+
+  const handleBookmark = async (postId: string) => {
+    try {
+      // TODO: Implement bookmark API
+      showAlert('Saved', 'Post saved to your collection');
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
+  const handleFollow = async (userId: string) => {
+    try {
+      await userAPI.followUser(userId);
+      // TODO: Update user following status in local state
+      showAlert('Success', 'You are now following this user');
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
+  const handleActivityPress = () => {
+    // TODO: Navigate to activity/notifications screen
+    showAlert('Activity', 'Activity feature coming soon');
+  };
+
+  // Mock suggested account - in production, fetch from API
+  const suggestedAccount = {
+    id: 'suggested_1',
+    username: 'world_of_biology_wob',
+    avatar: undefined,
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Header title="Instagram" />
+      <FeedHeader
+        onActivityPress={handleActivityPress}
+        hasNotifications={false}
+      />
       <FeedList
         posts={posts}
         isLoading={isLoading}
-        isRefreshing={false}
+        isRefreshing={isRefreshing}
         hasMore={hasMore}
-        onRefresh={refresh}
+        onRefresh={handleRefresh}
         onLoadMore={loadMore}
         onLike={handleLike}
         onComment={handleComment}
         onShare={handleShare}
+        onBookmark={handleBookmark}
+        onFollow={handleFollow}
+        showStories={true}
+        showCaughtUp={posts.length > 3}
+        suggestedAccount={suggestedAccount}
       />
     </View>
   );
@@ -67,4 +116,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

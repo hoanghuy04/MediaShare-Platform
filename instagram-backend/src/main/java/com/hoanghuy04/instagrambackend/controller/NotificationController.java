@@ -2,13 +2,13 @@ package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.NotificationResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,16 +35,16 @@ public class NotificationController {
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @return ResponseEntity with Page of NotificationResponse
+     * @return ResponseEntity with PageResponse of NotificationResponse
      */
     @GetMapping
     @Operation(summary = "Get user notifications")
-    public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getNotifications(
+    public ResponseEntity<ApiResponse<PageResponse<NotificationResponse>>> getNotifications(
             @RequestParam String userId,
             Pageable pageable) {
         log.info("Get notifications request received for user: {}", userId);
         
-        Page<NotificationResponse> response = notificationService.getNotifications(userId, pageable);
+        PageResponse<NotificationResponse> response = notificationService.getNotifications(userId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -92,5 +92,6 @@ public class NotificationController {
         long count = notificationService.getUnreadCount(userId);
         return ResponseEntity.ok(ApiResponse.success(count));
     }
+
 }
 

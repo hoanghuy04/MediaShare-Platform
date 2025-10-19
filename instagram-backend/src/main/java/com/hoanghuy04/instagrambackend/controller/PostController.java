@@ -2,6 +2,7 @@ package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.request.CreatePostRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -78,17 +78,17 @@ public class PostController {
      *
      * @param pageable pagination information
      * @param userDetails the authenticated user details
-     * @return ResponseEntity with Page of PostResponse
+     * @return ResponseEntity with PageResponse of PostResponse
      */
     @GetMapping
     @Operation(summary = "Get all posts")
-    public ResponseEntity<ApiResponse<Page<PostResponse>>> getAllPosts(
+    public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getAllPosts(
             Pageable pageable,
             @AuthenticationPrincipal UserDetails userDetails) {
         log.info("Get all posts request received");
         
         String currentUserId = userDetails != null ? userDetails.getUsername() : null;
-        Page<PostResponse> response = postService.getAllPosts(pageable, currentUserId);
+        PageResponse<PostResponse> response = postService.getAllPosts(pageable, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -98,18 +98,18 @@ public class PostController {
      * @param userId the user ID
      * @param pageable pagination information
      * @param userDetails the authenticated user details
-     * @return ResponseEntity with Page of PostResponse
+     * @return ResponseEntity with PageResponse of PostResponse
      */
     @GetMapping("/user/{userId}")
     @Operation(summary = "Get user's posts")
-    public ResponseEntity<ApiResponse<Page<PostResponse>>> getUserPosts(
+    public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getUserPosts(
             @PathVariable String userId,
             Pageable pageable,
             @AuthenticationPrincipal UserDetails userDetails) {
         log.info("Get user posts request received for user: {}", userId);
         
         String currentUserId = userDetails != null ? userDetails.getUsername() : null;
-        Page<PostResponse> response = postService.getUserPosts(userId, pageable, currentUserId);
+        PageResponse<PostResponse> response = postService.getUserPosts(userId, pageable, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -118,16 +118,16 @@ public class PostController {
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @return ResponseEntity with Page of PostResponse
+     * @return ResponseEntity with PageResponse of PostResponse
      */
     @GetMapping("/feed")
     @Operation(summary = "Get user's feed")
-    public ResponseEntity<ApiResponse<Page<PostResponse>>> getFeed(
+    public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getFeed(
             @RequestParam String userId,
             Pageable pageable) {
-        log.info("Get feed request received for user: {}", userId);
-        
-        Page<PostResponse> response = postService.getFeedPosts(userId, pageable);
+
+        PageResponse<PostResponse> response = postService.getFeedPosts(userId, pageable);
+        log.info("Feed posts retrieved: {}", response);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -136,17 +136,17 @@ public class PostController {
      *
      * @param pageable pagination information
      * @param userDetails the authenticated user details
-     * @return ResponseEntity with Page of PostResponse
+     * @return ResponseEntity with PageResponse of PostResponse
      */
     @GetMapping("/explore")
     @Operation(summary = "Get explore posts")
-    public ResponseEntity<ApiResponse<Page<PostResponse>>> getExplore(
+    public ResponseEntity<ApiResponse<PageResponse<PostResponse>>> getExplore(
             Pageable pageable,
             @AuthenticationPrincipal UserDetails userDetails) {
         log.info("Get explore posts request received");
         
         String currentUserId = userDetails != null ? userDetails.getUsername() : null;
-        Page<PostResponse> response = postService.getExplore(pageable, currentUserId);
+        PageResponse<PostResponse> response = postService.getExplore(pageable, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -186,6 +186,42 @@ public class PostController {
         
         postService.deletePost(id, userId);
         return ResponseEntity.ok(ApiResponse.success("Post deleted successfully", null));
+    }
+    
+    /**
+     * Like a post.
+     *
+     * @param id the post ID
+     * @param userId the user ID liking the post
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/{id}/like")
+    @Operation(summary = "Like a post")
+    public ResponseEntity<ApiResponse<Void>> likePost(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        log.info("Like post request received for post: {}", id);
+        
+        postService.likePost(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Post liked successfully", null));
+    }
+    
+    /**
+     * Unlike a post.
+     *
+     * @param id the post ID
+     * @param userId the user ID unliking the post
+     * @return ResponseEntity with success message
+     */
+    @DeleteMapping("/{id}/like")
+    @Operation(summary = "Unlike a post")
+    public ResponseEntity<ApiResponse<Void>> unlikePost(
+            @PathVariable String id,
+            @RequestParam String userId) {
+        log.info("Unlike post request received for post: {}", id);
+        
+        postService.unlikePost(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Post unliked successfully", null));
     }
 }
 

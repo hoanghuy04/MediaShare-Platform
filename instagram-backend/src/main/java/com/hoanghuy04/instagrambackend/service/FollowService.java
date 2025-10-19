@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.entity.Follow;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
+import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,8 @@ public class FollowService {
     
     private final FollowRepository followRepository;
     private final UserService userService;
-    
+    private final UserRepository userRepository;
+
     /**
      * Follow a user.
      *
@@ -56,7 +58,11 @@ public class FollowService {
         // Update user's following and followers lists
         follower.getFollowing().add(followingId);
         following.getFollowers().add(followerId);
-        
+
+
+        userRepository.save(follower);
+        userRepository.save(following);
+
         log.info("User followed successfully");
     }
     

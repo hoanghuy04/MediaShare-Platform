@@ -3,6 +3,7 @@ package com.hoanghuy04.instagrambackend.service;
 import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.Conversation;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
@@ -102,24 +103,27 @@ public class MessageService {
      * @param userId the current user ID
      * @param otherUserId the other user ID
      * @param pageable pagination information
-     * @return Page of MessageResponse
+     * @return PageResponse of MessageResponse
      */
     @Transactional(readOnly = true)
-    public Page<MessageResponse> getConversation(String userId, String otherUserId, Pageable pageable) {
+    public PageResponse<MessageResponse> getConversation(String userId, String otherUserId, Pageable pageable) {
         log.debug("Getting conversation between user {} and user: {}", userId, otherUserId);
         
-        return messageRepository.findConversationByIds(userId, otherUserId, pageable)
+        Page<MessageResponse> page = messageRepository.findConversationByIds(userId, otherUserId, pageable)
                 .map(this::convertToMessageResponse);
+        
+        return PageResponse.of(page);
     }
     
     /**
      * Get all conversations for a user.
      *
      * @param userId the user ID
-     * @return List of Conversation
+     * @param pageable pagination information
+     * @return PageResponse of Conversation
      */
     @Transactional(readOnly = true)
-    public List<Conversation> getConversations(String userId) {
+    public PageResponse<Conversation> getConversations(String userId, Pageable pageable) {
         log.debug("Getting all conversations for user: {}", userId);
         
         User user = userService.getUserEntityById(userId);
@@ -168,7 +172,23 @@ public class MessageService {
             conversations.add(conversation);
         }
         
-        return conversations;
+        // Sort by last message time (most recent first)
+        conversations.sort((c1, c2) -> c2.getLastMessageTime().compareTo(c1.getLastMessageTime()));
+        
+        // Manual pagination
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), conversations.size());
+        
+        List<Conversation> paginatedConversations = conversations.subList(start, end);
+        
+        // Create Page object manually
+        Page<Conversation> page = new org.springframework.data.domain.PageImpl<>(
+            paginatedConversations,
+            pageable,
+            conversations.size()
+        );
+        
+        return PageResponse.of(page);
     }
     
     /**

@@ -23,18 +23,22 @@ export const API_ENDPOINTS = {
   LOGIN: '/api/auth/login',
   REGISTER: '/api/auth/register',
   LOGOUT: '/api/auth/logout',
+  REFRESH_TOKEN: '/api/auth/refresh-token',
+  VERIFY_TOKEN: '/api/auth/verify-token',
   FORGOT_PASSWORD: '/api/auth/forgot-password',
   RESET_PASSWORD: '/api/auth/reset-password',
-  ME: '/api/auth/me',
 
   // Users
   USERS: '/api/users',
   USER_PROFILE: (id: string) => `/api/users/${id}`,
-  UPDATE_PROFILE: '/api/users/profile',
+  UPDATE_PROFILE: (id: string) => `/api/users/${id}`, // Khớp với backend
+  DELETE_USER: (id: string) => `/api/users/${id}`,
   FOLLOW: (id: string) => `/api/users/${id}/follow`,
-  UNFOLLOW: (id: string) => `/api/users/${id}/unfollow`,
+  UNFOLLOW: (id: string) => `/api/users/${id}/follow`, // DELETE method
   FOLLOWERS: (id: string) => `/api/users/${id}/followers`,
   FOLLOWING: (id: string) => `/api/users/${id}/following`,
+  USER_STATS: (id: string) => `/api/users/${id}/stats`,
+  IS_FOLLOWING: (id: string) => `/api/users/${id}/is-following`,
 
   // Posts
   POSTS: '/api/posts',
@@ -48,31 +52,31 @@ export const API_ENDPOINTS = {
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',
 
-  // Comments
-  COMMENTS: (postId: string) => `/api/posts/${postId}/comments`,
-  CREATE_COMMENT: (postId: string) => `/api/posts/${postId}/comments`,
-  DELETE_COMMENT: (postId: string, commentId: string) =>
-    `/api/posts/${postId}/comments/${commentId}`,
-  LIKE_COMMENT: (postId: string, commentId: string) =>
-    `/api/posts/${postId}/comments/${commentId}/like`,
+  // Comments (khớp với backend: /comments/*)
+  COMMENTS: (postId: string) => `/api/comments/post/${postId}`,
+  CREATE_COMMENT: `/api/comments`,
+  DELETE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
+  UPDATE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
+  LIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
+  UNLIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
 
   // Messages
-  CONVERSATIONS: '/api/messages/conversations',
-  CONVERSATION_DETAIL: (id: string) => `/api/messages/conversations/${id}`,
+  CONVERSATIONS: '/api/messages',
+  CONVERSATION_DETAIL: (id: string) => `/api/messages/${id}`,
   CREATE_CONVERSATION: '/api/messages/conversations',
-  MESSAGES: (conversationId: string) => `/api/messages/conversations/${conversationId}/messages`,
-  SEND_MESSAGE: (conversationId: string) =>
-    `/api/messages/conversations/${conversationId}/messages`,
+  MESSAGES: (conversationId: string) => `/api/messages/${conversationId}`,
+  SEND_MESSAGE: '/api/messages',
 
   // Notifications
   NOTIFICATIONS: '/api/notifications',
   MARK_READ: (id: string) => `/api/notifications/${id}/read`,
-  MARK_ALL_READ: '/api/notifications/read-all',
+  DELETE_NOTIFICATION: (id: string) => `/api/notifications/${id}`,
+  UNREAD_COUNT: '/api/notifications/unread-count',
 
   // Upload
   UPLOAD: '/api/upload',
-  UPLOAD_PROFILE_IMAGE: '/api/upload/profile',
-  UPLOAD_COVER_IMAGE: '/api/upload/cover',
-  UPLOAD_POST_MEDIA: '/api/upload/post',
+  UPLOAD_PROFILE_IMAGE: '/api/upload/profile-image',
+  UPLOAD_POST_MEDIA: '/api/upload/post-media',
+  UPLOAD_POST_MEDIA_BATCH: '/api/upload/post-media/batch',
+  DELETE_FILE: (fileId: string) => `/api/upload/files/${fileId}`,
 } as const;
-

@@ -1,5 +1,7 @@
+import { ProfileData } from './user';
+
 export interface LoginRequest {
-  username: string;
+  usernameOrEmail: string;
   password: string;
 }
 
@@ -7,11 +9,14 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
-  fullName: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export interface AuthResponse {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
   user: User;
 }
 
@@ -19,9 +24,13 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  fullName: string;
-  profileImage?: string;
-  bio?: string;
+  profile?: ProfileData;
+  roles?: string[];
+  followersCount?: number;
+  followingCount?: number;
+  isPrivate?: boolean;
+  isVerified?: boolean;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,4 +43,3 @@ export interface ResetPasswordRequest {
   token: string;
   newPassword: string;
 }
-

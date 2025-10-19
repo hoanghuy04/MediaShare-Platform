@@ -13,24 +13,26 @@ interface ConversationListProps {
 }
 
 export const ConversationList: React.FC<ConversationListProps> = ({
-  conversations,
+  conversations = [],
   onRefresh,
-  isRefreshing,
+  isRefreshing = false,
 }) => {
   const { theme } = useTheme();
   const router = useRouter();
 
   const renderConversation = ({ item }: { item: Conversation }) => {
-    const otherParticipant = item.participants[0]; // Simplified for demo
-    const hasUnread = item.unreadCount > 0;
+    const otherUser = item.otherUser;
+    const hasUnread = (item.unreadCount || 0) > 0;
+
+    if (!otherUser) return null;
 
     return (
       <TouchableOpacity
         style={[styles.conversationItem, { backgroundColor: theme.colors.background }]}
-        onPress={() => router.push(`/messages/${item.id}`)}
+        onPress={() => router.push(`/messages/${item.conversationId}`)}
       >
-        <Avatar uri={otherParticipant.profileImage} name={otherParticipant.username} size={56} />
-        
+        <Avatar uri={otherUser.profile?.avatar} name={otherUser.username} size={56} />
+
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
             <Text
@@ -39,7 +41,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 { color: theme.colors.text, fontWeight: hasUnread ? '600' : '400' },
               ]}
             >
-              {otherParticipant.username}
+              {otherUser.username}
             </Text>
             {item.lastMessage && (
               <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
@@ -47,7 +49,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               </Text>
             )}
           </View>
-          
+
           {item.lastMessage && (
             <View style={styles.messagePreview}>
               <Text
@@ -78,7 +80,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     <FlatList
       data={conversations}
       renderItem={renderConversation}
-      keyExtractor={item => item.id}
+      keyExtractor={item => item.conversationId}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
       ItemSeparatorComponent={() => (
@@ -136,4 +138,3 @@ const styles = StyleSheet.create({
     marginLeft: 84,
   },
 });
-

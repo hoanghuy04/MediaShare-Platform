@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@hooks/useTheme';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
@@ -11,6 +11,7 @@ import { showAlert } from '@utils/helpers';
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     data: conversations,
@@ -26,7 +27,13 @@ export default function MessagesScreen() {
     refresh();
   }, []);
 
-  if (isLoading) {
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refresh();
+    setIsRefreshing(false);
+  };
+
+  if (isLoading && !isRefreshing) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <Header title="Messages" />
@@ -38,14 +45,18 @@ export default function MessagesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Header title="Messages" rightIcon="create-outline" />
-      {conversations.length === 0 ? (
+      {conversations?.length === 0 || !conversations ? (
         <EmptyState
           icon="chatbubbles-outline"
           title="No Messages"
           description="Start a conversation with your friends"
         />
       ) : (
-        <ConversationList conversations={conversations} onRefresh={refresh} />
+        <ConversationList 
+          conversations={conversations} 
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
+        />
       )}
     </View>
   );

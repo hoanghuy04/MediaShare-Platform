@@ -1,34 +1,31 @@
+import { UserProfile } from './user';
+
 export interface Post {
   id: string;
-  userId: string;
-  user: {
-    id: string;
-    username: string;
-    profileImage?: string;
-  };
+  author: UserProfile;
   caption: string;
-  mediaFiles: MediaFile[];
+  media: Media[];
   likesCount: number;
   commentsCount: number;
-  isLiked: boolean;
-  isSaved: boolean;
+  sharesCount?: number;
+  bookmarksCount?: number;
+  tags?: string[];
+  location?: string;
+  isLikedByCurrentUser?: boolean;
+  isSaved?: boolean; // Frontend-only property
   createdAt: string;
   updatedAt: string;
 }
 
-export interface MediaFile {
-  id: string;
+export interface Media {
   url: string;
-  type: 'IMAGE' | 'VIDEO';
-  thumbnailUrl?: string;
-  width?: number;
-  height?: number;
-  duration?: number;
+  type: 'IMAGE' | 'VIDEO' | 'image' | 'video';
+  uploadedAt?: string;
 }
 
 export interface CreatePostRequest {
   caption: string;
-  mediaFiles: MediaFile[];
+  media: Media[];
 }
 
 export interface UpdatePostRequest {
@@ -38,22 +35,18 @@ export interface UpdatePostRequest {
 export interface Comment {
   id: string;
   postId: string;
-  userId: string;
-  user: {
-    id: string;
-    username: string;
-    profileImage?: string;
-  };
-  content: string;
+  author: UserProfile;
+  text: string;
   likesCount: number;
-  isLiked: boolean;
+  repliesCount?: number;
+  isLiked?: boolean; // Frontend-only property
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateCommentRequest {
   postId: string;
-  content: string;
+  text: string;
 }
 
 export interface LikeResponse {
@@ -61,4 +54,3 @@ export interface LikeResponse {
   isLiked: boolean;
   likesCount: number;
 }
-

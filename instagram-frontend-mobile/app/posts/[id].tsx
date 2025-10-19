@@ -41,7 +41,7 @@ export default function PostDetailScreen() {
   const loadComments = async () => {
     try {
       const response = await commentAPI.getComments(id);
-      setComments(response.data);
+      setComments(response.content);
     } catch (error: any) {
       console.error('Error loading comments:', error);
     }
@@ -108,4 +108,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

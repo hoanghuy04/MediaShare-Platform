@@ -13,26 +13,19 @@ interface ExploreGridProps {
   onEndReached?: () => void;
 }
 
-export const ExploreGrid: React.FC<ExploreGridProps> = ({ posts, onEndReached }) => {
+export const ExploreGrid: React.FC<ExploreGridProps> = ({ posts = [], onEndReached }) => {
   const { theme } = useTheme();
   const router = useRouter();
 
   const renderItem = ({ item }: { item: Post }) => (
-    <TouchableOpacity
-      style={styles.gridItem}
-      onPress={() => router.push(`/posts/${item.id}`)}
-    >
-      <Image
-        source={{ uri: item.mediaFiles[0]?.url }}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      {item.mediaFiles[0]?.type === 'VIDEO' && (
+    <TouchableOpacity style={styles.gridItem} onPress={() => router.push(`/posts/${item.id}`)}>
+      <Image source={{ uri: item.media?.[0]?.url }} style={styles.image} resizeMode="cover" />
+      {item.media?.[0]?.type === 'VIDEO' && (
         <View style={styles.videoIcon}>
           <Ionicons name="play" size={20} color="white" />
         </View>
       )}
-      {item.mediaFiles.length > 1 && (
+      {item.media && item.media.length > 1 && (
         <View style={styles.multipleIcon}>
           <Ionicons name="copy-outline" size={18} color="white" />
         </View>
@@ -79,4 +72,3 @@ const styles = StyleSheet.create({
     right: 8,
   },
 });
-

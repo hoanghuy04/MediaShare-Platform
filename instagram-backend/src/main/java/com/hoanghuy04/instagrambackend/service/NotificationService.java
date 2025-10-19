@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.service;
 
 import com.hoanghuy04.instagrambackend.dto.response.NotificationResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Notification;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -46,14 +47,16 @@ public class NotificationService {
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @return Page of NotificationResponse
+     * @return PageResponse of NotificationResponse
      */
     @Transactional(readOnly = true)
-    public Page<NotificationResponse> getNotifications(String userId, Pageable pageable) {
+    public PageResponse<NotificationResponse> getNotifications(String userId, Pageable pageable) {
         log.debug("Getting notifications for user: {}", userId);
         
-        return notificationRepository.findByUserId(userId, pageable)
+        Page<NotificationResponse> page = notificationRepository.findByUserId(userId, pageable)
                 .map(this::convertToNotificationResponse);
+        
+        return PageResponse.of(page);
     }
     
     /**

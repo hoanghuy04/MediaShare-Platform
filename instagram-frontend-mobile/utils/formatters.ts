@@ -14,39 +14,43 @@ export const formatDate = (dateString: string): string => {
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
-    return 'Just now';
+    return 'Vừa xong';
   }
 
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) {
-    return `${diffInMinutes}m`;
+    return `${diffInMinutes} phút`;
   }
 
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) {
-    return `${diffInHours}h`;
+    return `${diffInHours} giờ`;
   }
 
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays < 7) {
-    return `${diffInDays}d`;
+    return `${diffInDays} ngày`;
   }
 
   const diffInWeeks = Math.floor(diffInDays / 7);
   if (diffInWeeks < 4) {
-    return `${diffInWeeks}w`;
+    return `${diffInWeeks} tuần`;
   }
 
-  // For older dates, show the actual date
-  const month = date.toLocaleString('default', { month: 'short' });
+  // For older dates, show the actual date in Vietnamese format
+  const monthNames = [
+    'tháng 1', 'tháng 2', 'tháng 3', 'tháng 4', 'tháng 5', 'tháng 6',
+    'tháng 7', 'tháng 8', 'tháng 9', 'tháng 10', 'tháng 11', 'tháng 12'
+  ];
+  const month = monthNames[date.getMonth()];
   const day = date.getDate();
   const year = date.getFullYear();
   
   if (year === now.getFullYear()) {
-    return `${month} ${day}`;
+    return `${day} ${month}`;
   }
   
-  return `${month} ${day}, ${year}`;
+  return `${day} ${month}, ${year}`;
 };
 
 export const formatTime = (dateString: string): string => {

@@ -105,5 +105,38 @@ public class AuthController {
         boolean isValid = authService.validateToken(token);
         return ResponseEntity.ok(ApiResponse.success("Token validation result", isValid));
     }
+    
+    /**
+     * Forgot password - send reset email.
+     *
+     * @param email the user email
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Send password reset email")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@RequestParam String email) {
+        log.info("Forgot password request received for email: {}", email);
+        
+        authService.sendPasswordResetEmail(email);
+        return ResponseEntity.ok(ApiResponse.success("Password reset email sent", null));
+    }
+    
+    /**
+     * Reset password with token.
+     *
+     * @param token the reset token
+     * @param newPassword the new password
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password with token")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @RequestParam String token,
+            @RequestParam String newPassword) {
+        log.info("Reset password request received");
+        
+        authService.resetPassword(token, newPassword);
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully", null));
+    }
 }
 
