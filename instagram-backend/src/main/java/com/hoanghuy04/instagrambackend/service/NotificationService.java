@@ -71,7 +71,7 @@ public class NotificationService {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + notificationId));
         
-        notification.setIsRead(true);
+        notification.setRead(true);
         notificationRepository.save(notification);
         
         log.info("Notification marked as read successfully");
@@ -124,7 +124,7 @@ public class NotificationService {
                         ? notification.getRelatedPost().getId() 
                         : null)
                 .message(notification.getMessage())
-                .isRead(notification.getIsRead())
+                .isRead(notification.isRead())
                 .createdAt(notification.getCreatedAt())
                 .build();
     }

@@ -51,7 +51,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
 
             {/* Messages Icon */}
             <TouchableOpacity
-              onPress={onMessagesPress || (() => router.push('/(tabs)/messages'))}
+              onPress={onMessagesPress || (() => router.push('/messages'))}
               style={styles.iconButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >

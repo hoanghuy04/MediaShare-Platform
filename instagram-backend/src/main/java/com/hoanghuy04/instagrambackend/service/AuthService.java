@@ -118,7 +118,7 @@ public class AuthService {
                 .or(() -> userRepository.findByEmail(request.getUsernameOrEmail()))
                 .orElseThrow(() -> new BadRequestException("Invalid username/email or password"));
         
-        if (!user.getIsActive()) {
+        if (!user.isActive()) {
             throw new UnauthorizedException("User account is not active");
         }
         
@@ -163,7 +163,7 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BadRequestException("User not found"));
         
-        if (!user.getIsActive()) {
+        if (!user.isActive()) {
             throw new UnauthorizedException("User account is not active");
         }
         

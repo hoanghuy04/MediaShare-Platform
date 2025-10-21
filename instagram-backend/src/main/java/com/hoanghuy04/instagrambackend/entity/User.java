@@ -81,19 +81,19 @@ public class User {
      * Flag indicating if the account is private
      */
     @Builder.Default
-    private Boolean isPrivate = false;
+    private boolean isPrivate = false;
     
     /**
      * Flag indicating if the account is verified
      */
     @Builder.Default
-    private Boolean isVerified = false;
+    private boolean isVerified = false;
     
     /**
      * Flag indicating if the account is active
      */
     @Builder.Default
-    private Boolean isActive = true;
+    private boolean isActive = true;
     
     /**
      * Timestamp when the user was created

@@ -160,7 +160,7 @@ public class WebSocketMessageController {
             Message message = messageRepository.findById(chatMessage.getId())
                     .orElseThrow(() -> new RuntimeException("Message not found"));
             
-            message.setIsRead(true);
+            message.setRead(true);
             messageRepository.save(message);
             
             chatMessage.setType(MessageType.READ);

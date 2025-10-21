@@ -40,12 +40,13 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      * @param pageable pagination information
      * @return Page of messages in the conversation
      */
-    @Query("{'$or': [" +
-           "{'sender.$id': ?0, 'receiver.$id': ?1}, " +
-           "{'sender.$id': ?1, 'receiver.$id': ?0}" +
-           "]}")
+    @Query("{ '$or': [ " +
+            "{ 'sender': ObjectId(?0), 'receiver': ObjectId(?1) }, " +
+            "{ 'sender': ObjectId(?1), 'receiver': ObjectId(?0) } " +
+            "] }")
     Page<Message> findConversationByIds(String userId1, String userId2, Pageable pageable);
-    
+
+
     /**
      * Find all messages sent to a user.
      *

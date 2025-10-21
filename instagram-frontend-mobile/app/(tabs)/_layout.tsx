@@ -39,10 +39,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="messages"
+        name="reels"
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="chatbubble-outline" size={size} color={color} />
+            <Ionicons name="play" size={size} color={color} />
           ),
         }}
       />

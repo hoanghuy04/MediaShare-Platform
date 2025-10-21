@@ -8,7 +8,7 @@ import { ChatMessage } from '@components/messages/ChatMessage';
 import { MessageInput } from '@components/messages/MessageInput';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { messageAPI } from '@services/api';
-import { Message, Conversation } from '@types';
+import { Message } from '@types';
 import { showAlert } from '@utils/helpers';
 
 export default function ConversationScreen() {
@@ -16,31 +16,30 @@ export default function ConversationScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [otherUser, setOtherUser] = useState<any>(null);
 
   useEffect(() => {
-    loadConversation();
     loadMessages();
   }, [conversationId]);
-
-  const loadConversation = async () => {
-    try {
-      const data = await messageAPI.getConversation(conversationId);
-      setConversation(data);
-    } catch (error: any) {
-      showAlert('Error', error.message);
-      router.back();
-    }
-  };
 
   const loadMessages = async () => {
     try {
       const response = await messageAPI.getMessages(conversationId);
-      setMessages(response.content.reverse()); // Reverse to show oldest first
+      setMessages(response.content); 
+      
+      // Extract other user from messages
+      if (response.content.length > 0) {
+        const firstMessage = response.content[0];
+        const other = firstMessage.sender.id === user?.id 
+          ? firstMessage.receiver 
+          : firstMessage.sender;
+        setOtherUser(other);
+      }
     } catch (error: any) {
       showAlert('Error', error.message);
+      router.back();
     } finally {
       setIsLoading(false);
     }
@@ -49,7 +48,7 @@ export default function ConversationScreen() {
   const handleSendMessage = async (content: string) => {
     try {
       const newMessage = await messageAPI.sendMessage({
-        conversationId,
+        receiverId: conversationId, // conversationId is the other user's ID
         content,
       });
       setMessages([...messages, newMessage]);
@@ -59,10 +58,10 @@ export default function ConversationScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <ChatMessage message={item} isOwn={item.senderId === user?.id} />
+    <ChatMessage message={item} isOwn={item.sender.id === user?.id} />
   );
 
-  if (isLoading || !conversation) {
+  if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <Header showBack />
@@ -71,15 +70,13 @@ export default function ConversationScreen() {
     );
   }
 
-  const otherParticipant = conversation.participants.find(p => p.id !== user?.id);
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       keyboardVerticalOffset={0}
     >
-      <Header showBack title={otherParticipant?.username || 'Chat'} />
+      <Header showBack title={otherUser?.username || 'Chat'} />
       <FlatList
         data={messages}
         renderItem={renderMessage}

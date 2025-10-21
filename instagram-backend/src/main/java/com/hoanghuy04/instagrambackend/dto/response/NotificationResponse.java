@@ -30,7 +30,7 @@ public class NotificationResponse {
     
     private String message;
     
-    private Boolean isRead;
+    private boolean isRead;
     
     private LocalDateTime createdAt;
 }

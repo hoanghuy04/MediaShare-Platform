@@ -66,7 +66,7 @@ public class Notification {
      * Flag indicating if the notification has been read
      */
     @Builder.Default
-    private Boolean isRead = false;
+    private boolean isRead = false;
     
     /**
      * Timestamp when the notification was created

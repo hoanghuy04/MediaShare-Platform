@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Comment } from '@types';
 import { useTheme } from '@hooks/useTheme';
 import { Avatar } from '../common/Avatar';
@@ -62,13 +62,14 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
   );
 
   return (
-    <FlatList
-      data={comments}
-      renderItem={renderComment}
-      keyExtractor={item => item.id}
-      contentContainerStyle={styles.listContent}
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
-    />
+    <View style={styles.listContent}>
+      {comments.map((comment, index) => (
+        <View key={comment.id}>
+          {renderComment({ item: comment })}
+          {index < comments.length - 1 && <View style={styles.separator} />}
+        </View>
+      ))}
+    </View>
   );
 };
 

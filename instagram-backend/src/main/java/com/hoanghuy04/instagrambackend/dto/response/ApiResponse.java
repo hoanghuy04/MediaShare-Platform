@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ApiResponse<T> {
     
-    private Boolean success;
+    private boolean success;
     
     private String message;
     

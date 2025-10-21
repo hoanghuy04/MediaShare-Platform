@@ -204,7 +204,7 @@ public class MessageService {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
         
-        message.setIsRead(true);
+        message.setRead(true);
         messageRepository.save(message);
         
         log.info("Message marked as read successfully");
@@ -262,7 +262,7 @@ public class MessageService {
                 .receiver(userService.convertToUserResponse(message.getReceiver()))
                 .content(message.getContent())
                 .mediaUrl(message.getMediaUrl())
-                .isRead(message.getIsRead())
+                .isRead(message.isRead())
                 .createdAt(message.getCreatedAt())
                 .build();
     }
