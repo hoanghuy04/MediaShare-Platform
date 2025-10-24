@@ -36,14 +36,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" size={size} color={color} />
           ),
+          tabBarStyle: { display: 'none' },
         }}
       />
       <Tabs.Screen
         name="reels"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="play" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="play" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -55,4 +54,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-

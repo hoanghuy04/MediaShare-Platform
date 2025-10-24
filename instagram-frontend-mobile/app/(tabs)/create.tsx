@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTheme } from '@hooks/useTheme';
-import { CreatePostFlow } from '@components/create/CreatePostFlow';
+import { CreateTabbedFlow } from '@components/create/CreateTabbedFlow';
 
 export default function CreateScreen() {
   const { theme } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <CreatePostFlow />
+      <CreateTabbedFlow />
     </View>
   );
 }
@@ -18,4 +18,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
