@@ -1,1 +1,1 @@
-export { ReelsCreationScreen } from './ReelsCreationScreen';
+export { default as ReelsCreationScreen } from './ReelsCreationScreen';

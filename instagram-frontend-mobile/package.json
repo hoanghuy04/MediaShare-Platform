@@ -28,7 +28,7 @@
     "expo-image-picker": "^17.0.8",
     "expo-linear-gradient": "^14.0.3",
     "expo-linking": "^8.0.8",
-    "expo-media-library": "^18.2.0",
+    "expo-media-library": "~18.2.0",
     "expo-notifications": "^0.32.12",
     "expo-router": "^6.0.12",
     "expo-secure-store": "^15.0.7",
@@ -41,7 +41,9 @@
     "react-native-screens": "~4.16.0",
     "react-native-web": "^0.21.0",
     "react-refresh": "^0.18.0",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.8",
+    "expo-camera": "~17.0.8",
+    "expo-av": "~16.0.7"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

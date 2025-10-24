@@ -62,8 +62,8 @@
     },
     "extra": {
       "dev": {
-        "apiUrl": "http://192.168.110.243:8081",
-        "wsUrl": "ws://192.168.110.243:8081"
+        "apiUrl": "http://192.168.35.243:8081",
+        "wsUrl": "ws://192.168.35.243:8081"
       },
       "prod": {
         "apiUrl": "https://your-production-api.com",
