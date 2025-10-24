@@ -60,7 +60,7 @@ public class Message {
      * Flag indicating if the message has been read
      */
     @Builder.Default
-    private Boolean isRead = false;
+    private boolean isRead = false;
     
     /**
      * Timestamp when the message was created

@@ -3,6 +3,8 @@ package com.hoanghuy04.instagrambackend.service;
 import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.Conversation;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
+import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -11,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +25,7 @@ import java.util.Map;
 /**
  * Service class for message operations.
  * Handles direct messaging between users.
+ * Integrated with WebSocket for real-time messaging.
  * 
  * @author Instagram Backend Team
  * @version 1.0.0
@@ -33,9 +37,11 @@ public class MessageService {
     
     private final MessageRepository messageRepository;
     private final UserService userService;
+    private final SimpMessagingTemplate messagingTemplate;
     
     /**
      * Send a message to a user.
+     * Also pushes the message via WebSocket for real-time delivery.
      *
      * @param request the message send request
      * @param senderId the sender user ID
@@ -60,6 +66,34 @@ public class MessageService {
         
         log.info("Message sent successfully: {}", message.getId());
         
+        // Push message via WebSocket for real-time delivery
+        try {
+            ChatMessage chatMessage = ChatMessage.builder()
+                    .id(message.getId())
+                    .type(ChatMessage.MessageType.CHAT)
+                    .senderId(sender.getId())
+                    .senderUsername(sender.getUsername())
+                    .senderProfileImage(sender.getProfile() != null ? sender.getProfile().getAvatar() : null)
+                    .receiverId(receiver.getId())
+                    .content(message.getContent())
+                    .mediaUrl(message.getMediaUrl())
+                    .timestamp(message.getCreatedAt())
+                    .status(ChatMessage.MessageStatus.SENT)
+                    .build();
+            
+            // Send to receiver
+            messagingTemplate.convertAndSendToUser(
+                    receiver.getId(),
+                    "/queue/messages",
+                    chatMessage
+            );
+            
+            log.debug("Message pushed via WebSocket to user: {}", receiver.getId());
+        } catch (Exception e) {
+            log.warn("Failed to push message via WebSocket: {}", e.getMessage());
+            // Don't fail the whole operation if WebSocket push fails
+        }
+        
         return convertToMessageResponse(message);
     }
     
@@ -69,24 +103,27 @@ public class MessageService {
      * @param userId the current user ID
      * @param otherUserId the other user ID
      * @param pageable pagination information
-     * @return Page of MessageResponse
+     * @return PageResponse of MessageResponse
      */
     @Transactional(readOnly = true)
-    public Page<MessageResponse> getConversation(String userId, String otherUserId, Pageable pageable) {
+    public PageResponse<MessageResponse> getConversation(String userId, String otherUserId, Pageable pageable) {
         log.debug("Getting conversation between user {} and user: {}", userId, otherUserId);
         
-        return messageRepository.findConversationByIds(userId, otherUserId, pageable)
+        Page<MessageResponse> page = messageRepository.findConversationByIds(userId, otherUserId, pageable)
                 .map(this::convertToMessageResponse);
+        
+        return PageResponse.of(page);
     }
     
     /**
      * Get all conversations for a user.
      *
      * @param userId the user ID
-     * @return List of Conversation
+     * @param pageable pagination information
+     * @return PageResponse of Conversation
      */
     @Transactional(readOnly = true)
-    public List<Conversation> getConversations(String userId) {
+    public PageResponse<Conversation> getConversations(String userId, Pageable pageable) {
         log.debug("Getting all conversations for user: {}", userId);
         
         User user = userService.getUserEntityById(userId);
@@ -135,11 +172,28 @@ public class MessageService {
             conversations.add(conversation);
         }
         
-        return conversations;
+        // Sort by last message time (most recent first)
+        conversations.sort((c1, c2) -> c2.getLastMessageTime().compareTo(c1.getLastMessageTime()));
+        
+        // Manual pagination
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), conversations.size());
+        
+        List<Conversation> paginatedConversations = conversations.subList(start, end);
+        
+        // Create Page object manually
+        Page<Conversation> page = new org.springframework.data.domain.PageImpl<>(
+            paginatedConversations,
+            pageable,
+            conversations.size()
+        );
+        
+        return PageResponse.of(page);
     }
     
     /**
      * Mark a message as read.
+     * Also pushes read receipt via WebSocket.
      *
      * @param messageId the message ID
      */
@@ -150,10 +204,33 @@ public class MessageService {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
         
-        message.setIsRead(true);
+        message.setRead(true);
         messageRepository.save(message);
         
         log.info("Message marked as read successfully");
+        
+        // Push read receipt via WebSocket
+        try {
+            ChatMessage readReceipt = ChatMessage.builder()
+                    .id(message.getId())
+                    .type(ChatMessage.MessageType.READ)
+                    .senderId(message.getReceiver().getId())
+                    .receiverId(message.getSender().getId())
+                    .status(ChatMessage.MessageStatus.READ)
+                    .timestamp(message.getCreatedAt())
+                    .build();
+            
+            // Notify sender that message was read
+            messagingTemplate.convertAndSendToUser(
+                    message.getSender().getId(),
+                    "/queue/read-receipts",
+                    readReceipt
+            );
+            
+            log.debug("Read receipt pushed via WebSocket to user: {}", message.getSender().getId());
+        } catch (Exception e) {
+            log.warn("Failed to push read receipt via WebSocket: {}", e.getMessage());
+        }
     }
     
     /**
@@ -185,7 +262,7 @@ public class MessageService {
                 .receiver(userService.convertToUserResponse(message.getReceiver()))
                 .content(message.getContent())
                 .mediaUrl(message.getMediaUrl())
-                .isRead(message.getIsRead())
+                .isRead(message.isRead())
                 .createdAt(message.getCreatedAt())
                 .build();
     }

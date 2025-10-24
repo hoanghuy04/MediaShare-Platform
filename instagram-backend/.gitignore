@@ -49,14 +49,15 @@ out/
 
 # VS Code
 .vscode/
-*.code-workspace
 
-# NetBeans
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+### Environment Variables ###
+.env
+.env.local
+.env.*.local
+*.env
+
+### Uploads ###
+uploads/
 
 ### Operating System ###
 # macOS
@@ -124,4 +125,3 @@ logs/
 *.key
 *.crt
 application-secrets.properties
-

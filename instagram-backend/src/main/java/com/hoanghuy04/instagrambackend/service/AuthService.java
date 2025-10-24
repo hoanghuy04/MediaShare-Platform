@@ -118,7 +118,7 @@ public class AuthService {
                 .or(() -> userRepository.findByEmail(request.getUsernameOrEmail()))
                 .orElseThrow(() -> new BadRequestException("Invalid username/email or password"));
         
-        if (!user.getIsActive()) {
+        if (!user.isActive()) {
             throw new UnauthorizedException("User account is not active");
         }
         
@@ -163,7 +163,7 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BadRequestException("User not found"));
         
-        if (!user.getIsActive()) {
+        if (!user.isActive()) {
             throw new UnauthorizedException("User account is not active");
         }
         
@@ -199,6 +199,38 @@ public class AuthService {
      */
     public boolean validateToken(String token) {
         return jwtUtil.validateToken(token);
+    }
+    
+    /**
+     * Send password reset email.
+     *
+     * @param email the user email
+     */
+    public void sendPasswordResetEmail(String email) {
+        log.info("Sending password reset email to: {}", email);
+        
+        // Check if email exists
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Email not found"));
+        
+        // TODO: Implement email service to send reset link
+        // For now, just log the action
+        log.info("Password reset email would be sent to: {}", email);
+    }
+    
+    /**
+     * Reset password with token.
+     *
+     * @param token the reset token
+     * @param newPassword the new password
+     */
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        log.info("Resetting password with token");
+        
+        // TODO: Implement token validation and password reset logic
+        // For now, just log the action
+        log.info("Password reset would be processed for token: {}", token);
     }
 }
 

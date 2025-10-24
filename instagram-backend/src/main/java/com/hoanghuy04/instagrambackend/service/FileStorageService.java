@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Service class for file storage operations.
@@ -71,6 +73,35 @@ public class FileStorageService {
         log.info("File uploaded successfully: {}", filePath);
         
         return filePath;
+    }
+    
+    /**
+     * Upload multiple files.
+     *
+     * @param files the list of files to upload
+     * @param userId the user ID uploading the files
+     * @param fileType the type of files being uploaded
+     * @return the list of file paths
+     */
+    @Transactional
+    public List<String> uploadMultipleFiles(List<MultipartFile> files, String userId, FileType fileType) {
+        log.info("Uploading {} files for user: {}", files.size(), userId);
+        
+        if (files == null || files.isEmpty()) {
+            throw new FileUploadException("No files provided");
+        }
+        
+        List<String> filePaths = new ArrayList<>();
+        
+        for (MultipartFile file : files) {
+            if (!file.isEmpty()) {
+                String filePath = uploadFile(file, userId, fileType);
+                filePaths.add(filePath);
+            }
+        }
+        
+        log.info("Successfully uploaded {} files", filePaths.size());
+        return filePaths;
     }
     
     /**

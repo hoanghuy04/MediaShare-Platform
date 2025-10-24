@@ -1,10 +1,7 @@
 package com.hoanghuy04.instagrambackend.dto.response;
 
 import com.hoanghuy04.instagrambackend.entity.Media;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,8 +12,9 @@ import java.util.List;
  * @author Instagram Backend Team
  * @version 1.0.0
  */
-@Data
 @Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class PostResponse {
@@ -37,7 +35,7 @@ public class PostResponse {
     
     private String location;
     
-    private Boolean isLikedByCurrentUser;
+    private boolean isLikedByCurrentUser;
     
     private LocalDateTime createdAt;
     

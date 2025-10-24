@@ -2,6 +2,7 @@ package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.request.UpdateUserRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
 import com.hoanghuy04.instagrambackend.service.UserService;
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,8 +46,8 @@ public class UserController {
     @Operation(summary = "Get user by ID")
     public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable String id) {
         log.info("Get user request received for ID: {}", id);
-        
         UserResponse response = userService.getUserById(id);
+        log.info("response_________________________________________: {}", response);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -55,14 +55,14 @@ public class UserController {
      * Get all users with pagination.
      *
      * @param pageable pagination information
-     * @return ResponseEntity with Page of UserResponse
+     * @return ResponseEntity with PageResponse of UserResponse
      */
     @GetMapping
     @Operation(summary = "Get all users")
-    public ResponseEntity<ApiResponse<Page<UserResponse>>> getAllUsers(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> getAllUsers(Pageable pageable) {
         log.info("Get all users request received");
         
-        Page<UserResponse> response = userService.getAllUsers(pageable);
+        PageResponse<UserResponse> response = userService.getAllUsers(pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -136,16 +136,16 @@ public class UserController {
      *
      * @param query the search query
      * @param pageable pagination information
-     * @return ResponseEntity with Page of UserResponse
+     * @return ResponseEntity with PageResponse of UserResponse
      */
     @GetMapping("/search")
     @Operation(summary = "Search users")
-    public ResponseEntity<ApiResponse<Page<UserResponse>>> searchUsers(
+    public ResponseEntity<ApiResponse<PageResponse<UserResponse>>> searchUsers(
             @RequestParam String query,
             Pageable pageable) {
         log.info("Search users request received with query: {}", query);
-        
-        Page<UserResponse> response = userService.searchUsers(query, pageable);
+
+        PageResponse<UserResponse> response = userService.searchUsers(query, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     

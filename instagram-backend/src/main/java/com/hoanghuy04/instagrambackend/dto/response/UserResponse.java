@@ -36,11 +36,11 @@ public class UserResponse {
     
     private Integer followingCount;
     
-    private Boolean isPrivate;
+    private boolean isPrivate;
     
-    private Boolean isVerified;
+    private boolean isVerified;
     
-    private Boolean isActive;
+    private boolean isActive;
     
     private LocalDateTime createdAt;
     

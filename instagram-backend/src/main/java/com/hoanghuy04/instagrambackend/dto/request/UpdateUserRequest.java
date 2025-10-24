@@ -1,10 +1,7 @@
 package com.hoanghuy04.instagrambackend.dto.request;
 
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 /**
  * DTO for updating user profile information.
@@ -12,8 +9,9 @@ import lombok.NoArgsConstructor;
  * @author Instagram Backend Team
  * @version 1.0.0
  */
-@Data
 @Builder
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateUserRequest {
@@ -33,6 +31,6 @@ public class UpdateUserRequest {
     @Size(max = 100, message = "Location must not exceed 100 characters")
     private String location;
     
-    private Boolean isPrivate;
+    private boolean isPrivate;
 }
 

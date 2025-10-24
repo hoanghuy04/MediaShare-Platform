@@ -2,6 +2,7 @@ package com.hoanghuy04.instagrambackend.service;
 
 import com.hoanghuy04.instagrambackend.dto.request.CreateCommentRequest;
 import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Comment;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
@@ -12,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.ArrayList;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,14 +85,16 @@ public class CommentService {
      *
      * @param postId the post ID
      * @param pageable pagination information
-     * @return Page of CommentResponse
+     * @return PageResponse of CommentResponse
      */
     @Transactional(readOnly = true)
-    public Page<CommentResponse> getPostComments(String postId, Pageable pageable) {
+    public PageResponse<CommentResponse> getPostComments(String postId, Pageable pageable) {
         log.debug("Getting comments for post: {}", postId);
         
-        return commentRepository.findByPostId(postId, pageable)
+        Page<CommentResponse> page = commentRepository.findByPostId(postId, pageable)
                 .map(this::convertToCommentResponse);
+        
+        return PageResponse.of(page);
     }
     
     /**
@@ -166,6 +171,50 @@ public class CommentService {
         log.info("Reply created successfully");
         
         return reply;
+    }
+    
+    /**
+     * Like a comment.
+     *
+     * @param commentId the comment ID
+     * @param userId the user ID liking the comment
+     */
+    @Transactional
+    public void likeComment(String commentId, String userId) {
+        log.info("Liking comment: {} by user: {}", commentId, userId);
+        
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        if (comment.getLikes() == null) {
+            comment.setLikes(new ArrayList<>());
+        }
+        
+        if (!comment.getLikes().contains(userId)) {
+            comment.getLikes().add(userId);
+            commentRepository.save(comment);
+            log.info("Comment liked successfully");
+        }
+    }
+    
+    /**
+     * Unlike a comment.
+     *
+     * @param commentId the comment ID
+     * @param userId the user ID unliking the comment
+     */
+    @Transactional
+    public void unlikeComment(String commentId, String userId) {
+        log.info("Unliking comment: {} by user: {}", commentId, userId);
+        
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        if (comment.getLikes() != null && comment.getLikes().contains(userId)) {
+            comment.getLikes().remove(userId);
+            commentRepository.save(comment);
+            log.info("Comment unliked successfully");
+        }
     }
     
     /**

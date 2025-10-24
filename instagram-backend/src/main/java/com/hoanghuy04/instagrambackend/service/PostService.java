@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.service;
 
 import com.hoanghuy04.instagrambackend.dto.request.CreatePostRequest;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.entity.Post;
@@ -87,14 +88,16 @@ public class PostService {
      *
      * @param pageable pagination information
      * @param currentUserId the current user ID (optional)
-     * @return Page of PostResponse
+     * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public Page<PostResponse> getAllPosts(Pageable pageable, String currentUserId) {
+    public PageResponse<PostResponse> getAllPosts(Pageable pageable, String currentUserId) {
         log.debug("Getting all posts");
         
-        return postRepository.findAll(pageable)
+        Page<PostResponse> page = postRepository.findAll(pageable)
                 .map(post -> convertToPostResponse(post, currentUserId));
+        
+        return PageResponse.of(page);
     }
     
     /**
@@ -103,14 +106,16 @@ public class PostService {
      * @param userId the user ID
      * @param pageable pagination information
      * @param currentUserId the current user ID (optional)
-     * @return Page of PostResponse
+     * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public Page<PostResponse> getUserPosts(String userId, Pageable pageable, String currentUserId) {
+    public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable, String currentUserId) {
         log.debug("Getting posts for user: {}", userId);
         
-        return postRepository.findByAuthorId(userId, pageable)
+        Page<PostResponse> page = postRepository.findByAuthorId(userId, pageable)
                 .map(post -> convertToPostResponse(post, currentUserId));
+        
+        return PageResponse.of(page);
     }
     
     /**
@@ -118,24 +123,49 @@ public class PostService {
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @return Page of PostResponse
+     * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public Page<PostResponse> getFeedPosts(String userId, Pageable pageable) {
+    public PageResponse<PostResponse> getFeedPosts(String userId, Pageable pageable) {
         log.debug("Getting feed posts for user: {}", userId);
         
         User user = userService.getUserEntityById(userId);
         
-        // Get list of followed user IDs
+//        List<String> followingIds = followRepository.findByFollower(user).stream()
+//                .map(follow -> follow.getFollowing().getId())
+//                .collect(Collectors.toList());
+//
+//        followingIds.add(userId);
+//
+//        Page<PostResponse> page = postRepository.findByAuthorIdIn(followingIds, pageable)
+//                .map(post -> convertToPostResponse(post, userId));
+        //get All posts and prioritize posts from followed users
         List<String> followingIds = followRepository.findByFollower(user).stream()
                 .map(follow -> follow.getFollowing().getId())
                 .collect(Collectors.toList());
-        
-        // Include user's own posts
         followingIds.add(userId);
-        
-        return postRepository.findByAuthorIdIn(followingIds, pageable)
-                .map(post -> convertToPostResponse(post, userId));
+        Page<PostResponse> page = postRepository.findAll(pageable)
+                .map(post -> {
+                    PostResponse postResponse = convertToPostResponse(post, userId);
+                    if (followingIds.contains(post.getAuthor().getId())) {
+                        // Boost posts from followed users
+                        postResponse = PostResponse.builder()
+                                .id(postResponse.getId())
+                                .author(postResponse.getAuthor())
+                                .caption(postResponse.getCaption())
+                                .media(postResponse.getMedia())
+                                .likesCount(postResponse.getLikesCount())
+                                .commentsCount(postResponse.getCommentsCount())
+                                .tags(postResponse.getTags())
+                                .location(postResponse.getLocation())
+                                .isLikedByCurrentUser(postResponse.isLikedByCurrentUser())
+                                .createdAt(postResponse.getCreatedAt())
+                                .updatedAt(postResponse.getUpdatedAt())
+                                .build();
+                    }
+                    return postResponse;
+                });
+        return PageResponse.of(page);
     }
     
     /**
@@ -143,14 +173,16 @@ public class PostService {
      *
      * @param pageable pagination information
      * @param currentUserId the current user ID (optional)
-     * @return Page of PostResponse
+     * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public Page<PostResponse> getExplore(Pageable pageable, String currentUserId) {
+    public PageResponse<PostResponse> getExplore(Pageable pageable, String currentUserId) {
         log.debug("Getting explore posts");
         
-        return postRepository.findAll(pageable)
+        Page<PostResponse> page = postRepository.findAll(pageable)
                 .map(post -> convertToPostResponse(post, currentUserId));
+        
+        return PageResponse.of(page);
     }
     
     /**
@@ -216,6 +248,48 @@ public class PostService {
     public Post getPostEntityById(String postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+    }
+    
+    /**
+     * Like a post.
+     *
+     * @param postId the post ID
+     * @param userId the user ID liking the post
+     */
+    @Transactional
+    public void likePost(String postId, String userId) {
+        log.info("Liking post: {} by user: {}", postId, userId);
+        
+        Post post = getPostEntityById(postId);
+        
+        if (post.getLikes() == null) {
+            post.setLikes(new ArrayList<>());
+        }
+        
+        if (!post.getLikes().contains(userId)) {
+            post.getLikes().add(userId);
+            postRepository.save(post);
+            log.info("Post liked successfully");
+        }
+    }
+    
+    /**
+     * Unlike a post.
+     *
+     * @param postId the post ID
+     * @param userId the user ID unliking the post
+     */
+    @Transactional
+    public void unlikePost(String postId, String userId) {
+        log.info("Unliking post: {} by user: {}", postId, userId);
+        
+        Post post = getPostEntityById(postId);
+        
+        if (post.getLikes() != null && post.getLikes().contains(userId)) {
+            post.getLikes().remove(userId);
+            postRepository.save(post);
+            log.info("Post unliked successfully");
+        }
     }
     
     /**

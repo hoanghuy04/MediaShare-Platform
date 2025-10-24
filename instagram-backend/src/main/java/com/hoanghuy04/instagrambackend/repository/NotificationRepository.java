@@ -59,5 +59,12 @@ public interface NotificationRepository extends MongoRepository<Notification, St
      * @param user the user whose notifications should be deleted
      */
     void deleteByUser(User user);
+    
+    /**
+     * Mark all notifications as read for a user.
+     *
+     * @param user the user whose notifications should be marked as read
+     */
+//    void markAllAsReadByUser(User user);
 }
 

@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 /**
  * REST controller for file upload endpoints.
  * Handles file uploads and deletions.
@@ -66,6 +68,25 @@ public class FileUploadController {
         String filePath = fileStorageService.uploadFile(file, userId, FileType.POST_MEDIA);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("File uploaded successfully", filePath));
+    }
+    
+    /**
+     * Upload multiple post media files (batch upload).
+     *
+     * @param files the list of files to upload
+     * @param userId the user ID uploading the files
+     * @return ResponseEntity with list of file paths
+     */
+    @PostMapping("/post-media/batch")
+    @Operation(summary = "Upload multiple post media files")
+    public ResponseEntity<ApiResponse<List<String>>> uploadMultiplePostMedia(
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam String userId) {
+        log.info("Upload multiple post media request received from user: {} - {} files", userId, files.size());
+        
+        List<String> filePaths = fileStorageService.uploadMultipleFiles(files, userId, FileType.POST_MEDIA);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Files uploaded successfully", filePaths));
     }
     
     /**

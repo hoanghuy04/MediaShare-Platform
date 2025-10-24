@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.Conversation;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.service.MessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -11,13 +12,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * REST controller for message management endpoints.
@@ -61,17 +59,17 @@ public class MessageController {
      * @param conversationId the other user ID (conversation partner)
      * @param userId the current user ID
      * @param pageable pagination information
-     * @return ResponseEntity with Page of MessageResponse
+     * @return ResponseEntity with PageResponse of MessageResponse
      */
     @GetMapping("/{conversationId}")
     @Operation(summary = "Get conversation with a user")
-    public ResponseEntity<ApiResponse<Page<MessageResponse>>> getConversation(
+    public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> getConversation(
             @PathVariable String conversationId,
             @RequestParam String userId,
             Pageable pageable) {
         log.info("Get conversation request received for user: {}", userId);
         
-        Page<MessageResponse> response = messageService.getConversation(userId, conversationId, pageable);
+        PageResponse<MessageResponse> response = messageService.getConversation(userId, conversationId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -79,14 +77,17 @@ public class MessageController {
      * Get all conversations for a user.
      *
      * @param userId the user ID
-     * @return ResponseEntity with List of Conversation
+     * @param pageable pagination information
+     * @return ResponseEntity with PageResponse of Conversation
      */
     @GetMapping
     @Operation(summary = "Get all conversations")
-    public ResponseEntity<ApiResponse<List<Conversation>>> getConversations(@RequestParam String userId) {
+    public ResponseEntity<ApiResponse<PageResponse<Conversation>>> getConversations(
+            @RequestParam String userId,
+            Pageable pageable) {
         log.info("Get all conversations request received for user: {}", userId);
         
-        List<Conversation> response = messageService.getConversations(userId);
+        PageResponse<Conversation> response = messageService.getConversations(userId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
