@@ -26,7 +26,7 @@ type GalleryAsset = {
 };
 
 type GalleryPageProps = {
-  height: number; // dùng FULL_HEIGHT
+  height: number;
   gallery: GalleryAsset[];
   loadingGallery: boolean;
   onGoToCamera: () => void;
@@ -58,7 +58,6 @@ export function GalleryPage({
 
   return (
     <View style={[styles.page, { height }]}>
-      {/* Header */}
       <View style={styles.galleryHeaderBar}>
         <TouchableOpacity style={styles.closeBtn} onPress={onGoToCamera}>
           <Ionicons name="close" size={28} color="#fff" />
@@ -71,7 +70,6 @@ export function GalleryPage({
         </TouchableOpacity>
       </View>
 
-      {/* Chips */}
       <View style={styles.galleryActionRow}>
         <View style={styles.galleryChip}>
           <Ionicons name="logo-instagram" size={18} color="#fff" style={{ marginRight: 6 }} />
@@ -89,7 +87,6 @@ export function GalleryPage({
         </View>
       </View>
 
-      {/* Sub header */}
       <View style={styles.gallerySubHeaderRow}>
         <Text style={styles.subHeaderText}>Mới đây ▼</Text>
 
@@ -98,7 +95,6 @@ export function GalleryPage({
         </TouchableOpacity>
       </View>
 
-      {/* Grid scroll */}
       {loadingGallery ? (
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
           <Text style={{ color: '#888' }}>Đang tải thư viện...</Text>

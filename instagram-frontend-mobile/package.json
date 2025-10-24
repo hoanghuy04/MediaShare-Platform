@@ -20,6 +20,8 @@
     "axios": "^1.12.2",
     "babel-plugin-module-resolver": "^5.0.2",
     "expo": "~54.0.13",
+    "expo-av": "~16.0.7",
+    "expo-camera": "~17.0.8",
     "expo-constants": "^18.0.9",
     "expo-device": "^8.0.9",
     "expo-file-system": "^19.0.17",
@@ -28,6 +30,7 @@
     "expo-image-picker": "^17.0.8",
     "expo-linear-gradient": "^14.0.3",
     "expo-linking": "^8.0.8",
+    "expo-location": "~19.0.7",
     "expo-media-library": "~18.2.0",
     "expo-notifications": "^0.32.12",
     "expo-router": "^6.0.12",
@@ -41,9 +44,7 @@
     "react-native-screens": "~4.16.0",
     "react-native-web": "^0.21.0",
     "react-refresh": "^0.18.0",
-    "zustand": "^5.0.8",
-    "expo-camera": "~17.0.8",
-    "expo-av": "~16.0.7"
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

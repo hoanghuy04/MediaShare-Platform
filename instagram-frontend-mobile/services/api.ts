@@ -283,10 +283,19 @@ export const notificationAPI = {
 
 // Upload API
 export const uploadAPI = {
-  uploadFile: async (file: FormData, type: 'profile' | 'post'): Promise<string> => {
+  uploadFile: async (
+    file: FormData,
+    type: 'profile' | 'post',
+    userId?: string
+  ): Promise<string> => {
     let endpoint: string = API_ENDPOINTS.UPLOAD;
     if (type === 'profile') endpoint = API_ENDPOINTS.UPLOAD_PROFILE_IMAGE;
     if (type === 'post') endpoint = API_ENDPOINTS.UPLOAD_POST_MEDIA;
+
+    // Append userId to FormData if provided
+    if (userId) {
+      file.append('userId', userId);
+    }
 
     const response = await axiosInstance.post(endpoint, file, {
       headers: {

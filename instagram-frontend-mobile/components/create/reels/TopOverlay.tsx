@@ -9,7 +9,7 @@ type TopOverlayProps = {
   lastClipUri: string | null;
   onToggleFlash: () => void;
   onAvatarPress: () => void;
-  onClose?: () => void; // optional, bạn có thể truyền goBack screen cha
+  onClose?: () => void;
 };
 
 export function TopOverlay({
@@ -20,7 +20,6 @@ export function TopOverlay({
   onAvatarPress,
   onClose,
 }: TopOverlayProps) {
-  // Khi đang quay: chỉ hiện avatar góc phải để tránh rối
   if (recordState === 'recording') {
     return (
       <View style={styles.topRowRecordingOnlyRight}>
@@ -32,23 +31,19 @@ export function TopOverlay({
             source={lastClipUri ? { uri: lastClipUri } : { uri: 'https://placekitten.com/200/200' }}
             style={styles.avatarInner}
           />
-          {/* badge số tin/DM giả thôi */}
         </TouchableOpacity>
       </View>
     );
   }
 
-  // idle / postrecord
   return (
     <View style={styles.topRowWrapper}>
-      {/* nút đóng */}
       <View style={styles.topLeft}>
         <TouchableOpacity style={styles.roundBubbleDark} onPress={onClose}>
           <Ionicons name="close" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* cụm flash / tốc độ(1x) / hẹn giờ */}
       <View style={styles.topCenterGroup}>
         <TouchableOpacity onPress={onToggleFlash} style={styles.roundBubbleDark}>
           <Ionicons name={flash === 'on' ? 'flash' : 'flash-off'} size={20} color="#fff" />
@@ -63,7 +58,6 @@ export function TopOverlay({
         </View>
       </View>
 
-      {/* avatar góc phải */}
       <View style={styles.topRight}>
         <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={styles.avatarBubble}>
           <View style={styles.avatarBadge}>

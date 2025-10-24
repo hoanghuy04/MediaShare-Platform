@@ -30,11 +30,9 @@ export function BottomOverlay({
   onNext,
   onGoToGallery,
 }: BottomOverlayProps) {
-  // IDLE
   if (recordState === 'idle') {
     return (
       <View style={styles.bottomSectionIdle}>
-        {/* thumbnail left -> scroll xuống gallery */}
         <TouchableOpacity style={styles.galleryPreviewBtn} onPress={onGoToGallery}>
           {gallery[0] ? (
             <Image source={{ uri: gallery[0].uri }} style={styles.galleryPreviewThumb} />
@@ -53,7 +51,6 @@ export function BottomOverlay({
           <View style={styles.idleRecordInner} />
         </TouchableOpacity>
 
-        {/* flip cam */}
         <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
           <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
         </TouchableOpacity>
@@ -61,18 +58,15 @@ export function BottomOverlay({
     );
   }
 
-  // RECORDING
   if (recordState === 'recording') {
     return (
       <View style={styles.bottomSectionRecording}>
-        {/* nút stop: vòng xám + ô vuông trắng, không vệt tím */}
         <TouchableOpacity onPress={onRecordPress} activeOpacity={0.8}>
           <View style={styles.recordingBubble}>
             <View style={styles.stopSquare} />
           </View>
         </TouchableOpacity>
 
-        {/* flip cam bên phải */}
         <View style={styles.bottomRightFloating}>
           <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
             <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
@@ -82,30 +76,25 @@ export function BottomOverlay({
     );
   }
 
-  // POSTRECORD
   return (
     <>
       <View style={styles.bottomSectionPost}>
-        {/* hoàn tác */}
         <TouchableOpacity style={styles.undoPill} onPress={onUndo}>
           <Text style={styles.undoText}>Hoàn tác</Text>
         </TouchableOpacity>
 
-        {/* vòng trắng ở giữa - bấm để quay tiếp (không vệt tím) */}
         <TouchableOpacity onPress={onRecordPress}>
           <View style={styles.postRecordOuter}>
             <View style={styles.postRecordInner} />
           </View>
         </TouchableOpacity>
 
-        {/* tiếp -> */}
         <TouchableOpacity style={styles.nextPill} onPress={onNext}>
           <Text style={styles.nextText}>Tiếp</Text>
           <Ionicons name="chevron-forward" size={18} color="#000" />
         </TouchableOpacity>
       </View>
 
-      {/* thumbnail nhỏ góc trái -> kéo xuống gallery */}
       <View style={styles.bottomLeftFloating}>
         <TouchableOpacity style={styles.galleryPreviewSmall} onPress={onGoToGallery}>
           {lastClipUri || gallery[0] ? (
@@ -121,7 +110,6 @@ export function BottomOverlay({
         </TouchableOpacity>
       </View>
 
-      {/* flip cam góc phải */}
       <View style={styles.bottomRightFloating}>
         <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
           <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
@@ -132,7 +120,6 @@ export function BottomOverlay({
 }
 
 const styles = StyleSheet.create({
-  // IDLE
   bottomSectionIdle: {
     position: 'absolute',
     left: 0,
@@ -226,7 +213,6 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
 
-  // POSTRECORD
   bottomSectionPost: {
     position: 'absolute',
     left: 0,

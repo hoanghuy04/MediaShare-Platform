@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -17,9 +18,14 @@ const { width } = Dimensions.get('window');
 type TabType = 'post' | 'story' | 'reels';
 
 export const CreateTabbedFlow: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('reels');
+  const [activeTab, setActiveTab] = useState<TabType>('post');
 
-  // Render content based on active tab
+  // useFocusEffect(
+  //   React.useCallback(() => {
+  //     setActiveTab('post');
+  //   }, [])
+  // );
+
   const renderContent = () => {
     switch (activeTab) {
       case 'post':
@@ -41,18 +47,9 @@ export const CreateTabbedFlow: React.FC = () => {
     }
   };
 
-  // --- header trên cùng: IG thực tế không show header khi quay Reels,
-  // nên mình ẩn header nếu activeTab === 'reels' để không đè lên giao diện camera ---
-  const renderTopHeader = () => {
-    // Reels không có header vì ReelsCreationScreen tự có nút close
-    return null;
-  };
-
-  // --- thanh chọn tab dưới cùng ---
   const renderBottomTabs = () => {
     return (
       <View style={styles.bottomSegmentedControl}>
-        {/* BÀI VIẾT */}
         <TouchableOpacity
           style={[styles.bottomTab, activeTab === 'post' && styles.activeBottomTab]}
           onPress={() => setActiveTab('post')}
@@ -62,7 +59,6 @@ export const CreateTabbedFlow: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* TIN */}
         <TouchableOpacity
           style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
           onPress={() => setActiveTab('story')}
@@ -72,7 +68,6 @@ export const CreateTabbedFlow: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* THƯỚC PHIM */}
         <TouchableOpacity
           style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
           onPress={() => setActiveTab('reels')}
@@ -96,20 +91,17 @@ export const CreateTabbedFlow: React.FC = () => {
   );
 };
 
-// --- styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
 
-  // HEADER
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
 
-    // đẩy xuống một chút để tránh notch / statusbar trên iOS
     paddingTop: Platform.select({
       ios: 50,
       android: 20,
@@ -131,7 +123,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // CONTENT
   contentContainer: {
     flex: 1,
     backgroundColor: '#000',
@@ -150,7 +141,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // BOTTOM TABS
   bottomSegmentedControl: {
     position: 'absolute',
     bottom: 0,

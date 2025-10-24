@@ -23,7 +23,6 @@ import { GalleryPage } from './GalleryPage';
 import { Dimensions } from 'react-native';
 import { CameraPage } from '@/components/create/reels/CameraPage';
 
-// 👇 Dùng 'screen' thay vì 'window'
 const { height: FULL_HEIGHT, width: FULL_WIDTH } = Dimensions.get('screen');
 
 type GalleryAsset = {
@@ -62,13 +61,10 @@ export default function ReelsCreationScreen() {
 
   const [lastOffsetY, setLastOffsetY] = useState(0);
 
-  // đang ở camera page hay gallery page
   const [isOnCameraPage, setIsOnCameraPage] = useState(true);
 
-  // cho phép ScrollView cha cuộn hay không
   const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
 
-  // ===== permissions =====
   useEffect(() => {
     (async () => {
       if (!camPermission?.granted) await requestCamPermission();
@@ -79,7 +75,6 @@ export default function ReelsCreationScreen() {
     })();
   }, [camPermission, micPermission, requestCamPermission, requestMicPermission]);
 
-  // ===== load gallery =====
   useEffect(() => {
     if (!hasMediaPermission) return;
 
@@ -97,16 +92,17 @@ export default function ReelsCreationScreen() {
           mediaType: a.mediaType,
           duration: a.duration,
         }));
+
+        const videoCount = mapped.filter(a => a.mediaType === 'video').length;
+
         setGallery(mapped);
       } catch (err) {
-        console.log('Error loading gallery:', err);
       } finally {
         setLoadingGallery(false);
       }
     })();
   }, [hasMediaPermission]);
 
-  // ===== record =====
   const handleRecordPress = useCallback(async () => {
     const cam = cameraRef.current;
     if (!cam) return;
@@ -121,14 +117,11 @@ export default function ReelsCreationScreen() {
           setLastClipUri(videoData.uri);
           try {
             await MediaLibrary.saveToLibraryAsync(videoData.uri);
-          } catch (saveErr) {
-            console.log('Save gallery error:', saveErr);
-          }
+          } catch (saveErr) {}
         }
 
         setRecordState('postrecord');
       } catch (err) {
-        console.log('record error:', err);
         setRecordState('idle');
       }
     } else if (recordState === 'recording') {
@@ -159,7 +152,6 @@ export default function ReelsCreationScreen() {
     }
   }, [lastClipUri, openPreview]);
 
-  // ===== camera actions =====
   const toggleCameraType = useCallback(() => {
     setCameraType(prev => (prev === 'back' ? 'front' : 'back'));
   }, []);
@@ -168,12 +160,10 @@ export default function ReelsCreationScreen() {
     setFlash(prev => (prev === 'off' ? 'on' : 'off'));
   }, []);
 
-  // ===== ScrollView cha (vertical swipe) =====
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     setLastOffsetY(offsetY);
 
-    // page switch detect
     setIsOnCameraPage(offsetY < FULL_HEIGHT / 2);
   };
 
@@ -203,13 +193,12 @@ export default function ReelsCreationScreen() {
     }
   }, [lastOffsetY, parentScrollEnabled]);
 
-  // ===== chuyển trang =====
   const goToGallery = useCallback(() => {
     if (!scrollViewRef.current) return;
     isProgrammaticRef.current = true;
-    setParentScrollEnabled(false); // khoá parent khi đang trong gallery
+    setParentScrollEnabled(false);
     scrollViewRef.current.scrollTo({
-      y: FULL_HEIGHT, // 👈 dùng chiều cao screen full
+      y: FULL_HEIGHT,
       animated: true,
     });
     setLastOffsetY(FULL_HEIGHT);
@@ -218,7 +207,7 @@ export default function ReelsCreationScreen() {
   const goToCamera = useCallback(() => {
     if (!scrollViewRef.current) return;
     isProgrammaticRef.current = true;
-    setParentScrollEnabled(true); // mở lại scroll parent
+    setParentScrollEnabled(true);
     scrollViewRef.current.scrollTo({
       y: 0,
       animated: true,
@@ -226,7 +215,6 @@ export default function ReelsCreationScreen() {
     setLastOffsetY(0);
   }, []);
 
-  // ===== gallery inner scroll =====
   const handleGalleryBeginDrag = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     galleryDragStartYRef.current = e.nativeEvent.contentOffset.y;
     galleryScrollYRef.current = e.nativeEvent.contentOffset.y;
@@ -251,13 +239,11 @@ export default function ReelsCreationScreen() {
     const PULL_UP_THRESHOLD = -30;
     const isAtTop = end <= 10;
 
-    // kéo lên mạnh từ top => đóng gallery
     if (isAtTop && delta < PULL_UP_THRESHOLD) {
       goToCamera();
     }
   }, [goToCamera]);
 
-  // ===== permission fallback =====
   if (!camPermission || !micPermission) {
     return (
       <View style={styles.centerScreen}>
@@ -276,10 +262,8 @@ export default function ReelsCreationScreen() {
     );
   }
 
-  // ===== render =====
   return (
     <View style={styles.root}>
-      {/* Camera mode thường full-screen immersive nên để hidden */}
       <StatusBar hidden style="light" />
 
       <ScrollView
@@ -297,7 +281,6 @@ export default function ReelsCreationScreen() {
         onScrollEndDrag={trySnapCameraPage}
         onMomentumScrollEnd={trySnapCameraPage}
       >
-        {/* PAGE 1: CAMERA (cao đúng FULL_HEIGHT) */}
         <CameraPage
           height={FULL_HEIGHT}
           width={FULL_WIDTH}
@@ -318,7 +301,6 @@ export default function ReelsCreationScreen() {
           onGoToGallery={goToGallery}
         />
 
-        {/* PAGE 2: GALLERY (cũng cao đúng FULL_HEIGHT) */}
         <GalleryPage
           height={FULL_HEIGHT}
           gallery={gallery}

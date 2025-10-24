@@ -23,6 +23,11 @@ export default function ReelsPreviewPage() {
   };
 
   return (
-    <PreviewEditOverlay uri={params.mediaUri || ''} onClose={handleClose} onNext={handleNext} />
+    <PreviewEditOverlay
+      uri={params.mediaUri || ''}
+      mediaType={params.mediaType || 'photo'}
+      onClose={handleClose}
+      onNext={handleNext}
+    />
   );
 }

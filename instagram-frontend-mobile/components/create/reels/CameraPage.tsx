@@ -16,7 +16,7 @@ type GalleryAsset = {
 };
 
 type CameraPageProps = {
-  height: number; // dùng FULL_HEIGHT
+  height: number;
   width: number;
   cameraRef: React.RefObject<CameraView | null>;
   cameraType: CameraType;

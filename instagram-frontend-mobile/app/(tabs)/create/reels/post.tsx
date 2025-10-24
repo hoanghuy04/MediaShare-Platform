@@ -1,4 +1,4 @@
-import { ReelPostScreen } from '@/components/create/reels/ReelPostScreen';
+import { ReelPostScreen, type ReelPostData } from '@/components/create/reels/ReelPostScreen';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 export default function ReelsPostPage() {
@@ -12,11 +12,7 @@ export default function ReelsPostPage() {
     router.back();
   };
 
-  const handleShare = (caption: string, location?: string, tags?: string[]) => {
-    console.log('Share reel:', { caption, location, tags, uri: params.mediaUri });
-    // TODO: Implement actual share logic (upload to server)
-
-    // Navigate to profile after sharing
+  const handleShare = (data: ReelPostData) => {
     router.replace('/(tabs)/profile');
   };
 

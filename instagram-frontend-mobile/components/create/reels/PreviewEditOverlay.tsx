@@ -10,28 +10,32 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { Video, ResizeMode } from 'expo-av';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type PreviewEditOverlayProps = {
   uri: string;
+  mediaType?: 'photo' | 'video';
   onClose: () => void;
   onNext: () => void;
 };
 
-export const PreviewEditOverlay: React.FC<PreviewEditOverlayProps> = ({ uri, onClose, onNext }) => {
+export const PreviewEditOverlay: React.FC<PreviewEditOverlayProps> = ({
+  uri,
+  mediaType = 'photo',
+  onClose,
+  onNext,
+}) => {
   return (
     <View style={styles.overlayRoot}>
-      {/* ẩn status bar cả ở overlay */}
       <StatusBar hidden style="light" />
 
-      {/* TOP BAR */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.topBubble} onPress={onClose}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
 
-        {/* khối ở giữa: "Khám phá âm thanh" giống instagram */}
         <TouchableOpacity style={styles.soundInfo}>
           <Image source={{ uri: uri }} style={styles.soundAvatar} />
           <View style={{ flex: 1 }}>
@@ -50,20 +54,28 @@ export const PreviewEditOverlay: React.FC<PreviewEditOverlayProps> = ({ uri, onC
         </TouchableOpacity>
       </View>
 
-      {/* MEDIA PREVIEW */}
       <View style={styles.mediaArea}>
-        <Image source={{ uri }} style={styles.mediaImage} resizeMode="contain" />
+        {mediaType === 'video' ? (
+          <Video
+            source={{ uri }}
+            style={styles.mediaImage}
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay
+            isLooping
+            isMuted={false}
+            useNativeControls={false}
+          />
+        ) : (
+          <Image source={{ uri }} style={styles.mediaImage} resizeMode="contain" />
+        )}
       </View>
 
-      {/* TOOLBAR & ACTIONS AT BOTTOM */}
       <View style={styles.bottomSheet}>
-        {/* icon row scrollable ngang */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.iconRow}
         >
-          {/* mấy icon đại diện cho: âm thanh, text, sticker, filter,... */}
           <ActionIcon name="musical-notes-outline" label=" " />
           <ActionIcon name="text-outline" label=" " fallback="Aa" />
           <ActionIcon name="happy-outline" label=" " />
@@ -74,7 +86,6 @@ export const PreviewEditOverlay: React.FC<PreviewEditOverlayProps> = ({ uri, onC
           <ActionIcon name="add-outline" label=" " />
         </ScrollView>
 
-        {/* bottom row: "Chỉnh sửa video" + "Tiếp ->" */}
         <View style={styles.bottomRow}>
           <TouchableOpacity style={styles.editBtn}>
             <Text style={styles.editBtnText}>Chỉnh sửa video</Text>
@@ -120,7 +131,6 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
 
-  // TOP BAR
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -163,7 +173,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
 
-  // MEDIA PREVIEW
   mediaArea: {
     flex: 1,
     width: '100%',
@@ -176,7 +185,6 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  // BOTTOM SHEET PART
   bottomSheet: {
     backgroundColor: '#000',
     paddingBottom: 24,
@@ -226,7 +234,7 @@ const styles = StyleSheet.create({
   nextBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4a3bff', // tím xanh kiểu IG reels
+    backgroundColor: '#4a3bff',
     borderRadius: 28,
     paddingHorizontal: 16,
     paddingVertical: 12,

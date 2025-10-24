@@ -26,6 +26,8 @@ export interface Media {
 export interface CreatePostRequest {
   caption: string;
   media: Media[];
+  tags?: string[];
+  location?: string;
 }
 
 export interface UpdatePostRequest {
