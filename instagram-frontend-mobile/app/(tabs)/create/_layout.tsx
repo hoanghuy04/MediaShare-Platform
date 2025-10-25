@@ -9,6 +9,7 @@ export default function CreateLayout() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="posts/index" />
       <Stack.Screen name="reels/index" />
       <Stack.Screen name="reels/preview" />
       <Stack.Screen name="reels/post" />

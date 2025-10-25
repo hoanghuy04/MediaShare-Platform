@@ -12,13 +12,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import ReelsCreationScreen from './reels/ReelsCreationScreen';
+import PostCreationScreen from './posts/PostCreationScreen';
+
 
 const { width } = Dimensions.get('window');
 
 type TabType = 'post' | 'story' | 'reels';
 
-export const CreateTabbedFlow: React.FC = () => {
+interface CreateTabbedFlowProps {
+  onPostCreated?: () => void; // Callback để refresh feed
+}
+
+export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreated }) => {
   const [activeTab, setActiveTab] = useState<TabType>('post');
+  const [postStep, setPostStep] = useState(1);
 
   // useFocusEffect(
   //   React.useCallback(() => {
@@ -26,14 +33,18 @@ export const CreateTabbedFlow: React.FC = () => {
   //   }, [])
   // );
 
+  const handleTabPress = (tab: TabType) => {
+    setActiveTab(tab);
+  };
+
+  const handlePostStepChange = (step: number) => {
+    setPostStep(step);
+  };
+
   const renderContent = () => {
     switch (activeTab) {
-      case 'post':
-        return (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Post Creation Coming Soon...</Text>
-          </View>
-        );
+        case 'post':
+          return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} onPostCreated={onPostCreated} />;
       case 'story':
         return (
           <View style={styles.placeholder}>
@@ -43,7 +54,7 @@ export const CreateTabbedFlow: React.FC = () => {
       case 'reels':
         return <ReelsCreationScreen />;
       default:
-        return <ReelsCreationScreen />;
+        return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} />;
     }
   };
 
@@ -52,7 +63,7 @@ export const CreateTabbedFlow: React.FC = () => {
       <View style={styles.bottomSegmentedControl}>
         <TouchableOpacity
           style={[styles.bottomTab, activeTab === 'post' && styles.activeBottomTab]}
-          onPress={() => setActiveTab('post')}
+          onPress={() => handleTabPress('post')}
         >
           <Text style={[styles.bottomTabText, activeTab === 'post' && styles.activeBottomTabText]}>
             BÀI VIẾT
@@ -61,7 +72,7 @@ export const CreateTabbedFlow: React.FC = () => {
 
         <TouchableOpacity
           style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
-          onPress={() => setActiveTab('story')}
+          onPress={() => handleTabPress('story')}
         >
           <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
             TIN
@@ -70,7 +81,7 @@ export const CreateTabbedFlow: React.FC = () => {
 
         <TouchableOpacity
           style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
-          onPress={() => setActiveTab('reels')}
+          onPress={() => handleTabPress('reels')}
         >
           <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
             THƯỚC PHIM
@@ -86,7 +97,8 @@ export const CreateTabbedFlow: React.FC = () => {
 
       <View style={styles.contentContainer}>{renderContent()}</View>
 
-      {renderBottomTabs()}
+      {/* Ẩn tabbed flow khi ở step 2 và 3 của posts */}
+      {!(activeTab === 'post' && (postStep === 2 || postStep === 3)) && renderBottomTabs()}
     </View>
   );
 };

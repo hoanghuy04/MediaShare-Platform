@@ -49,7 +49,7 @@ export default function PostDetailScreen() {
 
   const handleSendComment = async (content: string) => {
     try {
-      const newComment = await commentAPI.createComment({ postId: id, content });
+      const newComment = await commentAPI.createComment({ postId: id, text: content });
       setComments([newComment, ...comments]);
     } catch (error: any) {
       showAlert('Error', error.message);
@@ -58,8 +58,48 @@ export default function PostDetailScreen() {
 
   const handleLikeComment = async (commentId: string) => {
     try {
-      await commentAPI.likeComment(id, commentId);
+      await commentAPI.likeComment(commentId);
       // TODO: Update comment in local state
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
+  const handleLikePost = async (postId: string) => {
+    try {
+      await postAPI.likePost(postId);
+      // Update post in local state
+      setPost(prev => prev ? {
+        ...prev,
+        isLikedByCurrentUser: !prev.isLikedByCurrentUser,
+        likesCount: prev.isLikedByCurrentUser ? prev.likesCount - 1 : prev.likesCount + 1
+      } : null);
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
+  const handleCommentPost = (postId: string) => {
+    // Already in comment screen, no need to navigate
+  };
+
+  const handleSharePost = (postId: string) => {
+    showAlert('Share', 'Share functionality coming soon');
+  };
+
+  const handleBookmarkPost = async (postId: string) => {
+    try {
+      // TODO: Implement bookmark API
+      showAlert('Saved', 'Post saved to your collection');
+    } catch (error: any) {
+      showAlert('Error', error.message);
+    }
+  };
+
+  const handleFollowUser = async (userId: string) => {
+    try {
+      // TODO: Implement follow API
+      showAlert('Success', 'You are now following this user');
     } catch (error: any) {
       showAlert('Error', error.message);
     }
@@ -67,7 +107,7 @@ export default function PostDetailScreen() {
 
   const handleDeleteComment = async (commentId: string) => {
     try {
-      await commentAPI.deleteComment(id, commentId);
+      await commentAPI.deleteComment(commentId);
       setComments(comments.filter(c => c.id !== commentId));
     } catch (error: any) {
       showAlert('Error', error.message);
@@ -90,7 +130,15 @@ export default function PostDetailScreen() {
     >
       <Header showBack title="Post" />
       <ScrollView>
-        <PostCard post={post} />
+        <PostCard 
+          post={post} 
+          onLike={handleLikePost}
+          onComment={handleCommentPost}
+          onShare={handleSharePost}
+          onBookmark={handleBookmarkPost}
+          onFollow={handleFollowUser}
+          disableNavigation={true}
+        />
         <CommentSection
           comments={comments}
           onLikeComment={handleLikeComment}

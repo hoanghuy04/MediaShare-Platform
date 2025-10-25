@@ -45,4 +45,11 @@ const styles = StyleSheet.create({
     fontSize: 25,
     color: 'white',
   },
+  createPostButton: {
+    marginLeft: 'auto',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#3897f0',
+    borderRadius: 20,
+  },
 });

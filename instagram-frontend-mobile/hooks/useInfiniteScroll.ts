@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { PaginatedResponse } from '@types';
 
 interface UseInfiniteScrollOptions<T> {
@@ -31,6 +31,18 @@ export const useInfiniteScroll = <T>({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // Use refs to store stable references
+  const fetchFuncRef = useRef(fetchFunc);
+  const limitRef = useRef(limit);
+  const onErrorRef = useRef(onError);
+
+  // Update refs when props change
+  useEffect(() => {
+    fetchFuncRef.current = fetchFunc;
+    limitRef.current = limit;
+    onErrorRef.current = onError;
+  }, [fetchFunc, limit, onError]);
+
   const loadData = useCallback(
     async (pageNum: number, isRefresh = false) => {
       if (pageNum === 0) {
@@ -41,7 +53,11 @@ export const useInfiniteScroll = <T>({
       setError(null);
 
       try {
-        const response = await fetchFunc(pageNum, limit);
+        console.log(`Fetching data for page ${pageNum}, limit ${limitRef.current}`);
+        const response = await fetchFuncRef.current(pageNum, limitRef.current);
+        console.log('API response:', response);
+        console.log('Response content:', response.content);
+        console.log('Response hasNext:', response.hasNext);
 
         if (isRefresh || pageNum === 0) {
           setData(response.content);
@@ -54,13 +70,13 @@ export const useInfiniteScroll = <T>({
       } catch (err) {
         const error = err as Error;
         setError(error);
-        onError?.(error);
+        onErrorRef.current?.(error);
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     },
-    [fetchFunc, limit, onError]
+    [] // Empty dependency array since we use refs
   );
 
   const loadMore = useCallback(async () => {
