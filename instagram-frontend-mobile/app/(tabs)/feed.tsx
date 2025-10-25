@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@hooks/useTheme';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
 import { FeedHeader } from '@components/feed/FeedHeader';
@@ -12,6 +12,7 @@ export default function FeedScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const hasInitialized = useRef(false);
 
   const {
     data: posts,
@@ -27,8 +28,21 @@ export default function FeedScreen() {
   });
 
   useEffect(() => {
-    refresh();
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      refresh();
+    }
   }, []);
+
+  // Refresh feed when screen comes into focus (e.g., after creating a post)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasInitialized.current) {
+        console.log('Feed screen focused, refreshing...');
+        refresh();
+      }
+    }, [refresh])
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

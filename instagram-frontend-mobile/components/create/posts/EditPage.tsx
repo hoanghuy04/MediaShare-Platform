@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.5; // Ảnh chiếm 50% screen height
@@ -37,6 +38,7 @@ export function EditPage({
 }: EditPageProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const router = useRouter();
 
   const selectedAssets = gallery.filter(asset => selectedMedia.includes(asset.id));
   const currentAsset = selectedAssets[currentIndex];

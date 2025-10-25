@@ -19,7 +19,11 @@ const { width } = Dimensions.get('window');
 
 type TabType = 'post' | 'story' | 'reels';
 
-export const CreateTabbedFlow: React.FC = () => {
+interface CreateTabbedFlowProps {
+  onPostCreated?: () => void; // Callback để refresh feed
+}
+
+export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreated }) => {
   const [activeTab, setActiveTab] = useState<TabType>('post');
   const [postStep, setPostStep] = useState(1);
 
@@ -39,8 +43,8 @@ export const CreateTabbedFlow: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'post':
-        return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} />;
+        case 'post':
+          return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} onPostCreated={onPostCreated} />;
       case 'story':
         return (
           <View style={styles.placeholder}>

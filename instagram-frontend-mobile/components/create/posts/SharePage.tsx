@@ -12,17 +12,21 @@ import {
   Switch,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { LocationSearchScreen } from '../reels/LocationSearchScreen';
 import { uploadAPI, postAPI } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { extractHashtags } from '@/utils/hashtag';
+import { CreatePostRequest, Media } from '@/types';
+import apiConfig from '@/config/apiConfig';
+import { isVideoFormatSupported } from '@/utils/videoUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4; // Tăng từ 25% lên 40% để dễ xem hơn
-const PREVIEW_HEIGHT = PREVIEW_WIDTH; // Square aspect ratio
+const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4; 
+const PREVIEW_HEIGHT = PREVIEW_WIDTH; 
 
 type GalleryAsset = {
   id: string;
@@ -56,10 +60,12 @@ type SharePageProps = {
   onBack: () => void;
   onShare: (data: PostData) => void;
   hideTabbedFlow?: boolean;
+  onPostCreated?: () => void; // Callback để refresh feed
 };
 
-export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedFlow = false }: SharePageProps) {
+export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedFlow = false, onPostCreated }: SharePageProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [caption, setCaption] = useState('');
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
@@ -75,14 +81,137 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
     setShowLocationSearch(false);
   };
 
+  const validateVideoFormat = (asset: GalleryAsset): boolean => {
+    if (asset.mediaType === 'video') {
+      return isVideoFormatSupported(asset.uri);
+    }
+    return true;
+  };
+
   const handleShare = async () => {
     if (isSharing) return;
 
     setIsSharing(true);
     try {
+      console.log('Starting share process...');
+      console.log('Selected assets:', selectedAssets);
+      console.log('Caption:', caption);
+      console.log('User:', user);
+
+      // Validate video formats before uploading
+      const unsupportedVideos = selectedAssets.filter(asset => !validateVideoFormat(asset));
+      if (unsupportedVideos.length > 0) {
+        Alert.alert(
+          'Video Format Not Supported',
+          'Some videos have unsupported formats and will be treated as images.',
+          [{ text: 'OK' }]
+        );
+      }
+
       const hashtags = extractHashtags(caption);
+      console.log('Extracted hashtags:', hashtags);
       
-      const postData: PostData = {
+      // Upload media files first
+      console.log('Starting media upload...');
+      const uploadedMedia = await Promise.all(
+        selectedAssets.map(async (asset, index) => {
+          console.log(`Uploading asset ${index + 1}:`, asset);
+          const formData = new FormData();
+          const filename = asset.uri.split('/').pop() || 'upload';
+          
+              // Determine file type and extension
+              let fileExtension = filename.split('.').pop()?.toLowerCase() || '';
+              let mimeType = '';
+              
+              // Check if video format is supported
+              const isVideoSupported = asset.mediaType === 'video' && isVideoFormatSupported(asset.uri);
+              
+              if (asset.mediaType === 'video' && isVideoSupported) {
+                if (['mp4', 'mov', 'avi', 'mkv', 'm4v'].includes(fileExtension)) {
+                  mimeType = `video/${fileExtension}`;
+                } else {
+                  mimeType = 'video/mp4';
+                  fileExtension = 'mp4';
+                }
+              } else {
+                // Treat as image if video format is not supported
+                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+                  mimeType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`;
+                } else {
+                  mimeType = 'image/jpeg';
+                  fileExtension = 'jpg';
+                }
+              }
+
+          console.log(`Asset ${index + 1} - MIME type:`, mimeType, 'Extension:', fileExtension);
+
+          formData.append('file', {
+            uri: asset.uri,
+            type: mimeType,
+            name: `upload.${fileExtension}`,
+          } as any);
+
+          // Check if this is a mock URL (picsum.photos)
+          if (asset.uri.includes('picsum.photos')) {
+            console.log(`Asset ${index + 1} is mock data, skipping upload`);
+            return {
+              url: asset.uri, // Use mock URL directly
+              type: asset.mediaType === 'video' ? 'VIDEO' : 'IMAGE',
+            } as Media;
+          }
+
+          const uploadResponse = await uploadAPI.uploadFile(formData, 'post', user?.id);
+          console.log(`Asset ${index + 1} uploaded successfully:`, uploadResponse);
+          console.log(`Asset ${index + 1} upload response type:`, typeof uploadResponse);
+          console.log(`Asset ${index + 1} upload response length:`, uploadResponse?.length);
+          
+          // Backend returns full URL, no need to modify
+          let mediaUrl = uploadResponse;
+          
+          // If it's a relative path (shouldn't happen with current backend), make it absolute
+          if (typeof mediaUrl === 'string' && !mediaUrl.startsWith('http')) {
+            mediaUrl = `${apiConfig.apiUrl}${mediaUrl}`;
+            console.log(`Asset ${index + 1} converted to absolute URL:`, mediaUrl);
+          }
+          
+          console.log(`Asset ${index + 1} final media URL:`, mediaUrl);
+          
+              return {
+                url: mediaUrl,
+                type: (asset.mediaType === 'video' && isVideoSupported) ? 'VIDEO' : 'IMAGE',
+              } as Media;
+        })
+      );
+
+      console.log('All media uploaded successfully:', uploadedMedia);
+
+      // Create post with uploaded media
+      const postData: CreatePostRequest = {
+        caption,
+        media: uploadedMedia,
+        tags: hashtags,
+        location: pickedLocation?.name,
+      };
+
+      console.log('Creating post with data:', postData);
+      const newPost = await postAPI.createPost(postData);
+      console.log('Post created successfully:', newPost);
+      
+      // Show success message
+      Alert.alert('Thành công', 'Bài viết đã được chia sẻ!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Trigger refresh feed
+            onPostCreated?.();
+            // Navigate to feed after successful post creation
+            router.push('/(tabs)/feed');
+          }
+        }
+      ]);
+      
+      // Call onShare callback to close the screen
+      await onShare({
         mediaUris: selectedAssets.map(asset => asset.uri),
         mediaType: selectedAssets[0]?.mediaType || 'photo',
         caption,
@@ -93,11 +222,13 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
           distance: pickedLocation.distance,
         } : undefined,
         aiTagEnabled,
-      };
-
-      await onShare(postData);
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể chia sẻ bài viết. Vui lòng thử lại.');
+      });
+      
+    } catch (error: any) {
+      console.error('Error sharing post:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      Alert.alert('Lỗi', `Không thể chia sẻ bài viết: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSharing(false);
     }
@@ -114,17 +245,23 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
   if (showLocationSearch) {
     return (
       <LocationSearchScreen
-        onLocationSelect={handleLocationSelect}
-        onBack={() => setShowLocationSearch(false)}
+        onSelectLocation={(loc) => {
+          setPickedLocation({
+            name: loc.name,
+            address: loc.address,
+            distance: loc.distance,
+          });
+          setShowLocationSearch(false);
+        }}
+        onClose={() => setShowLocationSearch(false)}
       />
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+      <StatusBar barStyle="dark-content" />
       
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={28} color="#000" />
@@ -134,7 +271,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Preview Section - Ở đầu như hình */}
+       
         {selectedAssets.length > 0 && (
           <View style={styles.previewSection}>
             <View style={styles.previewContainer}>
@@ -166,7 +303,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
           </View>
         )}
 
-        {/* Caption Input */}
         <View style={styles.captionSection}>
           <TextInput
             style={styles.captionInput}
@@ -179,9 +315,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
           />
         </View>
 
-        {/* Post Options */}
         <View style={styles.optionsSection}>
-          {/* Poll */}
           <TouchableOpacity style={styles.optionRow}>
             <View style={styles.optionLeft}>
               <Ionicons name="list" size={24} color="#000" />
@@ -190,7 +324,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
-          {/* Suggestions */}
           <TouchableOpacity style={styles.optionRow}>
             <View style={styles.optionLeft}>
               <Ionicons name="search" size={24} color="#000" />
@@ -199,7 +332,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
-          {/* Add Sound */}
           <View style={styles.optionRow}>
             <View style={styles.optionLeft}>
               <Ionicons name="musical-notes" size={24} color="#000" />
@@ -226,7 +358,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             </View>
           </View>
 
-          {/* Tag People */}
           <TouchableOpacity style={styles.optionRow}>
             <View style={styles.optionLeft}>
               <Ionicons name="person-add" size={24} color="#000" />
@@ -235,7 +366,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
-          {/* Add Location */}
           <TouchableOpacity 
             style={styles.optionRow}
             onPress={() => setShowLocationSearch(true)}

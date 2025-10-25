@@ -166,11 +166,17 @@ export const postAPI = {
   },
 
   likePost: async (postId: string): Promise<void> => {
-    await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId));
+    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId), null, {
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+    });
+    return response.data.data;
   },
 
   unlikePost: async (postId: string): Promise<void> => {
-    await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId));
+    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId), {
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+    });
+    return response.data.data;
   },
 };
 
@@ -207,11 +213,17 @@ export const commentAPI = {
   },
 
   likeComment: async (commentId: string): Promise<void> => {
-    await axiosInstance.post(API_ENDPOINTS.LIKE_COMMENT(commentId));
+    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_COMMENT(commentId), null, {
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+    });
+    return response.data.data;
   },
 
   unlikeComment: async (commentId: string): Promise<void> => {
-    await axiosInstance.delete(API_ENDPOINTS.UNLIKE_COMMENT(commentId));
+    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_COMMENT(commentId), {
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+    });
+    return response.data.data;
   },
 
   replyToComment: async (commentId: string, text: string): Promise<Comment> => {
