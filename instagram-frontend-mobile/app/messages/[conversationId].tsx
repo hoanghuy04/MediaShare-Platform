@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { 
-  View, 
-  FlatList, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
-  Platform, 
-  Text, 
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
   TouchableOpacity,
   Image,
   StatusBar,
-  SafeAreaView
+  SafeAreaView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,13 +30,26 @@ export default function ConversationScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { sendMessage: sendWebSocketMessage, sendReadReceipt, sendTyping, sendStopTyping, onMessage, onReadReceipt, onTyping, isConnected, connectionStatus, onConnectionStatusChange } = useWebSocket();
+  const {
+    sendMessage: sendWebSocketMessage,
+    sendReadReceipt,
+    sendTyping,
+    sendStopTyping,
+    onMessage,
+    onReadReceipt,
+    onTyping,
+    isConnected,
+    connectionStatus,
+    onConnectionStatusChange,
+  } = useWebSocket();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [localConnectionStatus, setLocalConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'reconnecting'>('disconnected');
+  const [localConnectionStatus, setLocalConnectionStatus] = useState<
+    'connected' | 'connecting' | 'disconnected' | 'reconnecting'
+  >('disconnected');
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
@@ -57,9 +70,10 @@ export default function ConversationScreen() {
     // Listen for incoming messages
     const handleWebSocketMessage = (message: any) => {
       console.log('Received WebSocket message:', message);
-      if (message.type === 'CHAT' && 
-          (message.senderId === conversationId || message.receiverId === conversationId)) {
-        
+      if (
+        message.type === 'CHAT' &&
+        (message.senderId === conversationId || message.receiverId === conversationId)
+      ) {
         // Convert WebSocket message to Message type
         const newMessage: Message = {
           id: message.id || '',
@@ -85,23 +99,25 @@ export default function ConversationScreen() {
           isRead: message.status === 'READ',
           createdAt: message.timestamp,
         };
-        
+
         setMessages(prev => {
           // Check if message already exists
           const exists = prev.some(msg => msg.id === message.id);
           if (exists) return prev;
-          
+
           // If it's a message from current user, replace optimistic message
           if (message.senderId === user?.id) {
-            return prev.map(msg => 
-              msg.id.startsWith('temp-') ? newMessage : msg
-            );
+            return prev.map(msg => (msg.id.startsWith('temp-') ? newMessage : msg));
           }
-          
+
           // Add new message from other user
           return [...prev, newMessage];
         });
-        
+
+        // Notify parent messages screen about new message for real-time updates
+        // This will trigger the WebSocket message handler in messages.tsx
+        console.log('New message received in conversation, should update messages screen');
+
         // Mark message as read if it's from the other user and not sent by current user
         if (message.senderId === conversationId && message.id && message.senderId !== user?.id) {
           sendReadReceipt(message.id, message.senderId);
@@ -112,10 +128,8 @@ export default function ConversationScreen() {
     // Listen for read receipts
     const handleReadReceipt = (messageId: string, senderId: string) => {
       if (senderId === conversationId) {
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === messageId ? { ...msg, isRead: true } : msg
-          )
+        setMessages(prev =>
+          prev.map(msg => (msg.id === messageId ? { ...msg, isRead: true } : msg))
         );
       }
     };
@@ -144,37 +158,32 @@ export default function ConversationScreen() {
     setShowDevelopmentModal(true);
   };
 
-
   const loadMessages = async () => {
     try {
       // conversationId is the other user's ID
       // Try to get messages, if no conversation exists, it will return empty
       const response = await messageAPI.getMessages(conversationId);
-      setMessages(response.content.reverse() || []); 
-      
-      // Mark all messages from other user as read
+      setMessages(response.content.reverse() || []);
+
+      // Mark all messages from other user as read via WebSocket
       if (response.content.length > 0) {
-        const unreadMessages = response.content.filter(msg => 
-          msg.sender.id !== user?.id && !msg.isRead
+        const unreadMessages = response.content.filter(
+          msg => msg.sender.id !== user?.id && !msg.isRead
         );
-        
+
         // Send read receipts for unread messages via WebSocket
         if (isConnected && unreadMessages.length > 0) {
+          console.log(`Sending read receipts for ${unreadMessages.length} unread messages`);
           unreadMessages.forEach(msg => {
             sendReadReceipt(msg.id, msg.sender.id);
           });
-        }
-        
-        // Also mark as read via API as fallback
-        if (unreadMessages.length > 0) {
-          try {
-            await messageAPI.markMessagesAsRead(conversationId);
-          } catch (error) {
-            console.log('API mark as read failed, using WebSocket only:', error);
-          }
+        } else if (unreadMessages.length > 0) {
+          console.log(
+            'WebSocket not connected, read receipts will be sent when connection is restored'
+          );
         }
       }
-      
+
       // If no messages exist, we need to get the other user's info
       if (response.content.length === 0) {
         // Load other user's profile info
@@ -184,7 +193,7 @@ export default function ConversationScreen() {
           setOtherUser({
             id: otherUserProfile.id,
             username: otherUserProfile.username,
-            profile: otherUserProfile.profile
+            profile: otherUserProfile.profile,
           });
         } catch (profileError) {
           console.error('Error loading user profile:', profileError);
@@ -192,9 +201,8 @@ export default function ConversationScreen() {
       } else {
         // Extract other user from messages
         const firstMessage = response.content[0];
-        const other = firstMessage.sender.id === user?.id 
-          ? firstMessage.receiver 
-          : firstMessage.sender;
+        const other =
+          firstMessage.sender.id === user?.id ? firstMessage.receiver : firstMessage.sender;
         setOtherUser(other);
       }
     } catch (error: any) {
@@ -247,12 +255,10 @@ export default function ConversationScreen() {
             receiverId: conversationId,
             content,
           });
-          
+
           // Replace optimistic message with real message
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === optimisticMessage.id ? newMessage : msg
-            )
+          setMessages(prev =>
+            prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
           );
         } catch (apiError) {
           // Remove optimistic message if API call fails
@@ -273,18 +279,17 @@ export default function ConversationScreen() {
     <SafeAreaView style={[styles.header, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
       <View style={styles.headerContent}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.userInfo}
-          onPress={() => router.push(`/messages/conversation-settings?conversationId=${conversationId}`)}
+          onPress={() =>
+            router.push(`/messages/conversation-settings?conversationId=${conversationId}`)
+          }
         >
-          <Image 
+          <Image
             source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/40' }}
             style={styles.avatar}
           />
@@ -297,15 +302,26 @@ export default function ConversationScreen() {
             </Text>
           </View>
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() =>
+              showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')
+            }
+          >
             <Ionicons name="person-add" size={20} color={theme.colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}
+          >
             <Ionicons name="call" size={20} color={theme.colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={() => showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')}
+          >
             <Ionicons name="videocam" size={20} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
@@ -315,7 +331,7 @@ export default function ConversationScreen() {
 
   const renderContactInfo = () => (
     <View style={styles.contactInfo}>
-      <Image 
+      <Image
         source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/100' }}
         style={styles.largeAvatar}
       />
@@ -336,9 +352,7 @@ export default function ConversationScreen() {
   const renderDateSeparator = () => (
     <View style={styles.dateSeparator}>
       <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
-      <Text style={[styles.dateText, { color: theme.colors.textSecondary }]}>
-        04 thg 9, 2024
-      </Text>
+      <Text style={[styles.dateText, { color: theme.colors.textSecondary }]}>04 thg 9, 2024</Text>
       <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
     </View>
   );
@@ -359,11 +373,11 @@ export default function ConversationScreen() {
       keyboardVerticalOffset={0}
     >
       {renderHeader()}
-      
+
       {messages.length === 0 && otherUser && renderContactInfo()}
-      
+
       {messages.length > 0 && renderDateSeparator()}
-      
+
       <FlatList
         data={messages}
         renderItem={renderMessage}
@@ -372,8 +386,8 @@ export default function ConversationScreen() {
         inverted={false}
         ListHeaderComponent={
           connectionStatus !== 'connected' ? (
-            <ConnectionStatus 
-              status={connectionStatus} 
+            <ConnectionStatus
+              status={connectionStatus}
               onRetry={() => {
                 console.log('Retrying connection...');
               }}
@@ -382,14 +396,11 @@ export default function ConversationScreen() {
         }
         ListFooterComponent={
           typingUsers.length > 0 ? (
-            <TypingIndicator 
-              isVisible={typingUsers.length > 0}
-              multipleUsers={typingUsers}
-            />
+            <TypingIndicator isVisible={typingUsers.length > 0} multipleUsers={typingUsers} />
           ) : null
         }
       />
-      <MessageInput 
+      <MessageInput
         onSend={handleSendMessage}
         onTyping={() => sendTyping(conversationId)}
         onStopTyping={() => sendStopTyping(conversationId)}

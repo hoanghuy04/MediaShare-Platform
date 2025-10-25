@@ -23,23 +23,22 @@ import { showAlert } from '../utils/helpers';
 import { Avatar } from '../components/common/Avatar';
 import { UserProfile, Conversation } from '../types';
 
-type MessageTab = 'messages' | 'pending';
-
 export default function MessagesScreen() {
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
   const { onMessage, onTyping, onReadReceipt } = useWebSocket();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<MessageTab>('messages');
+  const [activeTab, setActiveTab] = useState<'messages'>('messages');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [suggestedAccounts, setSuggestedAccounts] = useState<UserProfile[]>([]);
   const [followingUsers, setFollowingUsers] = useState<UserProfile[]>([]);
-  const [nonFollowingUsers, setNonFollowingUsers] = useState<UserProfile[]>([]);
-  const [lastMessages, setLastMessages] = useState<{[userId: string]: string}>({});
-  const [lastMessageTimestamps, setLastMessageTimestamps] = useState<{[userId: string]: string}>({});
-  const [unreadMessages, setUnreadMessages] = useState<{[userId: string]: boolean}>({});
-  const [typingUsers, setTypingUsers] = useState<{[userId: string]: boolean}>({});
-  const typingTimeouts = useRef<{[userId: string]: number}>({});
+  const [lastMessages, setLastMessages] = useState<{ [userId: string]: string }>({});
+  const [lastMessageTimestamps, setLastMessageTimestamps] = useState<{ [userId: string]: string }>(
+    {}
+  );
+  const [unreadMessages, setUnreadMessages] = useState<{ [userId: string]: boolean }>({});
+  const [typingUsers, setTypingUsers] = useState<{ [userId: string]: boolean }>({});
+  const typingTimeouts = useRef<{ [userId: string]: number }>({});
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     data: conversations,
@@ -59,40 +58,69 @@ export default function MessagesScreen() {
   useEffect(() => {
     const handleWebSocketMessage = (message: any) => {
       console.log('Messages screen received WebSocket message:', message);
-      
+      console.log('Current user ID:', currentUser?.id);
+      console.log('Message sender ID:', message.senderId);
+      console.log('Message receiver ID:', message.receiverId);
+
       if (message.type === 'CHAT') {
         // Update last message for the conversation
         const senderId = message.senderId;
         const receiverId = message.receiverId;
         const otherUserId = senderId === currentUser?.id ? receiverId : senderId;
-        
+
         console.log('Updating last message for user:', otherUserId, 'content:', message.content);
-        
+        console.log('Is message from current user?', senderId === currentUser?.id);
+
         setLastMessages(prev => ({
           ...prev,
-          [otherUserId]: message.content || ''
+          [otherUserId]: message.content || '',
         }));
-        
+
         // Update timestamp for sorting
         setLastMessageTimestamps(prev => ({
           ...prev,
-          [otherUserId]: message.timestamp || new Date().toISOString()
+          [otherUserId]: message.timestamp || new Date().toISOString(),
         }));
-        
+
         // Update unread status - mark as unread if message is from other user
         const isFromOtherUser = senderId !== currentUser?.id;
         setUnreadMessages(prev => ({
           ...prev,
-          [otherUserId]: isFromOtherUser
+          [otherUserId]: isFromOtherUser,
         }));
-        
+
+        // Force UI update for both sender and receiver
+        console.log('Message processed - updating UI for user:', otherUserId);
+
+        // Always refresh conversations to ensure latest data is displayed
+        // This ensures that messages sent by current user are immediately visible
+        if (senderId === currentUser?.id) {
+          console.log('Message sent by current user, refreshing conversations...');
+          // Clear existing timeout to avoid multiple refresh calls
+          if (refreshTimeoutRef.current) {
+            clearTimeout(refreshTimeoutRef.current);
+          }
+          // Use setTimeout to avoid infinite loop and debounce refresh calls
+          refreshTimeoutRef.current = setTimeout(() => {
+            try {
+              refresh();
+            } catch (error) {
+              console.log('Refresh error (likely due to infinite loop prevention):', error);
+            }
+          }, 500);
+        }
+
         // If conversation was deleted and we received a new message, refresh to show restored conversation
         // Backend automatically restores deleted conversations when new messages arrive
         if (isFromOtherUser) {
           // Check if this conversation was previously deleted (not in current conversations list)
-          const conversationExists = conversations?.some((conv: any) => conv.conversationId === otherUserId);
+          const conversationExists = conversations?.some(
+            (conv: any) => conv.conversationId === otherUserId
+          );
           if (!conversationExists) {
-            console.log('Conversation was deleted and received new message, refreshing to show restored conversation');
+            console.log(
+              'Conversation was deleted and received new message, refreshing to show restored conversation'
+            );
             refresh(); // Reload conversations to show the restored conversation
           }
         }
@@ -101,25 +129,25 @@ export default function MessagesScreen() {
 
     const handleTyping = (isTyping: boolean, userId: string) => {
       console.log('Messages screen received typing indicator:', { isTyping, userId });
-      
+
       // Clear existing timeout for this user
       if (typingTimeouts.current[userId]) {
         clearTimeout(typingTimeouts.current[userId]);
         delete typingTimeouts.current[userId];
       }
-      
+
       if (isTyping) {
         // Set typing indicator
         setTypingUsers(prev => ({
           ...prev,
-          [userId]: true
+          [userId]: true,
         }));
-        
+
         // Auto-clear typing indicator after 3 seconds
         typingTimeouts.current[userId] = setTimeout(() => {
           setTypingUsers(prev => ({
             ...prev,
-            [userId]: false
+            [userId]: false,
           }));
           delete typingTimeouts.current[userId];
         }, 3000);
@@ -127,7 +155,7 @@ export default function MessagesScreen() {
         // Clear typing indicator immediately
         setTypingUsers(prev => ({
           ...prev,
-          [userId]: false
+          [userId]: false,
         }));
       }
     };
@@ -137,14 +165,14 @@ export default function MessagesScreen() {
       // Update unread status when message is read
       setUnreadMessages(prev => ({
         ...prev,
-        [senderId]: false
+        [senderId]: false,
       }));
     };
 
     onMessage(handleWebSocketMessage);
     onTyping(handleTyping);
     onReadReceipt(handleReadReceipt);
-    
+
     // Cleanup function
     return () => {
       // Clear all typing timeouts
@@ -152,59 +180,32 @@ export default function MessagesScreen() {
         clearTimeout(timeout);
       });
       typingTimeouts.current = {};
+
+      // Clear refresh timeout
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
     };
   }, [currentUser?.id, onMessage, onTyping, onReadReceipt]);
 
   // Refresh data when screen comes into focus (e.g., returning from conversation)
   useFocusEffect(
     React.useCallback(() => {
-      // Refresh last messages when returning from conversation to update read status
-      if (followingUsers.length > 0) {
-        loadLastMessagesForUsers(followingUsers);
-      }
-    }, [followingUsers])
+      console.log('Messages screen focused, refreshing data...');
+      // Only refresh conversations to get latest data
+      // Avoid calling loadLastMessagesForUsers to prevent infinite loop
+      setTimeout(() => {
+        refresh();
+      }, 100);
+    }, []) // Remove all dependencies to prevent infinite loop
   );
-
-  // Auto switch to messages tab when user is moved from pending to following
-  // Only switch if we just moved a user from pending to following
-  useEffect(() => {
-    // This effect will be handled in handleMessagePress and handleFollowUser instead
-    // to avoid interfering with manual tab switching
-  }, []);
 
   const loadData = async () => {
     try {
-      await Promise.all([
-        refresh(),
-        loadSuggestedAccounts(),
-        loadFollowingUsers(),
-        loadNonFollowingUsers(),
-        loadLastMessages(),
-      ]);
+      await Promise.all([refresh(), loadFollowingUsers(), loadLastMessages()]);
     } catch (error) {
       console.error('Error loading data:', error);
-    }
-  };
-
-  const loadSuggestedAccounts = async (currentFollowingUsers?: UserProfile[]) => {
-    try {
-      // Get more users to filter from
-      const response = await userAPI.searchUsers('', 0, 20);
-      const allUsers = response.content || [];
-      
-      // Use provided following users or current state
-      const following = currentFollowingUsers || followingUsers;
-      
-      // Filter out current user and users already being followed
-      const suggested = allUsers.filter(user => 
-        user.id !== currentUser?.id && 
-        !following.some(followingUser => followingUser.id === user.id)
-      );
-      
-      // Take first 5 suggestions
-      setSuggestedAccounts(suggested.slice(0, 5));
-    } catch (error) {
-      console.error('Error loading suggested accounts:', error);
     }
   };
 
@@ -217,39 +218,20 @@ export default function MessagesScreen() {
         if (following && following.length > 0) {
           await loadLastMessagesForUsers(following);
         }
-        // Reload suggested accounts with current following users
-        await loadSuggestedAccounts(following || []);
       }
     } catch (error) {
       console.error('Error loading following users:', error);
     }
   };
 
-  const loadNonFollowingUsers = async () => {
-    try {
-      if (currentUser?.id) {
-        // Get users that current user is not following
-        const response = await userAPI.searchUsers('', 0, 20);
-        const allUsers = response.content || [];
-        const nonFollowing = allUsers.filter(user => 
-          user.id !== currentUser.id && 
-          !followingUsers.some(following => following.id === user.id)
-        );
-        setNonFollowingUsers(nonFollowing.slice(0, 10));
-      }
-    } catch (error) {
-      console.error('Error loading non-following users:', error);
-    }
-  };
-
   const loadLastMessagesForUsers = async (users: UserProfile[]) => {
     try {
       if (!currentUser?.id) return;
-      
-      const lastMessagesMap: {[userId: string]: string} = {};
-      const lastTimestampsMap: {[userId: string]: string} = {};
-      const unreadMap: {[userId: string]: boolean} = {};
-      
+
+      const lastMessagesMap: { [userId: string]: string } = {};
+      const lastTimestampsMap: { [userId: string]: string } = {};
+      const unreadMap: { [userId: string]: boolean } = {};
+
       // Load last messages for provided users
       for (const user of users) {
         try {
@@ -258,7 +240,7 @@ export default function MessagesScreen() {
             const lastMessage = response.content[0];
             lastMessagesMap[user.id] = lastMessage.content;
             lastTimestampsMap[user.id] = lastMessage.createdAt;
-            
+
             // Check if the last message is from the other user and not read by current user
             const isUnread = lastMessage.sender.id !== currentUser.id && !lastMessage.isRead;
             unreadMap[user.id] = isUnread;
@@ -268,7 +250,7 @@ export default function MessagesScreen() {
           console.log(`No messages with user ${user.id}`);
         }
       }
-      
+
       setLastMessages(lastMessagesMap);
       setLastMessageTimestamps(lastTimestampsMap);
       setUnreadMessages(unreadMap);
@@ -285,18 +267,7 @@ export default function MessagesScreen() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Refresh data based on active tab
-      if (activeTab === 'messages') {
-        await Promise.all([
-          loadFollowingUsers(),
-          loadLastMessagesForUsers(followingUsers),
-        ]);
-      } else {
-        await Promise.all([
-          loadNonFollowingUsers(),
-          loadSuggestedAccounts(),
-        ]);
-      }
+      await Promise.all([loadFollowingUsers(), loadLastMessagesForUsers(followingUsers)]);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -304,157 +275,36 @@ export default function MessagesScreen() {
     }
   };
 
-  const handleMessagePress = (userId: string) => {
+  const handleMessagePress = async (userId: string) => {
     // Mark messages as read when entering conversation
     setUnreadMessages(prev => ({
       ...prev,
-      [userId]: false
+      [userId]: false,
     }));
-    
-    // Check if user is in nonFollowingUsers (pending tab)
-    const isNonFollowing = nonFollowingUsers.some(user => user.id === userId);
-    
-    if (isNonFollowing) {
-      // Move user from nonFollowingUsers to followingUsers when starting conversation
-      const userToMove = nonFollowingUsers.find(user => user.id === userId);
-      if (userToMove) {
-        setFollowingUsers(prev => {
-          // Check if user already exists to avoid duplicates
-          const exists = prev.some(user => user.id === userId);
-          return exists ? prev : [...prev, userToMove];
-        });
-        setNonFollowingUsers(prev => prev.filter(user => user.id !== userId));
-        
-        // Remove from suggested accounts if exists
-        setSuggestedAccounts(prev => prev.filter(user => user.id !== userId));
-        
-        // Switch to messages tab since we moved a user from pending to following
-        setActiveTab('messages');
-      }
-    }
-    
+
     // Navigate directly to conversation using the other user's ID as conversationId
+    // The conversation screen will handle marking messages as read via WebSocket
     router.push(`/messages/${userId}`);
   };
 
   const handleLongPress = (conversation: UserProfile | Conversation) => {
-    const isConversation = 'conversationId' in conversation;
-    const conversationId = isConversation ? conversation.conversationId : conversation.id;
-    const username = isConversation ? conversation.otherUser.username : conversation.username;
-    const isPinned = isConversation ? conversation.isPinned : false;
-    
-    const options = [];
-    
-    if (isPinned) {
-      options.push({
-        text: 'Unpin Conversation',
-        onPress: () => handleUnpinConversation(conversationId),
-      });
-    } else {
-      options.push({
-        text: 'Pin Conversation',
-        onPress: () => handlePinConversation(conversationId),
-      });
-    }
-    
-    options.push({
-      text: 'Delete Conversation',
-      style: 'destructive' as const,
-      onPress: () => handleDeleteConversation(conversationId),
-    });
-    
-    options.push({
-      text: 'Cancel',
-      style: 'cancel' as const,
-    });
-    
-    Alert.alert(
-      'Conversation Options',
-      `Options for ${username}`,
-      options,
-      { cancelable: true }
-    );
-  };
-
-  const handlePinConversation = async (conversationId: string) => {
-    try {
-      if (!currentUser?.id) {
-        showAlert('Error', 'User not authenticated');
-        return;
-      }
-      await messageAPI.pinConversation(conversationId, currentUser.id);
-      await refresh(); // Reload danh sách
-      showAlert('Success', 'Conversation pinned');
-    } catch (error: any) {
-      showAlert('Error', error.message);
-    }
-  };
-
-  const handleUnpinConversation = async (conversationId: string) => {
-    try {
-      if (!currentUser?.id) {
-        showAlert('Error', 'User not authenticated');
-        return;
-      }
-      await messageAPI.unpinConversation(conversationId, currentUser.id);
-      await refresh(); // Reload danh sách
-      showAlert('Success', 'Conversation unpinned');
-    } catch (error: any) {
-      showAlert('Error', error.message);
-    }
-  };
-
-  const handleDeleteConversation = async (conversationId: string) => {
-    Alert.alert(
-      'Delete Conversation',
-      'This will hide the conversation. It will reappear if you receive a new message.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (!currentUser?.id) {
-                showAlert('Error', 'User not authenticated');
-                return;
-              }
-              await messageAPI.deleteConversation(conversationId, currentUser.id);
-              await refresh();
-              showAlert('Success', 'Conversation deleted');
-            } catch (error: any) {
-              showAlert('Error', error.message);
-            }
-          }
-        }
-      ]
-    );
+    // Long press functionality removed - no more pin/delete options
+    console.log('Long press on conversation:', conversation);
   };
 
   const handleFollowUser = async (userId: string) => {
     try {
       await userAPI.followUser(userId);
-      
-      // Move user from nonFollowingUsers to followingUsers
-      const userToMove = nonFollowingUsers.find(user => user.id === userId);
-      if (userToMove) {
-        const updatedFollowingUsers = [...followingUsers, userToMove];
-        setFollowingUsers(updatedFollowingUsers);
-        setNonFollowingUsers(prev => prev.filter(user => user.id !== userId));
-        
-        // Remove from suggested accounts if exists
-        setSuggestedAccounts(prev => prev.filter(user => user.id !== userId));
-        
-        // Reload suggested accounts with updated following list
-        await loadSuggestedAccounts(updatedFollowingUsers);
-        
-        // Switch to messages tab since we moved a user from pending to following
-        setActiveTab('messages');
-      }
-      
-      // Load last message for the newly followed user
-      if (userToMove) {
-        await loadLastMessagesForUsers([userToMove]);
+
+      // Load the newly followed user
+      if (currentUser?.id) {
+        const updatedFollowing = await userAPI.getFollowing(currentUser.id, 0, 50);
+        setFollowingUsers(updatedFollowing || []);
+
+        // Load last messages for the updated following list
+        if (updatedFollowing && updatedFollowing.length > 0) {
+          await loadLastMessagesForUsers(updatedFollowing);
+        }
       }
     } catch (error) {
       console.error('Error following user:', error);
@@ -486,7 +336,11 @@ export default function MessagesScreen() {
         <View style={styles.aiIcon}>
           <Ionicons name="sparkles" size={16} color="white" />
         </View>
-        <TextInput placeholderTextColor={theme.colors.textSecondary} style={styles.searchPlaceholder} placeholder="Hỏi AI hoặc tìm kiếm" />
+        <TextInput
+          placeholderTextColor={theme.colors.textSecondary}
+          style={styles.searchPlaceholder}
+          placeholder="Hỏi AI hoặc tìm kiếm"
+        />
       </View>
     </View>
   );
@@ -496,10 +350,10 @@ export default function MessagesScreen() {
       <View style={styles.notesContent}>
         {/* Speech bubble with "Chia sẻ ghi chú" */}
         <View style={styles.speechBubble}>
-          <Text style={[styles.speechBubbleText, { color: theme.colors.text }]}>Chia sẻ ghi chú</Text>
+          <Text style={[styles.speechBubbleText, { color: theme.colors.text }]}>Ghi chú</Text>
           <View style={styles.speechBubblePointer} />
         </View>
-        
+
         {/* Main note bubble */}
         <View style={styles.noteBubble}>
           <View style={styles.noteEmoji}>
@@ -507,71 +361,41 @@ export default function MessagesScreen() {
           </View>
           <View style={styles.notePointer} />
         </View>
-        
+
         {/* "Ghi chú của bạn" text */}
-        <Text style={[styles.noteSubtext, { color: theme.colors.textSecondary }]}>Ghi chú của bạn</Text>
+        <Text style={[styles.noteSubtext, { color: theme.colors.textSecondary }]}>
+          Ghi chú của bạn
+        </Text>
       </View>
     </View>
   );
 
   const renderTabs = () => (
-    <View style={styles.tabContainer}>
-      <TouchableOpacity
-        style={[styles.tab, activeTab === 'messages' && styles.activeTab]}
-        onPress={() => setActiveTab('messages')}
-      >
-        <Text style={[styles.tabText, activeTab === 'messages' && styles.activeTabText]}>
-          Tin nhắn
-        </Text>
-        {activeTab === 'messages' && <View style={styles.tabIndicator} />}
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
-        onPress={() => setActiveTab('pending')}
-      >
-        <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>
-          Tin nhắn đang chờ
-        </Text>
-        {activeTab === 'pending' && <View style={styles.tabIndicator} />}
+    <View style={styles.tabHeaderContainer}>
+      {/* Text "Tin nhắn" bên trái */}
+      <Text style={styles.headerTitle}>Tin nhắn </Text>
+
+      {/* Nút "Tin nhắn đang chờ" bên phải */}
+      <TouchableOpacity onPress={() => router.push('/messages/pending-messages')}>
+        <Text style={styles.pendingText}>Tin nhắn đang chờ</Text>
       </TouchableOpacity>
     </View>
   );
-
-  // Sort users by last message timestamp (newest first)
-  const getSortedUsers = (users: UserProfile[]) => {
-    return [...users].sort((a, b) => {
-      const timestampA = lastMessageTimestamps[a.id];
-      const timestampB = lastMessageTimestamps[b.id];
-      
-      // If both have timestamps, sort by newest first
-      if (timestampA && timestampB) {
-        return new Date(timestampB).getTime() - new Date(timestampA).getTime();
-      }
-      
-      // If only one has timestamp, prioritize it
-      if (timestampA && !timestampB) return -1;
-      if (!timestampA && timestampB) return 1;
-      
-      // If neither has timestamp, maintain original order
-      return 0;
-    });
-  };
 
   const renderConversationItem = ({ item }: { item: Conversation }) => {
     const lastMessage = item.lastMessage;
     const otherUser = item.otherUser;
     const isUnread = (item.unreadCount || 0) > 0;
-    const isPinned = item.isPinned || false;
-    
+
     // Show typing indicator if user is typing
     const displayText = lastMessage?.content || 'Chưa có tin nhắn';
-    
+
     // Format timestamp for display
     const formatTime = (timestamp: string) => {
       const date = new Date(timestamp);
       const now = new Date();
       const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-      
+
       if (diffInHours < 24) {
         return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
       } else if (diffInHours < 24 * 7) {
@@ -580,9 +404,9 @@ export default function MessagesScreen() {
         return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
       }
     };
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.messageItem}
         onPress={() => handleMessagePress(otherUser.id)}
         onLongPress={() => handleLongPress(otherUser)}
@@ -591,24 +415,17 @@ export default function MessagesScreen() {
         <View style={styles.messageContent}>
           <View style={styles.messageHeader}>
             <View style={styles.messageHeaderLeft}>
-              <Text style={[
-                styles.messageUsername, 
-                { 
-                  color: theme.colors.text,
-                  fontWeight: isUnread ? '700' : '600',
-                }
-              ]}>
+              <Text
+                style={[
+                  styles.messageUsername,
+                  {
+                    color: theme.colors.text,
+                    fontWeight: isUnread ? '700' : '600',
+                  },
+                ]}
+              >
                 {otherUser.username}
               </Text>
-              {/* Add pin icon if conversation is pinned */}
-              {isPinned && (
-                <Ionicons 
-                  name="pin" 
-                  size={12} 
-                  color={theme.colors.primary} 
-                  style={styles.pinIcon}
-                />
-              )}
             </View>
             {lastMessage?.createdAt && (
               <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
@@ -616,151 +433,42 @@ export default function MessagesScreen() {
               </Text>
             )}
           </View>
-          <Text style={[
-            styles.messageText, 
-            { 
-              fontWeight: isUnread ? '600' : '400',
-              color: isUnread ? theme.colors.text : theme.colors.textSecondary,
-            }
-          ]}>
+          <Text
+            style={[
+              styles.messageText,
+              {
+                fontWeight: isUnread ? '600' : '400',
+                color: isUnread ? theme.colors.text : theme.colors.textSecondary,
+              },
+            ]}
+          >
             {displayText}
           </Text>
         </View>
         {isUnread && (
-          <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
-            <Text style={styles.unreadText}>{item.unreadCount}</Text>
+          <View style={styles.unreadContainer}>
+            <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+              <Text style={styles.unreadText}>{item.unreadCount}</Text>
+            </View>
           </View>
         )}
       </TouchableOpacity>
     );
   };
 
-  const renderMessageItem = ({ item }: { item: UserProfile }) => {
-    const lastMessage = lastMessages[item.id];
-    const lastTimestamp = lastMessageTimestamps[item.id];
-    const isUnread = unreadMessages[item.id] || false;
-    const isTyping = typingUsers[item.id] || false;
-    
-    // Show typing indicator if user is typing
-    const displayText = isTyping ? 'Đang nhập...' : (lastMessage || 'Chưa có tin nhắn');
-    
-    // Format timestamp for display
-    const formatTime = (timestamp: string) => {
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-      
-      if (diffInHours < 24) {
-        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-      } else if (diffInHours < 24 * 7) {
-        return date.toLocaleDateString('vi-VN', { weekday: 'short' });
-      } else {
-        return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-      }
-    };
-    
-    return (
-      <TouchableOpacity 
-        style={styles.messageItem}
-        onPress={() => handleMessagePress(item.id)}
-        onLongPress={() => handleLongPress(item)}
-      >
-        <Avatar uri={item.profile?.avatar} name={item.username} size={50} />
-        <View style={styles.messageContent}>
-          <View style={styles.messageHeader}>
-            <View style={styles.messageHeaderLeft}>
-              <Text style={[
-                styles.messageUsername, 
-                { 
-                  color: theme.colors.text,
-                  fontWeight: isUnread ? '700' : '600',
-                }
-              ]}>
-                {item.username}
-              </Text>
-              {/* Pin icon not available for UserProfile items */}
-            </View>
-            {lastTimestamp && (
-              <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
-                {formatTime(lastTimestamp)}
-              </Text>
-            )}
-          </View>
-          <Text style={[
-            styles.messageText, 
-            { 
-              fontWeight: isUnread ? '600' : '400',
-              color: isTyping ? theme.colors.primary : (isUnread ? theme.colors.text : theme.colors.textSecondary),
-              fontStyle: isTyping ? 'italic' : 'normal',
-            }
-          ]}>
-            {displayText}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.cameraButton}>
-          <Ionicons name="camera-outline" size={20} color={theme.colors.text} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderSuggestedAccounts = () => (
-    <View style={styles.suggestedSection}>
-      <View style={styles.suggestedHeader}>
-        <Text style={[styles.suggestedTitle, { color: theme.colors.text }]}>Tài khoản nên theo dõi</Text>
-        <TouchableOpacity>
-          <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>Xem tất cả</Text>
-        </TouchableOpacity>
-      </View>
-      {suggestedAccounts.map((account, index) => (
-        <View key={`suggested-${account.id}-${index}`} style={styles.suggestedItem}>
-          <Avatar uri={account.profile?.avatar} name={account.username} size={40} />
-          <View style={styles.suggestedInfo}>
-            <Text style={[styles.suggestedUsername, { color: theme.colors.text }]}>{account.username}</Text>
-            <Text style={[styles.suggestedFullName, { color: theme.colors.textSecondary }]}>
-              {account.profile?.firstName && account.profile?.lastName 
-                ? `${account.profile.firstName} ${account.profile.lastName}`
-                : account.username
-              }
-            </Text>
-          </View>
-          <View style={styles.suggestedActions}>
-            <TouchableOpacity 
-              style={styles.followButton}
-              onPress={() => handleFollowUser(account.id)}
-            >
-              <Text style={styles.followButtonText}>Theo dõi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.dismissButton}>
-              <Ionicons name="close" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       <SafeAreaView style={styles.safeArea}>
         {renderHeader()}
-        
+
         <FlatList
-          data={activeTab === 'messages' ? (conversations || []) : getSortedUsers(nonFollowingUsers)}
+          data={conversations || []}
           renderItem={({ item, index }) => {
-            if (activeTab === 'messages') {
-              return renderConversationItem({ item: item as Conversation });
-            } else {
-              return renderMessageItem({ item: item as UserProfile });
-            }
+            return renderConversationItem({ item: item as Conversation });
           }}
           keyExtractor={(item, index) => {
-            if (activeTab === 'messages') {
-              return `${activeTab}-${(item as Conversation).conversationId}-${index}`;
-            } else {
-              return `${activeTab}-${(item as UserProfile).id}-${index}`;
-            }
+            return `messages-${(item as Conversation).conversationId}-${index}`;
           }}
           showsVerticalScrollIndicator={false}
           refreshing={isRefreshing}
@@ -777,14 +485,10 @@ export default function MessagesScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                {activeTab === 'messages' 
-                  ? 'Chưa có tin nhắn từ người bạn đang theo dõi'
-                  : 'Chưa có tin nhắn đang chờ'
-                }
+                Chưa có tin nhắn từ người bạn đang theo dõi
               </Text>
             </View>
           }
-          ListFooterComponent={renderSuggestedAccounts}
         />
       </SafeAreaView>
     </View>
@@ -962,8 +666,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     position: 'relative',
   },
-  activeTab: {
-    // Active tab styling
+  tabHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+  },
+  pendingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1877F2', // xanh kiểu Facebook Messenger
   },
   tabText: {
     fontSize: 16,
@@ -1016,13 +736,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 4,
   },
-  pinIcon: {
-    marginLeft: 4,
+  unreadContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
   },
   unreadBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -1045,63 +764,6 @@ const styles = StyleSheet.create({
   cameraButton: {
     padding: 8,
   },
-  suggestedSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  suggestedHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  suggestedTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  suggestedItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  suggestedInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  suggestedUsername: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  suggestedFullName: {
-    fontSize: 12,
-  },
-  suggestedActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  followButton: {
-    backgroundColor: '#0095F6',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  followButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dismissButton: {
-    padding: 4,
-  },
   emptyContainer: {
     paddingVertical: 40,
     alignItems: 'center',
@@ -1111,4 +773,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

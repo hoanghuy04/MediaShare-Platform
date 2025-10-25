@@ -129,6 +129,13 @@ public class WebSocketMessageController {
                 "/queue/typing",
                 chatMessage
         );
+        
+        // Also notify sender for real-time updates in messages screen
+        messagingTemplate.convertAndSendToUser(
+                chatMessage.getSenderId(),
+                "/queue/typing",
+                chatMessage
+        );
     }
 
     /**
@@ -147,6 +154,13 @@ public class WebSocketMessageController {
         // Notify receiver that sender stopped typing
         messagingTemplate.convertAndSendToUser(
                 chatMessage.getReceiverId(),
+                "/queue/typing",
+                chatMessage
+        );
+        
+        // Also notify sender for real-time updates in messages screen
+        messagingTemplate.convertAndSendToUser(
+                chatMessage.getSenderId(),
                 "/queue/typing",
                 chatMessage
         );

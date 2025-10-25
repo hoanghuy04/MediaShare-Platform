@@ -6,8 +6,6 @@ export interface Conversation {
   lastMessage?: Message;
   unreadCount?: number;
   lastMessageTime: string;
-  isPinned?: boolean;
-  isDeleted?: boolean;
 }
 
 export interface Message {
