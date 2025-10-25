@@ -89,8 +89,8 @@ public class AuthService {
         log.info("User registered successfully: {}", user.getUsername());
         
         // Generate tokens
-        String accessToken = jwtUtil.generateToken(user.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername());
+        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId());
         
         // Convert to response
         UserResponse userResponse = userService.convertToUserResponse(user);
@@ -130,8 +130,8 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         
         // Generate tokens
-        String accessToken = jwtUtil.generateToken(user.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername());
+        String accessToken = jwtUtil.generateToken(user.getUsername(), user.getId());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getId());
         
         log.info("User logged in successfully: {}", user.getUsername());
         
@@ -168,8 +168,8 @@ public class AuthService {
         }
         
         // Generate new tokens
-        String newAccessToken = jwtUtil.generateToken(username);
-        String newRefreshToken = jwtUtil.generateRefreshToken(username);
+        String newAccessToken = jwtUtil.generateToken(username, user.getId());
+        String newRefreshToken = jwtUtil.generateRefreshToken(username, user.getId());
         
         UserResponse userResponse = userService.convertToUserResponse(user);
         

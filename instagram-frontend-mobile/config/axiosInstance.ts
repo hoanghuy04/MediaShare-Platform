@@ -49,8 +49,14 @@ axiosInstance.interceptors.request.use(
 
         // Endpoints that need senderId (specifically for messages)
         if (url.includes('/messages')) {
-          // GET /messages needs userId for getConversations and getConversation
-          if (method === 'GET' && !config.params.userId) {
+          // GET /messages (without path param) needs userId for getConversations
+          // GET /messages/{id} (with path param) needs userId for getConversation - add it only if not a GET with path param
+          const hasPathParam = url.match(/\/messages\/[^\/?]+/);
+          if (method === 'GET' && !hasPathParam && !config.params.userId) {
+            config.params.userId = userId;
+          }
+          // GET /messages/{conversationId} with query params needs userId
+          if (method === 'GET' && hasPathParam && !config.params.userId) {
             config.params.userId = userId;
           }
           // POST /messages needs senderId for sendMessage
