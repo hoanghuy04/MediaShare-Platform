@@ -139,6 +139,39 @@ export const mediaService = {
     }
   },
 
+  // Pick media (images or videos) for Reels
+  async pickMediaForReels(): Promise<MediaAsset | null> {
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) return null;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow both images and videos
+        allowsEditing: false,
+        quality: 0.8,
+        videoMaxDuration: 90, // Instagram Reels max duration
+      });
+
+      if (result.canceled) return null;
+
+      const asset = result.assets[0];
+      const isVideo =
+        asset.type === 'video' || asset.uri.includes('.mp4') || asset.uri.includes('.mov');
+
+      return {
+        uri: asset.uri,
+        type: isVideo ? 'video' : 'image',
+        width: asset.width,
+        height: asset.height,
+        duration: asset.duration,
+      };
+    } catch (error) {
+      console.error('Error picking media for reels:', error);
+      Alert.alert('Error', 'Failed to pick media. Please try again.');
+      return null;
+    }
+  },
+
   async compressImage(
     uri: string,
     quality = 0.7,
@@ -207,4 +240,3 @@ export const mediaService = {
     return formData;
   },
 };
-
