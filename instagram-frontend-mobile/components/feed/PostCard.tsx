@@ -71,11 +71,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       {post.media && post.media.length > 0 && (
         <TouchableOpacity onPress={handlePostPress} activeOpacity={0.95}>
           <View style={styles.mediaContainer}>
-            <Image
-              source={{ uri: post.media[0].url }}
-              style={styles.media}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: post.media[0].url }} style={styles.media} resizeMode="cover" />
             {isVideo && (
               <TouchableOpacity
                 style={styles.muteButton}
@@ -164,9 +160,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           </Text>
           {post.caption.length > 100 && (
             <TouchableOpacity onPress={handlePostPress}>
-              <Text style={[styles.seeMore, { color: theme.colors.textSecondary }]}>
-                xem thêm
-              </Text>
+              <Text style={[styles.seeMore, { color: theme.colors.textSecondary }]}>xem thêm</Text>
             </TouchableOpacity>
           )}
         </View>

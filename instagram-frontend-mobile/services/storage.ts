@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   THEME: 'theme',
   LANGUAGE: 'language',
   ONBOARDING_COMPLETED: 'onboardingCompleted',
+  RECENT_SEARCHES: 'recentSearches',
 } as const;
 
 // Secure storage (for sensitive data like tokens)
@@ -94,6 +95,18 @@ export const storage = {
   async getOnboardingCompleted(): Promise<boolean> {
     const completed = await this.getItem<boolean>(STORAGE_KEYS.ONBOARDING_COMPLETED);
     return completed ?? false;
+  },
+
+  async setRecentSearches(searches: string[]): Promise<void> {
+    await this.setItem(STORAGE_KEYS.RECENT_SEARCHES, searches);
+  },
+
+  async getRecentSearches(): Promise<string[] | null> {
+    return await this.getItem<string[]>(STORAGE_KEYS.RECENT_SEARCHES);
+  },
+
+  async clearRecentSearches(): Promise<void> {
+    await this.removeItem(STORAGE_KEYS.RECENT_SEARCHES);
   },
 };
 

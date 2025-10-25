@@ -4,29 +4,32 @@ import Constants from 'expo-constants';
 const getEnvVars = () => {
   const extra = Constants.expoConfig?.extra;
   const releaseChannel = extra?.releaseChannel;
+  
+  console.log('🔧 Config Debug - extra:', extra);
+  console.log('🔧 Config Debug - releaseChannel:', releaseChannel);
 
   // Use environment-specific config from app.json
   if (__DEV__) {
-    return (
-      extra?.dev || {
-        apiUrl: 'http://192.168.185.1:8080',
-        wsUrl: 'ws://192.168.185.1:8080',
-      }
-    );
+    const config = extra?.dev || {
+      apiUrl: 'http://192.168.100.2:8080',
+      wsUrl: 'http://192.168.100.2:8080', 
+    };
+    console.log('🔧 Config Debug - DEV config:', config);
+    return config;
   } else if (releaseChannel === 'production') {
-    return (
-      extra?.prod || {
-        apiUrl: 'http://192.168.185.1:8080',
-        wsUrl: 'ws://192.168.185.1:8080',
-      }
-    );
+    const config = extra?.prod || {
+      apiUrl: 'http://192.168.100.2:8080',
+      wsUrl: 'http://192.168.100.2:8080', 
+    };
+    console.log('🔧 Config Debug - PROD config:', config);
+    return config;
   } else {
-    return (
-      extra?.dev || {
-        apiUrl: 'http://192.168.185.1:8080',
-        wsUrl: 'ws://192.168.185.1:8080',
-      }
-    );
+    const config = extra?.dev || {
+      apiUrl: 'http://192.168.100.2:8080',
+      wsUrl: 'http://192.168.100.2:8080', 
+    };
+    console.log('🔧 Config Debug - DEFAULT config:', config);
+    return config;
   }
 };
 

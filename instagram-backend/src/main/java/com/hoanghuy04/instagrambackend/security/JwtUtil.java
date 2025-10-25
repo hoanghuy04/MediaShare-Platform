@@ -47,6 +47,19 @@ public class JwtUtil {
     }
     
     /**
+     * Generate JWT token for a user with user ID.
+     *
+     * @param username the username
+     * @param userId the user ID
+     * @return JWT token
+     */
+    public String generateToken(String username, String userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        return createToken(claims, username, expiration);
+    }
+    
+    /**
      * Generate refresh token for a user.
      *
      * @param username the username
@@ -54,6 +67,19 @@ public class JwtUtil {
      */
     public String generateRefreshToken(String username) {
         Map<String, Object> claims = new HashMap<>();
+        return createToken(claims, username, refreshExpiration);
+    }
+    
+    /**
+     * Generate refresh token for a user with user ID.
+     *
+     * @param username the username
+     * @param userId the user ID
+     * @return refresh token
+     */
+    public String generateRefreshToken(String username, String userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
         return createToken(claims, username, refreshExpiration);
     }
     
@@ -97,6 +123,23 @@ public class JwtUtil {
      */
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
+    }
+    
+    /**
+     * Extract user ID from token.
+     * Assumes user ID is stored in the "userId" claim.
+     *
+     * @param token the JWT token
+     * @return user ID or null if not found
+     */
+    public String extractUserId(String token) {
+        try {
+            Claims claims = extractAllClaims(token);
+            return claims.get("userId", String.class);
+        } catch (Exception e) {
+            log.error("Error extracting user ID from token: {}", e.getMessage());
+            return null;
+        }
     }
     
     /**

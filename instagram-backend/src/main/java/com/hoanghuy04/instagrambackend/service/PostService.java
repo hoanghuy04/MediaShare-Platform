@@ -6,10 +6,12 @@ import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.entity.Media;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
+import com.hoanghuy04.instagrambackend.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,6 +39,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserService userService;
     private final FollowRepository followRepository;
+    private final FileStorageService fileStorageService;
     
     /**
      * Create a new post.
@@ -50,10 +54,13 @@ public class PostService {
         
         User author = userService.getUserEntityById(userId);
         
+        // Convert media file paths to URLs
+        List<Media> mediaWithUrls = convertMediaPathsToUrls(request.getMedia());
+        
         Post post = Post.builder()
                 .author(author)
                 .caption(request.getCaption())
-                .media(request.getMedia())
+                .media(mediaWithUrls)
                 .tags(request.getTags())
                 .location(request.getLocation())
                 .likes(new ArrayList<>())
@@ -205,8 +212,11 @@ public class PostService {
             throw new UnauthorizedException("You are not authorized to update this post");
         }
         
+        // Convert media file paths to URLs
+        List<Media> mediaWithUrls = convertMediaPathsToUrls(request.getMedia());
+        
         post.setCaption(request.getCaption());
-        post.setMedia(request.getMedia());
+        post.setMedia(mediaWithUrls);
         post.setTags(request.getTags());
         post.setLocation(request.getLocation());
         
@@ -319,6 +329,51 @@ public class PostService {
                 .isLikedByCurrentUser(isLikedByCurrentUser)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
+                .build();
+    }
+    
+    /**
+     * Convert media file paths to URLs.
+     *
+     * @param mediaList the list of media objects
+     * @return list of media objects with URLs
+     */
+    private List<Media> convertMediaPathsToUrls(List<Media> mediaList) {
+        if (mediaList == null || mediaList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        return mediaList.stream()
+                .map(this::convertMediaPathToUrl)
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Convert a single media file path to URL.
+     *
+     * @param media the media object
+     * @return media object with URL
+     */
+    private Media convertMediaPathToUrl(Media media) {
+        if (media == null || media.getUrl() == null) {
+            return media;
+        }
+        
+        String url = media.getUrl();
+        
+        // If URL is already a full URL (starts with http), return as is
+        if (url.startsWith("http")) {
+            return media;
+        }
+        
+        // If URL is a relative path, convert to full URL
+        String filename = Paths.get(url).getFileName().toString();
+        String fullUrl = fileStorageService.getFileUrl(filename);
+        
+        return Media.builder()
+                .url(fullUrl)
+                .type(media.getType())
+                .uploadedAt(media.getUploadedAt())
                 .build();
     }
 }
