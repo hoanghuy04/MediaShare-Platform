@@ -64,6 +64,12 @@ public class MessageService {
         
         message = messageRepository.save(message);
         
+        // Conversation restoration functionality removed
+        
+        // Update last interaction time for both users
+        updateLastInteractionTime(senderId, request.getReceiverId());
+        updateLastInteractionTime(request.getReceiverId(), senderId);
+        
         log.info("Message sent successfully: {}", message.getId());
         
         // Push message via WebSocket for real-time delivery
@@ -154,15 +160,17 @@ public class MessageService {
         // Convert to Conversation objects
         List<Conversation> conversations = new ArrayList<>();
         for (Map.Entry<String, Message> entry : conversationMap.entrySet()) {
+            String partnerId = entry.getKey();
             Message lastMessage = entry.getValue();
             User otherUser = lastMessage.getSender().getId().equals(userId) 
                     ? lastMessage.getReceiver() 
                     : lastMessage.getSender();
             
-            long unreadCount = messageRepository.countByReceiverAndIsReadFalse(user);
+            // Count unread messages for this specific conversation
+            long unreadCount = messageRepository.countByReceiverAndSenderAndIsReadFalse(user, otherUser);
             
             Conversation conversation = Conversation.builder()
-                    .conversationId(entry.getKey())
+                    .conversationId(partnerId)
                     .otherUser(userService.convertToUserResponse(otherUser))
                     .lastMessage(convertToMessageResponse(lastMessage))
                     .unreadCount((int) unreadCount)
@@ -172,8 +180,10 @@ public class MessageService {
             conversations.add(conversation);
         }
         
-        // Sort by last message time (most recent first)
-        conversations.sort((c1, c2) -> c2.getLastMessageTime().compareTo(c1.getLastMessageTime()));
+        // Sort conversations by last message time DESC
+        conversations.sort((c1, c2) -> 
+            c2.getLastMessageTime().compareTo(c1.getLastMessageTime())
+        );
         
         // Manual pagination
         int start = (int) pageable.getOffset();
@@ -248,6 +258,22 @@ public class MessageService {
         messageRepository.delete(message);
         log.info("Message deleted successfully");
     }
+    
+    
+    /**
+     * Update last interaction time for a conversation.
+     * This method is now simplified and doesn't use ConversationMetadata.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     */
+    @Transactional
+    public void updateLastInteractionTime(String userId, String partnerId) {
+        // Since we removed ConversationMetadata, this method is now a no-op
+        // Conversations will be sorted by the latest message timestamp
+        log.info("Last interaction time update for user {} with partner: {} - no longer tracked", userId, partnerId);
+    }
+    
     
     /**
      * Convert Message entity to MessageResponse DTO.
