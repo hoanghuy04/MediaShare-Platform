@@ -1,5 +1,5 @@
-import axiosInstance from '@config/axiosInstance';
-import { API_ENDPOINTS } from '@config/routes';
+import axiosInstance from '../config/axiosInstance';
+import { API_ENDPOINTS } from '../config/routes';
 import {
   LoginRequest,
   RegisterRequest,
@@ -16,7 +16,7 @@ import {
   SendMessageData,
   Notification,
   PaginatedResponse,
-} from '@types';
+} from '../types';
 import apiConfig from '../config/apiConfig';
 
 // Auth API
@@ -297,6 +297,28 @@ export const messageAPI = {
       participantIds,
     });
     return response.data.data; 
+  },
+
+  markMessagesAsRead: async (conversationId: string): Promise<void> => {
+    await axiosInstance.put(`/api/messages/${conversationId}/read`);
+  },
+
+  pinConversation: async (conversationId: string, userId: string): Promise<void> => {
+    await axiosInstance.put(API_ENDPOINTS.PIN_CONVERSATION(conversationId), null, {
+      params: { userId }
+    });
+  },
+
+  unpinConversation: async (conversationId: string, userId: string): Promise<void> => {
+    await axiosInstance.put(API_ENDPOINTS.UNPIN_CONVERSATION(conversationId), null, {
+      params: { userId }
+    });
+  },
+
+  deleteConversation: async (conversationId: string, userId: string): Promise<void> => {
+    await axiosInstance.delete(API_ENDPOINTS.DELETE_CONVERSATION(conversationId), {
+      params: { userId }
+    });
   },
 };
 

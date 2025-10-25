@@ -6,6 +6,7 @@ import { User, LoginRequest, RegisterRequest } from '@types';
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
@@ -30,6 +31,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const segments = useSegments();
@@ -57,8 +59,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadUser = async () => {
     try {
-      const token = await secureStorage.getToken();
-      if (token) {
+      const storedToken = await secureStorage.getToken();
+      if (storedToken) {
+        setToken(storedToken);
         const userData = await storage.getUserData<User>();
         if (userData) {
           console.log('User loaded from storage:', userData.username);
@@ -67,12 +70,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // If token exists but no user data, clear token and redirect to login
           console.log('Token exists but no user data, clearing...');
           await secureStorage.removeToken();
+          setToken(null);
         }
       }
     } catch (error) {
       console.error('Error loading user:', error);
       await secureStorage.removeToken();
       await storage.removeUserData();
+      setToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -90,6 +95,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       await secureStorage.setToken(response.accessToken);
       await storage.setUserData(response.user);
+      setToken(response.accessToken);
       setUser(response.user);
 
       // Force navigation to feed after successful login
@@ -112,6 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       await secureStorage.setToken(response.accessToken);
       await storage.setUserData(response.user);
+      setToken(response.accessToken);
       setUser(response.user);
 
       // Force navigation to feed after successful registration
@@ -131,6 +138,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       await secureStorage.removeToken();
       await storage.removeUserData();
+      setToken(null);
       setUser(null);
       router.replace('/(auth)/login');
     }
@@ -145,6 +153,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
+        token,
         isLoading,
         isAuthenticated: !!user,
         login,

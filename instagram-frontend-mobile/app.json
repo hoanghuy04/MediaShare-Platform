@@ -63,11 +63,11 @@
     "extra": {
       "dev": {
         "apiUrl": "http://192.168.100.2:8080",
-        "wsUrl": "ws://192.168.100.2:8080"
+        "wsUrl": "http://192.168.100.2:8080"
       },
       "prod": {
         "apiUrl": "https://your-production-api.com",
-        "wsUrl": "wss://your-production-api.com"
+        "wsUrl": "https://your-production-api.com"
       }
     }
   }

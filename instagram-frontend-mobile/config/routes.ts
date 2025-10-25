@@ -66,6 +66,9 @@ export const API_ENDPOINTS = {
   CREATE_CONVERSATION: '/api/messages/conversations',
   MESSAGES: (conversationId: string) => `/api/messages/${conversationId}`,
   SEND_MESSAGE: '/api/messages',
+  PIN_CONVERSATION: (id: string) => `/api/messages/conversations/${id}/pin`,
+  UNPIN_CONVERSATION: (id: string) => `/api/messages/conversations/${id}/unpin`,
+  DELETE_CONVERSATION: (id: string) => `/api/messages/conversations/${id}`,
 
   // Notifications
   NOTIFICATIONS: '/api/notifications',
@@ -75,8 +78,4 @@ export const API_ENDPOINTS = {
 
   // Upload
   UPLOAD: '/api/upload',
-  UPLOAD_PROFILE_IMAGE: '/api/upload/profile-image',
-  UPLOAD_POST_MEDIA: '/api/upload/post-media',
-  UPLOAD_POST_MEDIA_BATCH: '/api/upload/post-media/batch',
-  DELETE_FILE: (fileId: string) => `/api/upload/files/${fileId}`,
 } as const;

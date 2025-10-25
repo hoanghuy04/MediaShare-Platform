@@ -28,5 +28,9 @@ public class Conversation {
     private Integer unreadCount;
     
     private LocalDateTime lastMessageTime;
+    
+    private Boolean isPinned;
+    
+    private Boolean isDeleted;
 }
 

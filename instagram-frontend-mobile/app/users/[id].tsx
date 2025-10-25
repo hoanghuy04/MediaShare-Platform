@@ -77,8 +77,8 @@ export default function UserProfileScreen() {
   };
 
   const handleMessage = () => {
-    // TODO: Create conversation and navigate to messages
-    router.push('/(tabs)/messages');
+    // Navigate directly to conversation using the user's ID as conversationId
+    router.push(`/messages/${id}`);
   };
 
   if (isLoading || !profile) {

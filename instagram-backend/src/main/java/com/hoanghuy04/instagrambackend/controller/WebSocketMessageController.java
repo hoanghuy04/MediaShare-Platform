@@ -15,6 +15,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * WebSocket controller for real-time messaging.
@@ -43,6 +44,8 @@ public class WebSocketMessageController {
     public void sendMessage(@Payload ChatMessage chatMessage, SimpMessageHeaderAccessor headerAccessor) {
         try {
             log.info("Received chat message from {} to {}", chatMessage.getSenderId(), chatMessage.getReceiverId());
+            log.info("Message content: {}", chatMessage.getContent());
+            log.info("Message type: {}", chatMessage.getType());
             
             // Get sender and receiver
             User sender = userService.getUserEntityById(chatMessage.getSenderId());
@@ -70,6 +73,8 @@ public class WebSocketMessageController {
             chatMessage.setSenderProfileImage(sender.getProfile() != null ? sender.getProfile().getAvatar() : null);
             
             // Send to receiver via WebSocket
+            String receiverDestination = "/user/" + chatMessage.getReceiverId() + "/queue/messages";
+            log.info("Sending message to receiver destination: {}", receiverDestination);
             messagingTemplate.convertAndSendToUser(
                     chatMessage.getReceiverId(),
                     "/queue/messages",
@@ -77,6 +82,8 @@ public class WebSocketMessageController {
             );
             
             // Send confirmation back to sender
+            String senderDestination = "/user/" + chatMessage.getSenderId() + "/queue/messages";
+            log.info("Sending confirmation to sender destination: {}", senderDestination);
             messagingTemplate.convertAndSendToUser(
                     chatMessage.getSenderId(),
                     "/queue/messages",
@@ -190,8 +197,17 @@ public class WebSocketMessageController {
     public void handleUserJoin(@Payload ChatMessage chatMessage, SimpMessageHeaderAccessor headerAccessor) {
         log.info("User {} joined chat", chatMessage.getSenderId());
         
-        // Store username in WebSocket session
-        headerAccessor.getSessionAttributes().put("username", chatMessage.getSenderUsername());
+        // Store username in WebSocket session (with null check)
+        Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
+        if (sessionAttributes != null) {
+            log.info("Storing {} in WebSocket session", chatMessage);
+            // Only store username if it's not null
+            if (chatMessage.getSenderUsername() != null) {
+                sessionAttributes.put("username", chatMessage.getSenderUsername());
+            } else {
+                log.warn("SenderUsername is null for user {}", chatMessage.getSenderId());
+            }
+        }
         
         chatMessage.setType(MessageType.JOIN);
         chatMessage.setTimestamp(LocalDateTime.now());

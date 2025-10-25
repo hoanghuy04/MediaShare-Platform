@@ -23,7 +23,6 @@ import { postAPI, userAPI } from '../services/api';
 import { showAlert } from '../utils/helpers';
 import { UserProfile, Post } from '../types';
 import { Avatar } from '../components/common/Avatar';
-import { DevelopmentNotice } from '../components/common/DevelopmentNotice';
 import { storage } from '../services/storage';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -413,11 +412,12 @@ export default function SearchScreen() {
     if (apiUnavailable) {
       return (
         <View style={styles.contentContainer}>
-          <DevelopmentNotice 
-            title="Tìm kiếm đang phát triển"
-            message="Chức năng tìm kiếm chi tiết đang được phát triển. Hiện tại hiển thị nội dung khám phá thay thế."
-            icon="search-outline"
-          />
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            Tìm kiếm đang phát triển
+          </Text>
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            Chức năng tìm kiếm chi tiết đang được phát triển. Hiện tại hiển thị nội dung khám phá thay thế.
+          </Text>
         </View>
       );
     }

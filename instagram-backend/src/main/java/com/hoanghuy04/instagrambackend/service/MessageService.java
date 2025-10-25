@@ -5,9 +5,11 @@ import com.hoanghuy04.instagrambackend.dto.response.Conversation;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
+import com.hoanghuy04.instagrambackend.entity.ConversationMetadata;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.repository.ConversationMetadataRepository;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,10 +19,14 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Service class for message operations.
@@ -36,6 +42,7 @@ import java.util.Map;
 public class MessageService {
     
     private final MessageRepository messageRepository;
+    private final ConversationMetadataRepository conversationMetadataRepository;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
     
@@ -63,6 +70,14 @@ public class MessageService {
                 .build();
         
         message = messageRepository.save(message);
+        
+        // Check if conversation was deleted and restore if needed
+        restoreConversationIfDeleted(senderId, request.getReceiverId());
+        restoreConversationIfDeleted(request.getReceiverId(), senderId);
+        
+        // Update last interaction time for both users
+        updateLastInteractionTime(senderId, request.getReceiverId());
+        updateLastInteractionTime(request.getReceiverId(), senderId);
         
         log.info("Message sent successfully: {}", message.getId());
         
@@ -151,29 +166,60 @@ public class MessageService {
             }
         }
         
+        // Load conversation metadata for the user
+        Map<String, ConversationMetadata> metadataMap = conversationMetadataRepository.findByUserId(userId)
+                .stream()
+                .collect(Collectors.toMap(
+                        ConversationMetadata::getPartnerId,
+                        Function.identity()
+                ));
+        
         // Convert to Conversation objects
         List<Conversation> conversations = new ArrayList<>();
         for (Map.Entry<String, Message> entry : conversationMap.entrySet()) {
+            String partnerId = entry.getKey();
             Message lastMessage = entry.getValue();
             User otherUser = lastMessage.getSender().getId().equals(userId) 
                     ? lastMessage.getReceiver() 
                     : lastMessage.getSender();
             
+            // Check if conversation is deleted
+            ConversationMetadata metadata = metadataMap.get(partnerId);
+            if (metadata != null && metadata.isDeleted()) {
+                continue; // Skip deleted conversations
+            }
+            
             long unreadCount = messageRepository.countByReceiverAndIsReadFalse(user);
             
             Conversation conversation = Conversation.builder()
-                    .conversationId(entry.getKey())
+                    .conversationId(partnerId)
                     .otherUser(userService.convertToUserResponse(otherUser))
                     .lastMessage(convertToMessageResponse(lastMessage))
                     .unreadCount((int) unreadCount)
                     .lastMessageTime(lastMessage.getCreatedAt())
+                    .isPinned(metadata != null && metadata.isPinned())
+                    .isDeleted(metadata != null && metadata.isDeleted())
                     .build();
             
             conversations.add(conversation);
         }
         
-        // Sort by last message time (most recent first)
-        conversations.sort((c1, c2) -> c2.getLastMessageTime().compareTo(c1.getLastMessageTime()));
+        // Sort conversations: pinned first (by pinnedAt DESC), then by lastMessageTime DESC
+        conversations.sort((c1, c2) -> {
+            // Pinned conversations first
+            if (c1.getIsPinned() != null && c2.getIsPinned() != null) {
+                if (c1.getIsPinned() != c2.getIsPinned()) {
+                    return c1.getIsPinned() ? -1 : 1;
+                }
+            } else if (c1.getIsPinned() != null && c1.getIsPinned()) {
+                return -1;
+            } else if (c2.getIsPinned() != null && c2.getIsPinned()) {
+                return 1;
+            }
+            
+            // Then sort by last message time
+            return c2.getLastMessageTime().compareTo(c1.getLastMessageTime());
+        });
         
         // Manual pagination
         int start = (int) pageable.getOffset();
@@ -247,6 +293,111 @@ public class MessageService {
         
         messageRepository.delete(message);
         log.info("Message deleted successfully");
+    }
+    
+    /**
+     * Pin a conversation for a user.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     */
+    @Transactional
+    public void pinConversation(String userId, String partnerId) {
+        log.info("Pinning conversation for user {} with partner: {}", userId, partnerId);
+        
+        ConversationMetadata metadata = getOrCreateMetadata(userId, partnerId);
+        metadata.setPinned(true);
+        metadata.setPinnedAt(LocalDateTime.now());
+        conversationMetadataRepository.save(metadata);
+        
+        log.info("Conversation pinned successfully");
+    }
+    
+    /**
+     * Unpin a conversation for a user.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     */
+    @Transactional
+    public void unpinConversation(String userId, String partnerId) {
+        log.info("Unpinning conversation for user {} with partner: {}", userId, partnerId);
+        
+        ConversationMetadata metadata = getOrCreateMetadata(userId, partnerId);
+        metadata.setPinned(false);
+        metadata.setPinnedAt(null);
+        conversationMetadataRepository.save(metadata);
+        
+        log.info("Conversation unpinned successfully");
+    }
+    
+    /**
+     * Delete (hide) a conversation for a user.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     */
+    @Transactional
+    public void deleteConversation(String userId, String partnerId) {
+        log.info("Deleting conversation for user {} with partner: {}", userId, partnerId);
+        
+        ConversationMetadata metadata = getOrCreateMetadata(userId, partnerId);
+        metadata.setDeleted(true);
+        metadata.setDeletedAt(LocalDateTime.now());
+        conversationMetadataRepository.save(metadata);
+        
+        log.info("Conversation deleted successfully");
+    }
+    
+    /**
+     * Restore a deleted conversation if it was deleted.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     */
+    @Transactional
+    public void restoreConversationIfDeleted(String userId, String partnerId) {
+        Optional<ConversationMetadata> metadataOpt = conversationMetadataRepository
+                .findByUserIdAndPartnerIdIncludingDeleted(userId, partnerId);
+        
+        if (metadataOpt.isPresent() && metadataOpt.get().isDeleted()) {
+            ConversationMetadata metadata = metadataOpt.get();
+            metadata.setDeleted(false);
+            metadata.setDeletedAt(null);
+            conversationMetadataRepository.save(metadata);
+            log.info("Conversation restored for user {} with partner: {}", userId, partnerId);
+        }
+    }
+    
+    /**
+     * Update last interaction time for a conversation.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     */
+    @Transactional
+    public void updateLastInteractionTime(String userId, String partnerId) {
+        ConversationMetadata metadata = getOrCreateMetadata(userId, partnerId);
+        metadata.setLastInteractionAt(LocalDateTime.now());
+        conversationMetadataRepository.save(metadata);
+    }
+    
+    /**
+     * Get or create conversation metadata for a user and partner.
+     *
+     * @param userId the user ID
+     * @param partnerId the partner ID
+     * @return ConversationMetadata
+     */
+    private ConversationMetadata getOrCreateMetadata(String userId, String partnerId) {
+        return conversationMetadataRepository.findByUserIdAndPartnerId(userId, partnerId)
+                .orElse(ConversationMetadata.builder()
+                        .userId(userId)
+                        .partnerId(partnerId)
+                        .isPinned(false)
+                        .isDeleted(false)
+                        .lastInteractionAt(LocalDateTime.now())
+                        .build());
     }
     
     /**

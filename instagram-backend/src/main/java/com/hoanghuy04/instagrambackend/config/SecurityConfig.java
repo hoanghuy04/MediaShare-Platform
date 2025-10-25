@@ -61,6 +61,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         
+                        // WebSocket endpoints
+                        .requestMatchers("/ws/**").permitAll()
+                        
                         // Public read endpoints
                         .requestMatchers(HttpMethod.GET, "/users/{id}").permitAll()
                         .requestMatchers(HttpMethod.GET, "/posts/{id}").permitAll()
