@@ -74,6 +74,15 @@ public interface MessageRepository extends MongoRepository<Message, String> {
     long countByReceiverAndIsReadFalse(User receiver);
     
     /**
+     * Count unread messages from a specific sender to a receiver.
+     *
+     * @param receiver the user who received the messages
+     * @param sender the user who sent the messages
+     * @return number of unread messages from this sender
+     */
+    long countByReceiverAndSenderAndIsReadFalse(User receiver, User sender);
+    
+    /**
      * Find unread messages for a user.
      *
      * @param receiver the user to find unread messages for

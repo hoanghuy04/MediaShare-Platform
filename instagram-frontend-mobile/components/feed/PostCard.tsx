@@ -363,9 +363,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           </Text>
           {post.caption.length > 100 && (
             <TouchableOpacity onPress={handlePostPress}>
-              <Text style={[styles.seeMore, { color: theme.colors.textSecondary }]}>
-                xem thêm
-              </Text>
+              <Text style={[styles.seeMore, { color: theme.colors.textSecondary }]}>xem thêm</Text>
             </TouchableOpacity>
           )}
         </View>

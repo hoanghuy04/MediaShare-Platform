@@ -15,6 +15,7 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="search" />
                 <Stack.Screen name="posts/[id]" />
                 <Stack.Screen name="users/[id]" />
                 <Stack.Screen name="messages/[conversationId]" />
