@@ -331,22 +331,28 @@ export default function MessagesScreen() {
   );
 
   const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
+    <TouchableOpacity 
+      style={styles.searchContainer}
+      onPress={() => router.push('/messages/message-search')}
+      activeOpacity={0.7}
+    >
       <View style={styles.searchBar}>
         <View style={styles.aiIcon}>
           <Ionicons name="sparkles" size={16} color="white" />
         </View>
-        <TextInput
-          placeholderTextColor={theme.colors.textSecondary}
-          style={styles.searchPlaceholder}
-          placeholder="Hỏi AI hoặc tìm kiếm"
-        />
+        <Text style={[styles.searchPlaceholder, { color: theme.colors.textSecondary }]}>
+          Hỏi AI hoặc tìm kiếm
+        </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderNotesSection = () => (
-    <View style={styles.notesSection}>
+    <TouchableOpacity 
+      style={styles.notesSection}
+      onPress={() => router.push('/messages/notes')}
+      activeOpacity={0.7}
+    >
       <View style={styles.notesContent}>
         {/* Speech bubble with "Chia sẻ ghi chú" */}
         <View style={styles.speechBubble}>
@@ -357,9 +363,12 @@ export default function MessagesScreen() {
         {/* Main note bubble */}
         <View style={styles.noteBubble}>
           <View style={styles.noteEmoji}>
-            <Text style={styles.emoji}>:)</Text>
+            <Avatar 
+              uri={currentUser?.profile?.avatar} 
+              name={currentUser?.username} 
+              size={60} 
+            />
           </View>
-          <View style={styles.notePointer} />
         </View>
 
         {/* "Ghi chú của bạn" text */}
@@ -367,7 +376,7 @@ export default function MessagesScreen() {
           Ghi chú của bạn
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderTabs = () => (
@@ -546,7 +555,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 2,
+    paddingVertical: 12,
   },
   aiIcon: {
     width: 24,
@@ -559,7 +568,6 @@ const styles = StyleSheet.create({
   },
   searchPlaceholder: {
     fontSize: 16,
-    color: '#8e8e8e',
     flex: 1,
   },
   notesSection: {
@@ -610,7 +618,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#E3F2FD',
     borderWidth: 2,
     borderColor: 'white',
     alignItems: 'center',
@@ -623,19 +630,6 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 16,
-  },
-  notePointer: {
-    position: 'absolute',
-    top: 58,
-    left: 24,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#E3F2FD',
   },
   noteText: {
     fontSize: 14,

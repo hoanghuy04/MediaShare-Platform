@@ -10,9 +10,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../hooks/useAuth';
+import { Avatar } from '../../components/common/Avatar';
 
-export default function PendingMessagesScreen() {
+export default function NotesScreen() {
   const { theme } = useTheme();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
 
   const renderHeader = () => (
@@ -21,7 +24,7 @@ export default function PendingMessagesScreen() {
         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-        Tin nhắn đang chờ
+        Ghi chú
       </Text>
       <View style={styles.placeholder} />
     </View>
@@ -30,17 +33,19 @@ export default function PendingMessagesScreen() {
   const renderComingSoon = () => (
     <View style={styles.comingSoonContainer}>
       <View style={styles.iconContainer}>
-        <Ionicons 
-          name="time-outline" 
-          size={80} 
-          color={theme.colors.textSecondary} 
-        />
+        <View style={styles.noteIconContainer}>
+          <Avatar 
+            uri={currentUser?.profile?.avatar} 
+            name={currentUser?.username} 
+            size={60} 
+          />
+        </View>
       </View>
       <Text style={[styles.comingSoonTitle, { color: theme.colors.text }]}>
         Coming Soon
       </Text>
       <Text style={[styles.comingSoonDescription, { color: theme.colors.textSecondary }]}>
-        Tính năng tin nhắn đang chờ sẽ sớm được ra mắt. Hãy chờ đón nhé!
+        Tính năng ghi chú sẽ sớm được ra mắt. Bạn sẽ có thể tạo và chia sẻ ghi chú với bạn bè!
       </Text>
       <TouchableOpacity 
         style={[styles.backToMessagesButton, { backgroundColor: theme.colors.primary }]}
@@ -99,6 +104,24 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: 24,
+  },
+  noteIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#E3F2FD',
+    borderWidth: 3,
+    borderColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  noteEmoji: {
+    fontSize: 32,
   },
   comingSoonTitle: {
     fontSize: 28,

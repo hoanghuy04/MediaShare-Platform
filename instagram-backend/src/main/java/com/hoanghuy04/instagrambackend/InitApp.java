@@ -87,7 +87,7 @@ public class InitApp implements CommandLineRunner {
                 .firstName("Admin")
                 .lastName("User")
                 .bio("System Administrator")
-                .avatar("https://via.placeholder.com/150/007bff/ffffff?text=A")
+                .avatar("https://picsum.photos/id/237/200/300")
                 .location("System")
                 .build();
         
@@ -119,14 +119,14 @@ public class InitApp implements CommandLineRunner {
         List<User> users = new ArrayList<>();
         
         String[][] userData = {
-            {"john_doe", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "https://via.placeholder.com/150/28a745/ffffff?text=J", "New York, NY"},
-            {"jane_smith", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "https://via.placeholder.com/150/dc3545/ffffff?text=J", "Los Angeles, CA"},
-            {"mike_wilson", "mike@example.com", "Mike", "Wilson", "Fitness coach 💪", "https://via.placeholder.com/150/ffc107/ffffff?text=M", "Miami, FL"},
-            {"sarah_jones", "sarah@example.com", "Sarah", "Jones", "Food lover 🍕", "https://via.placeholder.com/150/17a2b8/ffffff?text=S", "Chicago, IL"},
-            {"alex_brown", "alex@example.com", "Alex", "Brown", "Tech enthusiast 💻", "https://via.placeholder.com/150/6f42c1/ffffff?text=A", "Seattle, WA"},
-            {"emma_davis", "emma@example.com", "Emma", "Davis", "Artist 🎨", "https://via.placeholder.com/150/fd7e14/ffffff?text=E", "Portland, OR"},
-            {"david_miller", "david@example.com", "David", "Miller", "Musician 🎵", "https://via.placeholder.com/150/20c997/ffffff?text=D", "Austin, TX"},
-            {"lisa_garcia", "lisa@example.com", "Lisa", "Garcia", "Fashion designer 👗", "https://via.placeholder.com/150/e83e8c/ffffff?text=L", "New York, NY"}
+            {"john_doe", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
+            {"jane_smith", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
+            {"mike_wilson", "mike@example.com", "Mike", "Wilson", "Fitness coach 💪", "", "Miami, FL"},
+            {"sarah_jones", "sarah@example.com", "Sarah", "Jones", "Food lover 🍕", "", "Chicago, IL"},
+            {"alex_brown", "alex@example.com", "Alex", "Brown", "Tech enthusiast 💻", "", "Seattle, WA"},
+            {"emma_davis", "emma@example.com", "Emma", "Davis", "Artist 🎨", "", "Portland, OR"},
+            {"david_miller", "david@example.com", "David", "Miller", "Musician 🎵", "", "Austin, TX"},
+            {"lisa_garcia", "lisa@example.com", "Lisa", "Garcia", "Fashion designer 👗", "", "New York, NY"}
         };
         
         for (String[] data : userData) {
@@ -134,10 +134,11 @@ public class InitApp implements CommandLineRunner {
                     .firstName(data[2])
                     .lastName(data[3])
                     .bio(data[4])
-                    .avatar(data[5])
+                    .avatar("https://picsum.photos/200/300?random=" + System.currentTimeMillis() + "_" + data[0])
                     .location(data[6])
                     .build();
-            
+
+
             User user = User.builder()
                     .username(data[0])
                     .email(data[1])
