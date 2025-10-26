@@ -10,10 +10,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../hooks/useAuth';
 import { ComingSoon } from '../../components/common/ComingSoon';
 
-export default function PendingMessagesScreen() {
+export default function NotesScreen() {
   const { theme } = useTheme();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
 
   const renderHeader = () => (
@@ -22,7 +24,7 @@ export default function PendingMessagesScreen() {
         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-        Tin nhắn đang chờ
+        Ghi chú
       </Text>
       <View style={styles.placeholder} />
     </View>
@@ -31,10 +33,12 @@ export default function PendingMessagesScreen() {
   const renderComingSoon = () => (
     <ComingSoon
       title="Coming Soon"
-      description="Tính năng tin nhắn đang chờ sẽ sớm được ra mắt. Hãy chờ đón nhé!"
+      description="Tính năng ghi chú sẽ sớm được ra mắt. Bạn sẽ có thể tạo và chia sẻ ghi chú với bạn bè!"
       backButtonText="Quay lại tin nhắn"
       onBackPress={() => router.back()}
-      iconType="time"
+      iconType="avatar"
+      avatarUri={currentUser?.profile?.avatar}
+      avatarName={currentUser?.username}
     />
   );
 
