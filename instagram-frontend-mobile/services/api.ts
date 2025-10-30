@@ -289,7 +289,7 @@ export const notificationAPI = {
 
   getUnreadCount: async (): Promise<number> => {
     const response = await axiosInstance.get(API_ENDPOINTS.UNREAD_COUNT);
-    return response.data.data; // Extract data from ApiResponse wrapper
+    return response.data.data; 
   },
 };
 

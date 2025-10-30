@@ -32,7 +32,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 interface PostCreationScreenProps {
   onClose: () => void;
   onStepChange?: (step: number) => void;
-  onPostCreated?: () => void; // Callback để refresh feed
+  onPostCreated?: () => void; 
 }
 
 type GalleryAsset = {
@@ -57,10 +57,7 @@ export default function PostCreationScreen({ onClose, onStepChange, onPostCreate
   const scrollY = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  // Mock data for testing (thay thế cho MediaLibrary do iOS issue)
-  // WARNING: Đây là mock data với URLs từ picsum.photos, không phải file thật
-  // Khi upload, backend sẽ nhận được URL này thay vì file thật
-  // TODO: Implement real MediaLibrary integration
+  
   const mockGallery: GalleryAsset[] = [
     {
       id: '1',
