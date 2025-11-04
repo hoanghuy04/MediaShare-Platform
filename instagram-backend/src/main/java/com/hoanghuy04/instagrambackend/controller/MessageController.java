@@ -1,6 +1,6 @@
 package com.hoanghuy04.instagrambackend.controller;
 
-import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
+import com.hoanghuy04.instagrambackend.dto.message.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.Conversation;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
@@ -21,10 +21,10 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * REST controller for message management endpoints.
- * Handles direct messaging between users.
+ * Handles direct messaging between users and group conversations.
  * 
  * @author Instagram Backend Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Slf4j
 @RestController
@@ -38,13 +38,17 @@ public class MessageController {
     
     /**
      * Send a message.
-     *
+     * Supports both direct messages (via receiverId) and conversation messages (via conversationId).
+     * 
      * @param request the message send request
+     *   - If conversationId is provided: sends message to that conversation (direct or group)
+     *   - If receiverId is provided: sends direct message (creates conversation if needed)
+     *   - replyToMessageId (optional): for replying to a specific message
      * @param senderId the sender user ID
      * @return ResponseEntity with MessageResponse
      */
     @PostMapping
-    @Operation(summary = "Send a message")
+    @Operation(summary = "Send a message (supports direct messages and group chat)")
     public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
             @Valid @RequestBody SendMessageRequest request,
             @RequestParam String senderId) {

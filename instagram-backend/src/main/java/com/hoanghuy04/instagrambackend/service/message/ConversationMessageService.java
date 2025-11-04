@@ -1,5 +1,10 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.message.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.message.response.LastMessageDTO;
+import com.hoanghuy04.instagrambackend.dto.message.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.message.response.UserSummaryDTO;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
@@ -13,6 +18,7 @@ import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
+import com.hoanghuy04.instagrambackend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Service class for conversation-based message operations.
@@ -46,6 +53,7 @@ public class ConversationMessageService {
     private final MessageRequestRepository messageRequestRepository;
     private final UserRepository userRepository;
     private final FollowRepository followRepository;
+    private final UserService userService;
     
     /**
      * Send a message to a conversation.
@@ -212,6 +220,35 @@ public class ConversationMessageService {
             pageable,
             allMessages.size()
         );
+    }
+    
+    /**
+     * Get messages in a conversation as DTOs (excluding deleted by user).
+     *
+     * @param conversationId the conversation ID
+     * @param userId the user ID
+     * @param pageable pagination information
+     * @return PageResponse of MessageDTO
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<MessageDTO> getConversationMessagesAsDTO(String conversationId, String userId, Pageable pageable) {
+        log.debug("Getting messages for conversation {} by user {} as DTOs", conversationId, userId);
+        
+        Page<Message> messagePage = getConversationMessages(conversationId, userId, pageable);
+        
+        // Convert to DTOs
+        List<MessageDTO> messageDTOs = messagePage.getContent().stream()
+            .map((Message message) -> convertToMessageDTO(message, userId))
+            .collect(Collectors.toList());
+        
+        // Create Page with DTOs
+        Page<MessageDTO> dtoPage = new org.springframework.data.domain.PageImpl<>(
+            messageDTOs,
+            pageable,
+            messagePage.getTotalElements()
+        );
+        
+        return PageResponse.of(dtoPage);
     }
     
     /**
@@ -423,6 +460,231 @@ public class ConversationMessageService {
     private Message getMessageById(String messageId) {
         return messageRepository.findById(messageId)
             .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
+    }
+    
+    /**
+     * Get all conversations for a user as DTOs with pagination.
+     *
+     * @param userId the user ID
+     * @param pageable pagination information
+     * @return PageResponse of ConversationDTO
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ConversationDTO> getUserConversationsAsDTO(String userId, Pageable pageable) {
+        log.debug("Getting conversations for user: {} with pagination", userId);
+        
+        List<Conversation> conversations = conversationService.getUserConversations(userId);
+        
+        // Convert to DTOs
+        List<ConversationDTO> conversationDTOs = conversations.stream()
+            .map(conv -> convertToConversationDTO(conv, userId))
+            .collect(Collectors.toList());
+        
+        // Manual pagination
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), conversationDTOs.size());
+        List<ConversationDTO> paginatedConversations = start < conversationDTOs.size() 
+            ? conversationDTOs.subList(start, end) 
+            : new ArrayList<>();
+        
+        // Create Page object manually
+        Page<ConversationDTO> page = new org.springframework.data.domain.PageImpl<>(
+            paginatedConversations,
+            pageable,
+            conversationDTOs.size()
+        );
+        
+        return PageResponse.of(page);
+    }
+    
+    /**
+     * Get conversation details as DTO.
+     *
+     * @param conversationId the conversation ID
+     * @param userId the user ID (to verify access and calculate unread count)
+     * @return ConversationDTO
+     */
+    @Transactional(readOnly = true)
+    public ConversationDTO getConversationAsDTO(String conversationId, String userId) {
+        log.debug("Getting conversation details: {} for user: {}", conversationId, userId);
+        
+        // Verify user is participant
+        if (!conversationService.isParticipant(conversationId, userId)) {
+            throw new BadRequestException("You are not a participant in this conversation");
+        }
+        
+        Conversation conversation = conversationService.getConversationById(conversationId);
+        return convertToConversationDTO(conversation, userId);
+    }
+    
+    /**
+     * Create a group conversation and return as DTO.
+     *
+     * @param creatorId the creator user ID
+     * @param participantIds list of participant IDs
+     * @param groupName the group name
+     * @param avatar the group avatar URL
+     * @return ConversationDTO
+     */
+    @Transactional
+    public ConversationDTO createGroupAndConvertToDTO(
+            String creatorId,
+            List<String> participantIds,
+            String groupName,
+            String avatar) {
+        Conversation conversation = conversationService.createGroupConversation(
+            creatorId, participantIds, groupName, avatar
+        );
+        return convertToConversationDTO(conversation, creatorId);
+    }
+    
+    /**
+     * Update group info and return as DTO.
+     *
+     * @param conversationId the conversation ID
+     * @param name the new group name
+     * @param avatar the new avatar URL
+     * @param userId the user ID (must be admin)
+     * @return ConversationDTO
+     */
+    @Transactional
+    public ConversationDTO updateGroupAndConvertToDTO(
+            String conversationId,
+            String name,
+            String avatar,
+            String userId) {
+        Conversation conversation = conversationService.updateGroupInfo(conversationId, name, avatar);
+        return convertToConversationDTO(conversation, userId);
+    }
+    
+    /**
+     * Convert Conversation entity to ConversationDTO.
+     *
+     * @param conversation the Conversation entity
+     * @param currentUserId the current user ID (for unread count calculation)
+     * @return ConversationDTO
+     */
+    private ConversationDTO convertToConversationDTO(Conversation conversation, String currentUserId) {
+        // Get participants as UserSummaryDTO
+        List<UserSummaryDTO> participants = conversation.getParticipants().stream()
+            .map(userId -> {
+                try {
+                    User user = getUserById(userId);
+                    return UserSummaryDTO.builder()
+                        .id(user.getId())
+                        .username(user.getUsername())
+                        .avatar(user.getProfile() != null && user.getProfile().getAvatar() != null 
+                            ? user.getProfile().getAvatar() 
+                            : null)
+                        .isVerified(user.isVerified())
+                        .build();
+                } catch (Exception e) {
+                    log.warn("Failed to load user {}: {}", userId, e.getMessage());
+                    return null;
+                }
+            })
+            .filter(user -> user != null)
+            .collect(Collectors.toList());
+        
+        // Convert last message
+        LastMessageDTO lastMessageDTO = null;
+        if (conversation.getLastMessage() != null) {
+            try {
+                User sender = getUserById(conversation.getLastMessage().getSenderId());
+                lastMessageDTO = LastMessageDTO.builder()
+                    .messageId(conversation.getLastMessage().getMessageId())
+                    .content(conversation.getLastMessage().getContent())
+                    .senderId(conversation.getLastMessage().getSenderId())
+                    .senderUsername(sender.getUsername())
+                    .timestamp(conversation.getLastMessage().getTimestamp())
+                    .build();
+            } catch (Exception e) {
+                log.warn("Failed to load last message sender: {}", e.getMessage());
+            }
+        }
+        
+        // Calculate unread count
+        int unreadCount = 0;
+        try {
+            unreadCount = (int) messageRepository.countByConversationIdAndSenderIdNotAndReadByNotContaining(
+                conversation.getId(), currentUserId, currentUserId
+            );
+        } catch (Exception e) {
+            log.warn("Failed to count unread messages: {}", e.getMessage());
+        }
+        
+        return ConversationDTO.builder()
+            .id(conversation.getId())
+            .type(conversation.getType())
+            .name(conversation.getName())
+            .avatar(conversation.getAvatar())
+            .participants(participants)
+            .lastMessage(lastMessageDTO)
+            .unreadCount(unreadCount)
+            .createdAt(conversation.getCreatedAt())
+            .build();
+    }
+    
+    /**
+     * Convert Message entity to MessageDTO.
+     *
+     * @param message the Message entity
+     * @param currentUserId the current user ID (to determine if message is deleted by user)
+     * @return MessageDTO
+     */
+    private MessageDTO convertToMessageDTO(Message message, String currentUserId) {
+        if (message == null) {
+            return null;
+        }
+        
+        // Get sender info
+        UserSummaryDTO sender = null;
+        if (message.getSender() != null) {
+            try {
+                User senderUser = message.getSender();
+                sender = UserSummaryDTO.builder()
+                    .id(senderUser.getId())
+                    .username(senderUser.getUsername())
+                    .avatar(senderUser.getProfile() != null && senderUser.getProfile().getAvatar() != null
+                        ? senderUser.getProfile().getAvatar()
+                        : null)
+                    .isVerified(senderUser.isVerified())
+                    .build();
+            } catch (Exception e) {
+                log.warn("Failed to load sender for message {}: {}", message.getId(), e.getMessage());
+            }
+        }
+        
+        // Get reply-to message if exists
+        MessageDTO replyTo = null;
+        if (message.getReplyToMessageId() != null) {
+            try {
+                Message replyToMessage = getMessageById(message.getReplyToMessageId());
+                replyTo = MessageDTO.builder()
+                    .id(replyToMessage.getId())
+                    .sender(UserSummaryDTO.builder()
+                        .id(replyToMessage.getSender().getId())
+                        .username(replyToMessage.getSender().getUsername())
+                        .build())
+                    .content(replyToMessage.getContent())
+                    .createdAt(replyToMessage.getCreatedAt())
+                    .build();
+            } catch (Exception e) {
+                log.warn("Failed to load reply-to message {}: {}", message.getReplyToMessageId(), e.getMessage());
+            }
+        }
+        
+        return MessageDTO.builder()
+            .id(message.getId())
+            .conversationId(message.getConversation() != null ? message.getConversation().getId() : null)
+            .sender(sender)
+            .content(message.getContent())
+            .mediaUrl(message.getMediaUrl())
+            .readBy(new ArrayList<>(message.getReadBy()))
+            .replyTo(replyTo)
+            .createdAt(message.getCreatedAt())
+            .isDeleted(message.getDeletedBy().contains(currentUserId))
+            .build();
     }
 }
 
