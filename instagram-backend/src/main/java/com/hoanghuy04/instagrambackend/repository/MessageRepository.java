@@ -8,15 +8,20 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
 /**
  * Repository interface for Message entity operations.
  * Provides CRUD operations and custom queries for message management.
  * 
  * @author Instagram Backend Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Repository
 public interface MessageRepository extends MongoRepository<Message, String> {
+    
+    // ==================== OLD METHODS (Backward Compatibility) ====================
     
     /**
      * Find messages between two users.
@@ -91,5 +96,63 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      * @return Page of unread messages
      */
     Page<Message> findByReceiverAndIsRead(User receiver, boolean isRead, Pageable pageable);
+    
+    // ==================== NEW METHODS (Conversation-based) ====================
+    
+    /**
+     * Get messages in conversation (excluding deleted by user)
+     *
+     * @param conversationId the conversation ID
+     * @param userId the user ID to exclude deleted messages for
+     * @param pageable pagination information
+     * @return List of messages not deleted by the user
+     */
+    List<Message> findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
+        String conversationId, 
+        String userId,
+        Pageable pageable
+    );
+    
+    /**
+     * Count unread messages in conversation
+     * Unread = message not sent by user AND user hasn't read it
+     *
+     * @param conversationId the conversation ID
+     * @param currentUserId the current user ID
+     * @param currentUserId2 same as currentUserId (required for not equals check)
+     * @return number of unread messages
+     */
+    @Query("{ 'conversation.$id': ?0, 'sender.$id': { $ne: ?1 }, 'readBy': { $ne: ?2 } }")
+    long countByConversationIdAndSenderIdNotAndReadByNotContaining(
+        String conversationId, 
+        String currentUserId,
+        String currentUserId2
+    );
+    
+    /**
+     * Find messages deleted by all participants (for cleanup)
+     *
+     * @param conversationId the conversation ID
+     * @return List of fully deleted messages
+     */
+    @Query("{ 'conversation.$id': ?0, $expr: { $eq: [{ $size: '$deletedBy' }, { $size: '$conversation.participants' }] } }")
+    List<Message> findFullyDeletedMessages(String conversationId);
+    
+    /**
+     * Get latest message in conversation
+     *
+     * @param conversationId the conversation ID
+     * @return Optional containing the latest message
+     */
+    Optional<Message> findFirstByConversationIdOrderByCreatedAtDesc(String conversationId);
+    
+    /**
+     * Find messages between sender and receiver (OLD: Keep for compatibility)
+     *
+     * @param sender the sender user
+     * @param receiver the receiver user
+     * @return List of messages
+     */
+    List<Message> findBySenderAndReceiverOrderByCreatedAtDesc(User sender, User receiver);
 }
 

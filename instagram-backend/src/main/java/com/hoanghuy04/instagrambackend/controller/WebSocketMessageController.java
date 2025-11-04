@@ -6,6 +6,7 @@ import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.service.UserService;
+import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -32,6 +33,7 @@ public class WebSocketMessageController {
     private final SimpMessagingTemplate messagingTemplate;
     private final MessageRepository messageRepository;
     private final UserService userService;
+    private final ConversationMessageService conversationMessageService;
 
     /**
      * Handle private chat messages.
@@ -47,20 +49,32 @@ public class WebSocketMessageController {
             log.info("Message content: {}", chatMessage.getContent());
             log.info("Message type: {}", chatMessage.getType());
             
-            // Get sender and receiver
+            // Get sender
             User sender = userService.getUserEntityById(chatMessage.getSenderId());
             User receiver = userService.getUserEntityById(chatMessage.getReceiverId());
             
-            // Save message to database
-            Message message = Message.builder()
-                    .sender(sender)
-                    .receiver(receiver)
-                    .content(chatMessage.getContent())
-                    .mediaUrl(chatMessage.getMediaUrl())
-                    .isRead(false)
-                    .build();
-            
-            message = messageRepository.save(message);
+            // NEW: Use ConversationMessageService to handle conversation logic
+            Message message;
+            try {
+                message = conversationMessageService.sendMessage(
+                    chatMessage.getSenderId(),
+                    chatMessage.getReceiverId(),
+                    chatMessage.getContent(),
+                    chatMessage.getMediaUrl()
+                );
+                log.info("Message sent via conversation service: {}", message.getId());
+            } catch (Exception e) {
+                log.warn("Failed to send via conversation service, using fallback: {}", e.getMessage());
+                // Fallback: Save directly
+                message = Message.builder()
+                        .sender(sender)
+                        .receiver(receiver)
+                        .content(chatMessage.getContent())
+                        .mediaUrl(chatMessage.getMediaUrl())
+                        .isRead(false)
+                        .build();
+                message = messageRepository.save(message);
+            }
             
             // Set message ID and timestamp
             chatMessage.setId(message.getId());
