@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.dto.message.request;
+package com.hoanghuy04.instagrambackend.dto.request;
 
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;

@@ -70,33 +70,6 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      */
     Page<Message> findBySender(User sender, Pageable pageable);
     
-    /**
-     * Count unread messages for a user.
-     *
-     * @param receiver the user to count unread messages for
-     * @return number of unread messages
-     */
-    long countByReceiverAndIsReadFalse(User receiver);
-    
-    /**
-     * Count unread messages from a specific sender to a receiver.
-     *
-     * @param receiver the user who received the messages
-     * @param sender the user who sent the messages
-     * @return number of unread messages from this sender
-     */
-    long countByReceiverAndSenderAndIsReadFalse(User receiver, User sender);
-    
-    /**
-     * Find unread messages for a user.
-     *
-     * @param receiver the user to find unread messages for
-     * @param isRead read status
-     * @param pageable pagination information
-     * @return Page of unread messages
-     */
-    Page<Message> findByReceiverAndIsRead(User receiver, boolean isRead, Pageable pageable);
-    
     // ==================== NEW METHODS (Conversation-based) ====================
     
     /**
@@ -111,22 +84,6 @@ public interface MessageRepository extends MongoRepository<Message, String> {
         String conversationId, 
         String userId,
         Pageable pageable
-    );
-    
-    /**
-     * Count unread messages in conversation
-     * Unread = message not sent by user AND user hasn't read it
-     *
-     * @param conversationId the conversation ID
-     * @param currentUserId the current user ID
-     * @param currentUserId2 same as currentUserId (required for not equals check)
-     * @return number of unread messages
-     */
-    @Query("{ 'conversation.$id': ?0, 'sender.$id': { $ne: ?1 }, 'readBy': { $ne: ?2 } }")
-    long countByConversationIdAndSenderIdNotAndReadByNotContaining(
-        String conversationId, 
-        String currentUserId,
-        String currentUserId2
     );
     
     /**

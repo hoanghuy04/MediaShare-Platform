@@ -1,14 +1,17 @@
-package com.hoanghuy04.instagrambackend.controller.message;
+package com.hoanghuy04.instagrambackend.controller;
 
-import com.hoanghuy04.instagrambackend.dto.message.request.AddMemberRequest;
-import com.hoanghuy04.instagrambackend.dto.message.request.CreateGroupRequest;
-import com.hoanghuy04.instagrambackend.dto.message.request.UpdateGroupRequest;
-import com.hoanghuy04.instagrambackend.dto.message.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.message.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.request.AddMemberRequest;
+import com.hoanghuy04.instagrambackend.dto.request.CreateGroupRequest;
+import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
+import com.hoanghuy04.instagrambackend.dto.request.UpdateGroupRequest;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
 import com.hoanghuy04.instagrambackend.service.message.ConversationService;
+import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,8 +24,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * REST controller for conversation management endpoints.
@@ -41,6 +42,7 @@ public class ConversationController {
     
     private final ConversationService conversationService;
     private final ConversationMessageService conversationMessageService;
+    private final WebSocketMessageService webSocketMessageService;
     
     /**
      * Get all conversations for a user.
@@ -208,6 +210,122 @@ public class ConversationController {
         
         conversationService.leaveGroup(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Left group successfully", null));
+    }
+    
+    /**
+     * Send a direct message to a user.
+     * Automatically creates a conversation if it doesn't exist.
+     *
+     * @param request the send message request (receiverId, content, mediaUrl)
+     * @param senderId the sender user ID
+     * @return ResponseEntity with MessageDTO
+     */
+    @PostMapping("/direct/messages")
+    @Operation(summary = "Send a direct message to a user (auto-creates conversation)")
+    public ResponseEntity<ApiResponse<MessageDTO>> sendDirectMessage(
+            @Valid @RequestBody SendMessageRequest request,
+            @RequestParam String senderId) {
+        log.info("Send direct message from user {} to user {}", senderId, request.getReceiverId());
+        
+        if (request.getReceiverId() == null || request.getReceiverId().isBlank()) {
+            throw new com.hoanghuy04.instagrambackend.exception.BadRequestException("receiverId is required for direct messages");
+        }
+        
+        // Use ConversationMessageService.sendMessage which handles conversation creation
+        Message message = conversationMessageService.sendMessage(
+            senderId,
+            request.getReceiverId(),
+            request.getContent(),
+            request.getMediaUrl()
+        );
+        
+        // Push via WebSocket
+        webSocketMessageService.pushMessage(message);
+        
+        MessageDTO dto = conversationMessageService.convertToMessageDTO(message, senderId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Message sent successfully", dto));
+    }
+    
+    /**
+     * Send a message to a conversation.
+     * conversationId is taken from path parameter.
+     *
+     * @param conversationId the conversation ID
+     * @param request the send message request (content, mediaUrl, replyToMessageId)
+     * @param senderId the sender user ID
+     * @return ResponseEntity with MessageDTO
+     */
+    @PostMapping("/{conversationId}/messages")
+    @Operation(summary = "Send a message to a conversation")
+    public ResponseEntity<ApiResponse<MessageDTO>> sendMessage(
+            @PathVariable String conversationId,
+            @Valid @RequestBody SendMessageRequest request,
+            @RequestParam String senderId) {
+        log.info("Send message to conversation {} by user {}", conversationId, senderId);
+        
+        Message message;
+        if (request.getReplyToMessageId() != null && !request.getReplyToMessageId().isBlank()) {
+            // Send as reply
+            message = conversationMessageService.replyToMessage(
+                conversationId, 
+                senderId, 
+                request.getReplyToMessageId(), 
+                request.getContent()
+            );
+        } else {
+            // Send normal message
+            message = conversationMessageService.sendMessageToConversation(
+                conversationId, 
+                senderId, 
+                request.getContent(), 
+                request.getMediaUrl()
+            );
+        }
+        
+        // Push via WebSocket
+        webSocketMessageService.pushMessage(message);
+        
+        MessageDTO dto = conversationMessageService.convertToMessageDTO(message, senderId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Message sent successfully", dto));
+    }
+    
+    /**
+     * Mark a message as read.
+     * This will mark all messages in the conversation as read (Instagram-style).
+     *
+     * @param messageId the message ID
+     * @param userId the user ID who reads the message
+     * @return ResponseEntity with success message
+     */
+    @PostMapping("/messages/{messageId}/read")
+    @Operation(summary = "Mark message as read (marks all in conversation)")
+    public ResponseEntity<ApiResponse<Void>> markMessageAsRead(
+            @PathVariable String messageId,
+            @RequestParam String userId) {
+        log.info("Mark message {} as read by user {}", messageId, userId);
+        
+        conversationMessageService.markAsRead(messageId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Message marked as read", null));
+    }
+    
+    /**
+     * Delete a message for user (soft delete).
+     *
+     * @param messageId the message ID
+     * @param userId the user ID
+     * @return ResponseEntity with success message
+     */
+    @DeleteMapping("/messages/{messageId}")
+    @Operation(summary = "Delete a message for user (soft delete)")
+    public ResponseEntity<ApiResponse<Void>> deleteMessage(
+            @PathVariable String messageId,
+            @RequestParam String userId) {
+        log.info("Delete message {} for user {}", messageId, userId);
+        
+        conversationMessageService.deleteMessageForUser(messageId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Message deleted successfully", null));
     }
     
     /**

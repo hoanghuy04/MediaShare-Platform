@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.dto.message.response;
+package com.hoanghuy04.instagrambackend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

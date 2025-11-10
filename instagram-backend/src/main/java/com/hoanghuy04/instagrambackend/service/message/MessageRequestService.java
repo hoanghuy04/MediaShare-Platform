@@ -1,6 +1,10 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
 import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
@@ -16,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Service class for message request operations.
@@ -81,16 +86,20 @@ public class MessageRequestService {
      * Get pending message requests for a user.
      *
      * @param userId the user ID
-     * @return List of pending message requests
+     * @return List of pending message requests as DTOs
      */
     @Transactional(readOnly = true)
-    public List<MessageRequest> getPendingRequests(String userId) {
+    public List<MessageRequestDTO> getPendingRequests(String userId) {
         log.debug("Getting pending requests for user: {}", userId);
         
-        return messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
+        List<MessageRequest> requests = messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
             userId, 
             RequestStatus.PENDING
         );
+        
+        return requests.stream()
+            .map(this::convertToDTO)
+            .collect(Collectors.toList());
     }
     
     /**
@@ -194,14 +203,14 @@ public class MessageRequestService {
     }
     
     /**
-     * Count pending requests for a user.
+     * Get count of pending message requests for a user.
      *
      * @param userId the user ID
      * @return number of pending requests
      */
     @Transactional(readOnly = true)
-    public long countPendingRequests(String userId) {
-        return messageRequestRepository.countByReceiverIdAndStatus(userId, RequestStatus.PENDING);
+    public int getPendingRequestsCount(String userId) {
+        return (int) messageRequestRepository.countByReceiverIdAndStatus(userId, RequestStatus.PENDING);
     }
     
     /**
@@ -250,6 +259,79 @@ public class MessageRequestService {
     public MessageRequest getRequestById(String requestId) {
         return messageRequestRepository.findById(requestId)
             .orElseThrow(() -> new ResourceNotFoundException("Message request not found with id: " + requestId));
+    }
+    
+    /**
+     * Convert MessageRequest entity to DTO.
+     *
+     * @param request the message request entity
+     * @return MessageRequestDTO
+     */
+    private MessageRequestDTO convertToDTO(MessageRequest request) {
+        // Get receiver ID for converting message
+        String receiverId = request.getReceiver().getId();
+        
+        return MessageRequestDTO.builder()
+            .id(request.getId())
+            .sender(convertToUserSummaryDTO(request.getSender()))
+            .firstMessage(convertToMessageDTO(request.getFirstMessage(), receiverId))
+            .status(request.getStatus())
+            .createdAt(request.getCreatedAt())
+            .build();
+    }
+    
+    /**
+     * Convert User entity to UserSummaryDTO.
+     *
+     * @param user the user entity
+     * @return UserSummaryDTO
+     */
+    private UserSummaryDTO convertToUserSummaryDTO(User user) {
+        if (user == null) {
+            return null;
+        }
+        
+        // Get avatar from profile
+        String avatar = null;
+        if (user.getProfile() != null) {
+            avatar = user.getProfile().getAvatar();
+        }
+        
+        return UserSummaryDTO.builder()
+            .id(user.getId())
+            .username(user.getUsername())
+            .avatar(avatar)
+            .isVerified(false) // Default to false
+            .build();
+    }
+    
+    /**
+     * Convert Message entity to MessageDTO.
+     *
+     * @param message the message entity
+     * @param currentUserId the current user ID
+     * @return MessageDTO
+     */
+    private MessageDTO convertToMessageDTO(Message message, String currentUserId) {
+        if (message == null) {
+            return null;
+        }
+        
+        // Check if message is deleted by current user
+        boolean isDeleted = message.getDeletedBy() != null 
+            && message.getDeletedBy().contains(currentUserId);
+        
+        return MessageDTO.builder()
+            .id(message.getId())
+            .conversationId(message.getConversation() != null ? message.getConversation().getId() : null)
+            .sender(convertToUserSummaryDTO(message.getSender()))
+            .content(message.getContent())
+            .mediaUrl(message.getMediaUrl())
+            .readBy(message.getReadBy() != null ? message.getReadBy() : List.of())
+            .replyTo(null) // Simplified - don't fetch replyTo for message requests
+            .createdAt(message.getCreatedAt())
+            .isDeleted(isDeleted)
+            .build();
     }
 }
 

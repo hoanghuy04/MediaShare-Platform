@@ -60,12 +60,29 @@ export const API_ENDPOINTS = {
   LIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
   UNLIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
 
-  // Messages
-  CONVERSATIONS: '/api/messages',
-  CONVERSATION_DETAIL: (id: string) => `/api/messages/${id}`,
-  CREATE_CONVERSATION: '/api/messages/conversations',
-  MESSAGES: (conversationId: string) => `/api/messages/${conversationId}`,
-  SEND_MESSAGE: '/api/messages',
+  // Messages / Conversations
+  CONVERSATIONS: '/api/conversations',
+  CONVERSATION_DETAIL: (id: string) => `/api/conversations/${id}`,
+  CONVERSATION_MESSAGES: (id: string) => `/api/conversations/${id}/messages`,
+  SEND_DIRECT_MESSAGE: '/api/conversations/direct/messages',
+  SEND_MESSAGE: (conversationId: string) => `/api/conversations/${conversationId}/messages`,
+  MARK_MESSAGE_READ: (messageId: string) => `/api/conversations/messages/${messageId}/read`,
+  DELETE_MESSAGE: (messageId: string) => `/api/conversations/messages/${messageId}`,
+  DELETE_CONVERSATION: (conversationId: string) => `/api/conversations/${conversationId}`,
+  
+  // Group Chat
+  CREATE_GROUP: '/api/conversations/group',
+  UPDATE_GROUP: (id: string) => `/api/conversations/${id}`,
+  ADD_MEMBERS: (id: string) => `/api/conversations/${id}/members`,
+  REMOVE_MEMBER: (id: string, userId: string) => `/api/conversations/${id}/members/${userId}`,
+  LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
+  
+  // Message Requests
+  MESSAGE_REQUESTS: '/api/message-requests',
+  MESSAGE_REQUESTS_COUNT: '/api/message-requests/count',
+  ACCEPT_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/accept`,
+  REJECT_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/reject`,
+  IGNORE_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/ignore`,
 
   // Notifications
   NOTIFICATIONS: '/api/notifications',

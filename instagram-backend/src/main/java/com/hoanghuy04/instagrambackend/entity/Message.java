@@ -69,21 +69,14 @@ public class Message {
     private String mediaUrl;
     
     /**
-     * NEW: List of user IDs who have read this message
+     * List of user IDs who have read this message
      * Used for multi-user read receipts in group chats
      */
     @Builder.Default
     private List<String> readBy = new ArrayList<>();
     
     /**
-     * DEPRECATED: Flag indicating if the message has been read
-     * Kept for migration compatibility - use readBy instead
-     */
-    @Builder.Default
-    private boolean isRead = false;
-    
-    /**
-     * NEW: ID of the message this message is replying to (threading support)
+     * ID of the message this message is replying to (threading support)
      */
     private String replyToMessageId;
     

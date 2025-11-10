@@ -29,8 +29,6 @@ public class MessageResponse {
     
     private String mediaUrl;
     
-    private Boolean isRead;
-    
     private LocalDateTime createdAt;
 }
 

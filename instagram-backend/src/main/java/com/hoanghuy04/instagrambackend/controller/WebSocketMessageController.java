@@ -147,25 +147,14 @@ public class WebSocketMessageController {
                 return;
             }
             
-            // Update message in database
-            Message message = messageRepository.findById(chatMessage.getId())
-                    .orElseThrow(() -> new RuntimeException("Message not found"));
-            
-            // Mark as read using ConversationMessageService if possible
-            if (message.getConversation() != null && chatMessage.getSenderId() != null) {
-                conversationMessageService.markConversationAsRead(
-                    message.getConversation().getId(),
+            // Update message in database using unified markAsRead method
+            // This will mark the message and all unread messages in the conversation as read
+            // and automatically push WebSocket read receipt
+            if (chatMessage.getSenderId() != null) {
+                conversationMessageService.markAsRead(
+                    chatMessage.getId(),
                     chatMessage.getSenderId()
                 );
-            } else {
-                // Fallback: just mark this message
-                message.setRead(true);
-                messageRepository.save(message);
-            }
-            
-            // Push read receipt via WebSocket
-            if (chatMessage.getSenderId() != null) {
-                webSocketMessageService.pushReadReceipt(message, chatMessage.getSenderId());
             }
             
         } catch (Exception e) {

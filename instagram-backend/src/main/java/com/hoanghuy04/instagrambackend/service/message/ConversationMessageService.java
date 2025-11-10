@@ -1,9 +1,9 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.message.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.message.response.LastMessageDTO;
-import com.hoanghuy04.instagrambackend.dto.message.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.message.response.UserSummaryDTO;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.LastMessageDTO;
+import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
@@ -18,11 +18,9 @@ import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
-import com.hoanghuy04.instagrambackend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,13 +45,13 @@ import java.util.stream.Collectors;
 public class ConversationMessageService {
     
     private final MessageRepository messageRepository;
-    private final ConversationService conversationService;
     private final MessageRequestService messageRequestService;
-    private final ConversationRepository conversationRepository;
     private final MessageRequestRepository messageRequestRepository;
-    private final UserRepository userRepository;
+    private final ConversationService conversationService;
+    private final ConversationRepository conversationRepository;
     private final FollowRepository followRepository;
-    private final UserService userService;
+    private final UserRepository userRepository;
+    private final WebSocketMessageService webSocketMessageService;
     
     /**
      * Send a message to a conversation.
@@ -80,6 +78,10 @@ public class ConversationMessageService {
         // Get sender
         User sender = getUserById(senderId);
         
+        // Auto-mark all unread messages as read when user sends a reply
+        // Logic: When you reply to someone, it means you've read their messages
+        autoMarkMessagesAsReadOnReply(conversationId, senderId);
+        
         // Create message
         Message message = Message.builder()
             .conversation(conversation)
@@ -87,7 +89,6 @@ public class ConversationMessageService {
             .receiver(null) // Deprecated field - will be populated for backward compatibility
             .content(content)
             .mediaUrl(mediaUrl)
-            .isRead(false)
             .build();
         
         // Set receiver for backward compatibility (for WebSocket and old queries)
@@ -167,7 +168,6 @@ public class ConversationMessageService {
                 .receiver(receiver)
                 .content(content)
                 .mediaUrl(mediaUrl)
-                .isRead(false)
                 .build();
             
             message = messageRepository.save(message);
@@ -181,48 +181,6 @@ public class ConversationMessageService {
     }
     
     /**
-     * Get messages in a conversation (excluding deleted by user).
-     *
-     * @param conversationId the conversation ID
-     * @param userId the user ID
-     * @param pageable pagination information
-     * @return Page of messages
-     */
-    @Transactional(readOnly = true)
-    public Page<Message> getConversationMessages(String conversationId, String userId, Pageable pageable) {
-        log.debug("Getting messages for conversation {} by user {}", conversationId, userId);
-        
-        // Verify user is participant
-        if (!conversationService.isParticipant(conversationId, userId)) {
-            throw new BadRequestException("You are not a participant in this conversation");
-        }
-        
-        List<Message> messages = messageRepository.findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
-            conversationId, 
-            userId,
-            pageable
-        );
-        
-        // Convert to Page
-        Pageable unpagedPageable = PageRequest.of(0, Integer.MAX_VALUE);
-        List<Message> allMessages = messageRepository.findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
-            conversationId, 
-            userId,
-            unpagedPageable
-        );
-        
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), messages.size());
-        List<Message> paginatedMessages = messages.subList(start, end);
-        
-        return new org.springframework.data.domain.PageImpl<>(
-            paginatedMessages,
-            pageable,
-            allMessages.size()
-        );
-    }
-    
-    /**
      * Get messages in a conversation as DTOs (excluding deleted by user).
      *
      * @param conversationId the conversation ID
@@ -232,27 +190,47 @@ public class ConversationMessageService {
      */
     @Transactional(readOnly = true)
     public PageResponse<MessageDTO> getConversationMessagesAsDTO(String conversationId, String userId, Pageable pageable) {
-        log.debug("Getting messages for conversation {} by user {} as DTOs", conversationId, userId);
+        log.debug("Getting messages for conversation {} by user {}", conversationId, userId);
         
-        Page<Message> messagePage = getConversationMessages(conversationId, userId, pageable);
+        // Verify user is participant
+        if (!conversationService.isParticipant(conversationId, userId)) {
+            throw new BadRequestException("You are not a participant in this conversation");
+        }
+        
+        // Get messages directly
+        List<Message> messages = messageRepository
+            .findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
+                conversationId, 
+                userId,
+                pageable
+            );
         
         // Convert to DTOs
-        List<MessageDTO> messageDTOs = messagePage.getContent().stream()
+        List<MessageDTO> messageDTOs = messages.stream()
             .map((Message message) -> convertToMessageDTO(message, userId))
             .collect(Collectors.toList());
         
-        // Create Page with DTOs
-        Page<MessageDTO> dtoPage = new org.springframework.data.domain.PageImpl<>(
-            messageDTOs,
-            pageable,
-            messagePage.getTotalElements()
-        );
+        // Get total count
+        List<Message> allMessages = messageRepository
+            .findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
+                conversationId, 
+                userId,
+                Pageable.unpaged()
+            );
         
-        return PageResponse.of(dtoPage);
+        Page<MessageDTO> page = new org.springframework.data.domain.PageImpl<>(messageDTOs, pageable, allMessages.size());
+        return PageResponse.of(page);
     }
     
     /**
-     * Mark a message as read.
+     * Mark a message as read (unified intelligent method).
+     * - Adds userId to readBy list
+     * - Marks all messages in conversation as read (Instagram-style)
+     * - Pushes WebSocket read receipt
+     * 
+     * Behavior:
+     * - For conversation messages: marks all unread messages in the conversation as read
+     * - For legacy messages: marks all messages between sender and receiver as read
      *
      * @param messageId the message ID
      * @param userId the user ID who reads the message
@@ -263,52 +241,54 @@ public class ConversationMessageService {
         
         Message message = getMessageById(messageId);
         
-        // Add user to readBy list if not already there
+        // Add user to readBy list
         if (!message.getReadBy().contains(userId)) {
             message.getReadBy().add(userId);
-            
-            // Also update deprecated isRead field for backward compatibility
-            if (message.getConversation() != null) {
-                // For conversation messages, mark as read for backward compatibility
-                message.setRead(true);
-            }
-            
             messageRepository.save(message);
-            log.info("Message marked as read successfully");
-        }
-    }
-    
-    /**
-     * Mark all messages in a conversation as read.
-     *
-     * @param conversationId the conversation ID
-     * @param userId the user ID
-     */
-    @Transactional
-    public void markConversationAsRead(String conversationId, String userId) {
-        log.info("Marking all messages in conversation {} as read by user {}", conversationId, userId);
-        
-        // Verify user is participant
-        if (!conversationService.isParticipant(conversationId, userId)) {
-            throw new BadRequestException("You are not a participant in this conversation");
         }
         
-        // Get all unread messages
-        Pageable pageable = PageRequest.of(0, Integer.MAX_VALUE);
-        List<Message> messages = messageRepository.findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
-            conversationId, 
-            userId,
-            pageable
-        );
-        
-        // Mark each as read
-        for (Message message : messages) {
-            if (!message.getReadBy().contains(userId) && !message.getSender().getId().equals(userId)) {
-                markAsRead(message.getId(), userId);
+        // Mark ALL messages in conversation as read (Instagram behavior)
+        if (message.getConversation() != null) {
+            // Get all unread messages in this conversation
+            Pageable unpaged = Pageable.unpaged();
+            List<Message> unreadMessages = messageRepository
+                .findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
+                    message.getConversation().getId(), 
+                    userId,
+                    unpaged
+                );
+            
+            for (Message msg : unreadMessages) {
+                if (!msg.getReadBy().contains(userId) && !msg.getSender().getId().equals(userId)) {
+                    msg.getReadBy().add(userId);
+                    messageRepository.save(msg);
+                }
+            }
+        } else {
+            // Legacy: mark all between sender and receiver
+            User sender = message.getSender();
+            User receiver = message.getReceiver();
+            
+            if (sender != null && receiver != null) {
+                List<Message> unreadMessages = messageRepository
+                    .findBySenderAndReceiverOrderByCreatedAtDesc(sender, receiver)
+                    .stream()
+                    .filter(msg -> msg.getReceiver() != null 
+                        && msg.getReceiver().getId().equals(userId) 
+                        && !msg.getReadBy().contains(userId))
+                    .toList();
+                
+                for (Message msg : unreadMessages) {
+                    msg.getReadBy().add(userId);
+                    messageRepository.save(msg);
+                }
             }
         }
         
-        log.info("All messages marked as read successfully");
+        // Push WebSocket read receipt
+        webSocketMessageService.pushReadReceipt(message, userId);
+        
+        log.info("Message marked as read successfully");
     }
     
     /**
@@ -447,8 +427,71 @@ public class ConversationMessageService {
     }
     
     /**
+     * Auto-mark all unread messages as read when user sends a reply.
+     * Logic: When you reply to someone, it means you've read their messages.
+     * 
+     * @param conversationId the conversation ID
+     * @param userId the user ID who is sending the reply
+     */
+    private void autoMarkMessagesAsReadOnReply(String conversationId, String userId) {
+        try {
+            log.debug("Auto-marking messages as read for user {} in conversation {}", userId, conversationId);
+            
+            // Get all unread messages in this conversation that were NOT sent by this user
+            Pageable unpaged = Pageable.unpaged();
+            List<Message> unreadMessages = messageRepository
+                .findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
+                    conversationId, 
+                    userId,
+                    unpaged
+                );
+            
+            int markedCount = 0;
+            for (Message msg : unreadMessages) {
+            // Only mark messages sent by OTHER users
+            if (!msg.getSender().getId().equals(userId) && !msg.getReadBy().contains(userId)) {
+                msg.getReadBy().add(userId);
+                messageRepository.save(msg);
+                
+                // Push read receipt via WebSocket for each message
+                webSocketMessageService.pushReadReceipt(msg, userId);
+                markedCount++;
+            }
+            }
+            
+            if (markedCount > 0) {
+                log.info("Auto-marked {} messages as read for user {} when replying", markedCount, userId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-mark messages as read: {}", e.getMessage());
+            // Don't fail the whole send operation if auto-mark fails
+        }
+    }
+    
+    /**
+     * Convert User entity to UserSummaryDTO.
+     *
+     * @param user the User entity
+     * @return UserSummaryDTO
+     */
+    public UserSummaryDTO convertToUserSummaryDTO(User user) {
+        if (user == null) {
+            return null;
+        }
+        return UserSummaryDTO.builder()
+            .id(user.getId())
+            .username(user.getUsername())
+            .avatar(user.getProfile() != null && user.getProfile().getAvatar() != null
+                ? user.getProfile().getAvatar()
+                : null)
+            .isVerified(user.isVerified())
+            .build();
+    }
+    
+    /**
      * Get user by ID.
      */
+    //TODO: delete this method if there is a service implemented
     private User getUserById(String userId) {
         return userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
@@ -457,6 +500,7 @@ public class ConversationMessageService {
     /**
      * Get message by ID.
      */
+    //TODO: delete this method if there is a service implemented
     private Message getMessageById(String messageId) {
         return messageRepository.findById(messageId)
             .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
@@ -564,7 +608,7 @@ public class ConversationMessageService {
      * @param currentUserId the current user ID (for unread count calculation)
      * @return ConversationDTO
      */
-    private ConversationDTO convertToConversationDTO(Conversation conversation, String currentUserId) {
+    public ConversationDTO convertToConversationDTO(Conversation conversation, String currentUserId) {
         // Get participants as UserSummaryDTO
         List<UserSummaryDTO> participants = conversation.getParticipants().stream()
             .map(userId -> {
@@ -603,16 +647,6 @@ public class ConversationMessageService {
             }
         }
         
-        // Calculate unread count
-        int unreadCount = 0;
-        try {
-            unreadCount = (int) messageRepository.countByConversationIdAndSenderIdNotAndReadByNotContaining(
-                conversation.getId(), currentUserId, currentUserId
-            );
-        } catch (Exception e) {
-            log.warn("Failed to count unread messages: {}", e.getMessage());
-        }
-        
         return ConversationDTO.builder()
             .id(conversation.getId())
             .type(conversation.getType())
@@ -620,7 +654,6 @@ public class ConversationMessageService {
             .avatar(conversation.getAvatar())
             .participants(participants)
             .lastMessage(lastMessageDTO)
-            .unreadCount(unreadCount)
             .createdAt(conversation.getCreatedAt())
             .build();
     }
@@ -632,7 +665,7 @@ public class ConversationMessageService {
      * @param currentUserId the current user ID (to determine if message is deleted by user)
      * @return MessageDTO
      */
-    private MessageDTO convertToMessageDTO(Message message, String currentUserId) {
+    public MessageDTO convertToMessageDTO(Message message, String currentUserId) {
         if (message == null) {
             return null;
         }

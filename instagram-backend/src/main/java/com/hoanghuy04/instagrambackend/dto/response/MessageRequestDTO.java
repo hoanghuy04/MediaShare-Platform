@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.dto.message.response;
+package com.hoanghuy04.instagrambackend.dto.response;
 
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import lombok.AllArgsConstructor;
@@ -34,11 +34,6 @@ public class MessageRequestDTO {
      * The first message in the request
      */
     private MessageDTO firstMessage;
-    
-    /**
-     * Number of pending messages
-     */
-    private int pendingCount;
     
     /**
      * Current status of the request

@@ -13,7 +13,7 @@ import {
   Conversation,
   Message,
   SendMessageRequest,
-  SendMessageData,
+  MessageRequest,
   Notification,
   PaginatedResponse,
 } from '../types';
@@ -276,39 +276,170 @@ export const commentAPI = {
 
 // Message API
 export const messageAPI = {
+  // Get all conversations for current user
   getConversations: async (page = 0, limit = 20): Promise<PaginatedResponse<Conversation>> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'] as string;
+    console.log('Getting conversations with userId:', userId);
     const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATIONS, {
-      params: { page, limit },
+      params: { userId, page, limit },
     });
     return response.data.data;
   },
 
-  getConversation: async (conversationId: string): Promise<PaginatedResponse<Message>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATION_DETAIL(conversationId));
+  // Get conversation details
+  getConversation: async (conversationId: string): Promise<Conversation> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATION_DETAIL(conversationId), {
+      params: { userId },
+    });
     return response.data.data;
   },
 
+  // Get messages in a conversation
   getMessages: async (
     conversationId: string,
     page = 0,
     limit = 50
   ): Promise<PaginatedResponse<Message>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGES(conversationId), {
-      params: { page, limit },
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATION_MESSAGES(conversationId), {
+      params: { userId, page, limit },
     });
     return response.data.data;
   },
 
-  sendMessage: async (data: SendMessageRequest): Promise<Message> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.SEND_MESSAGE, data);
+  // Send direct message (auto-creates conversation if needed)
+  sendDirectMessage: async (receiverId: string, content: string, mediaUrl?: string): Promise<Message> => {
+    const senderId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.SEND_DIRECT_MESSAGE,
+      { receiverId, content, mediaUrl },
+      { params: { senderId } }
+    );
     return response.data.data;
   },
 
-  createConversation: async (participantIds: string[]): Promise<Conversation> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.CREATE_CONVERSATION, {
-      participantIds,
+  // Send message to existing conversation
+  sendMessage: async (
+    conversationId: string,
+    content: string,
+    mediaUrl?: string,
+    replyToMessageId?: string
+  ): Promise<Message> => {
+    const senderId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.SEND_MESSAGE(conversationId),
+      { content, mediaUrl, replyToMessageId },
+      { params: { senderId } }
+    );
+    return response.data.data;
+  },
+
+  // Mark message as read (marks all messages in conversation)
+  markAsRead: async (messageId: string): Promise<void> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    await axiosInstance.post(
+      API_ENDPOINTS.MARK_MESSAGE_READ(messageId),
+      null,
+      { params: { userId } }
+    );
+  },
+
+  // Delete message (soft delete)
+  deleteMessage: async (messageId: string): Promise<void> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    await axiosInstance.delete(
+      API_ENDPOINTS.DELETE_MESSAGE(messageId),
+      { params: { userId } }
+    );
+  },
+
+  // Delete conversation (soft delete)
+  deleteConversation: async (conversationId: string): Promise<void> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    await axiosInstance.delete(
+      API_ENDPOINTS.DELETE_CONVERSATION(conversationId),
+      { params: { userId } }
+    );
+  },
+
+  // Create group chat
+  createGroup: async (groupName: string, participantIds: string[], avatar?: string): Promise<Conversation> => {
+    const creatorId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.CREATE_GROUP,
+      { groupName, participantIds, avatar },
+      { params: { creatorId } }
+    );
+    return response.data.data;
+  },
+
+  // Update group info
+  updateGroup: async (conversationId: string, name: string, avatar?: string): Promise<Conversation> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.put(
+      API_ENDPOINTS.UPDATE_GROUP(conversationId),
+      { name, avatar },
+      { params: { userId } }
+    );
+    return response.data.data;
+  },
+
+  // Leave group
+  leaveGroup: async (conversationId: string): Promise<void> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    await axiosInstance.post(
+      API_ENDPOINTS.LEAVE_GROUP(conversationId),
+      null,
+      { params: { userId } }
+    );
+  },
+};
+
+// Message Request API
+export const messageRequestAPI = {
+  getPendingRequests: async (): Promise<MessageRequest[]> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS, {
+      params: { userId },
     });
     return response.data.data;
+  },
+
+  getPendingRequestsCount: async (): Promise<number> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_COUNT, {
+      params: { userId },
+    });
+    return response.data.data;
+  },
+
+  acceptRequest: async (requestId: string): Promise<Conversation> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.ACCEPT_MESSAGE_REQUEST(requestId),
+      null,
+      { params: { userId } }
+    );
+    return response.data.data;
+  },
+
+  rejectRequest: async (requestId: string): Promise<void> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    await axiosInstance.post(
+      API_ENDPOINTS.REJECT_MESSAGE_REQUEST(requestId),
+      null,
+      { params: { userId } }
+    );
+  },
+
+  ignoreRequest: async (requestId: string): Promise<void> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    await axiosInstance.post(
+      API_ENDPOINTS.IGNORE_MESSAGE_REQUEST(requestId),
+      null,
+      { params: { userId } }
+    );
   },
 };
 

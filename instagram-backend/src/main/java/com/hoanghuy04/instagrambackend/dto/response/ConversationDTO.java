@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.dto.message.response;
+package com.hoanghuy04.instagrambackend.dto.response;
 
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import lombok.AllArgsConstructor;
@@ -50,11 +50,6 @@ public class ConversationDTO {
      * Information about the last message
      */
     private LastMessageDTO lastMessage;
-    
-    /**
-     * Number of unread messages for the current user
-     */
-    private int unreadCount;
     
     /**
      * Timestamp when the conversation was created
