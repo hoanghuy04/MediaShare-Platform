@@ -1,15 +1,13 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
-import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
 import com.hoanghuy04.instagrambackend.entity.Message;
-import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +35,7 @@ public class MessageRequestService {
     private final MessageRequestRepository messageRequestRepository;
     private final ConversationService conversationService;
     private final MessageRepository messageRepository;
+    private final MessageMapper messageMapper;
     
     /**
      * Create a new message request.
@@ -273,64 +272,10 @@ public class MessageRequestService {
         
         return MessageRequestDTO.builder()
             .id(request.getId())
-            .sender(convertToUserSummaryDTO(request.getSender()))
-            .firstMessage(convertToMessageDTO(request.getFirstMessage(), receiverId))
+            .sender(messageMapper.toUserSummaryDTO(request.getSender()))
+            .firstMessage(messageMapper.toMessageDTO(request.getFirstMessage(), receiverId))
             .status(request.getStatus())
             .createdAt(request.getCreatedAt())
-            .build();
-    }
-    
-    /**
-     * Convert User entity to UserSummaryDTO.
-     *
-     * @param user the user entity
-     * @return UserSummaryDTO
-     */
-    private UserSummaryDTO convertToUserSummaryDTO(User user) {
-        if (user == null) {
-            return null;
-        }
-        
-        // Get avatar from profile
-        String avatar = null;
-        if (user.getProfile() != null) {
-            avatar = user.getProfile().getAvatar();
-        }
-        
-        return UserSummaryDTO.builder()
-            .id(user.getId())
-            .username(user.getUsername())
-            .avatar(avatar)
-            .isVerified(false) // Default to false
-            .build();
-    }
-    
-    /**
-     * Convert Message entity to MessageDTO.
-     *
-     * @param message the message entity
-     * @param currentUserId the current user ID
-     * @return MessageDTO
-     */
-    private MessageDTO convertToMessageDTO(Message message, String currentUserId) {
-        if (message == null) {
-            return null;
-        }
-        
-        // Check if message is deleted by current user
-        boolean isDeleted = message.getDeletedBy() != null 
-            && message.getDeletedBy().contains(currentUserId);
-        
-        return MessageDTO.builder()
-            .id(message.getId())
-            .conversationId(message.getConversation() != null ? message.getConversation().getId() : null)
-            .sender(convertToUserSummaryDTO(message.getSender()))
-            .content(message.getContent())
-            .mediaUrl(message.getMediaUrl())
-            .readBy(message.getReadBy() != null ? message.getReadBy() : List.of())
-            .replyTo(null) // Simplified - don't fetch replyTo for message requests
-            .createdAt(message.getCreatedAt())
-            .isDeleted(isDeleted)
             .build();
     }
 }

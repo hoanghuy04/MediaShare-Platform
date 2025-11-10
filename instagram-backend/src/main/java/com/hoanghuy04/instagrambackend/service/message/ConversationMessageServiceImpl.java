@@ -1,9 +1,7 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.LastMessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
@@ -13,6 +11,7 @@ import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
@@ -52,6 +51,7 @@ public class ConversationMessageService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final WebSocketMessageService webSocketMessageService;
+    private final MessageMapper messageMapper;
     
     /**
      * Send a message to a conversation.
@@ -207,7 +207,7 @@ public class ConversationMessageService {
         
         // Convert to DTOs
         List<MessageDTO> messageDTOs = messages.stream()
-            .map((Message message) -> convertToMessageDTO(message, userId))
+            .map((Message message) -> messageMapper.toMessageDTO(message, userId))
             .collect(Collectors.toList());
         
         // Get total count
@@ -468,25 +468,6 @@ public class ConversationMessageService {
         }
     }
     
-    /**
-     * Convert User entity to UserSummaryDTO.
-     *
-     * @param user the User entity
-     * @return UserSummaryDTO
-     */
-    public UserSummaryDTO convertToUserSummaryDTO(User user) {
-        if (user == null) {
-            return null;
-        }
-        return UserSummaryDTO.builder()
-            .id(user.getId())
-            .username(user.getUsername())
-            .avatar(user.getProfile() != null && user.getProfile().getAvatar() != null
-                ? user.getProfile().getAvatar()
-                : null)
-            .isVerified(user.isVerified())
-            .build();
-    }
     
     /**
      * Get user by ID.
@@ -521,7 +502,7 @@ public class ConversationMessageService {
         
         // Convert to DTOs
         List<ConversationDTO> conversationDTOs = conversations.stream()
-            .map(conv -> convertToConversationDTO(conv, userId))
+            .map(conv -> messageMapper.toConversationDTO(conv, userId))
             .collect(Collectors.toList());
         
         // Manual pagination
@@ -558,7 +539,7 @@ public class ConversationMessageService {
         }
         
         Conversation conversation = conversationService.getConversationById(conversationId);
-        return convertToConversationDTO(conversation, userId);
+        return messageMapper.toConversationDTO(conversation, userId);
     }
     
     /**
@@ -579,7 +560,7 @@ public class ConversationMessageService {
         Conversation conversation = conversationService.createGroupConversation(
             creatorId, participantIds, groupName, avatar
         );
-        return convertToConversationDTO(conversation, creatorId);
+        return messageMapper.toConversationDTO(conversation, creatorId);
     }
     
     /**
@@ -598,126 +579,7 @@ public class ConversationMessageService {
             String avatar,
             String userId) {
         Conversation conversation = conversationService.updateGroupInfo(conversationId, name, avatar);
-        return convertToConversationDTO(conversation, userId);
-    }
-    
-    /**
-     * Convert Conversation entity to ConversationDTO.
-     *
-     * @param conversation the Conversation entity
-     * @param currentUserId the current user ID (for unread count calculation)
-     * @return ConversationDTO
-     */
-    public ConversationDTO convertToConversationDTO(Conversation conversation, String currentUserId) {
-        // Get participants as UserSummaryDTO
-        List<UserSummaryDTO> participants = conversation.getParticipants().stream()
-            .map(userId -> {
-                try {
-                    User user = getUserById(userId);
-                    return UserSummaryDTO.builder()
-                        .id(user.getId())
-                        .username(user.getUsername())
-                        .avatar(user.getProfile() != null && user.getProfile().getAvatar() != null 
-                            ? user.getProfile().getAvatar() 
-                            : null)
-                        .isVerified(user.isVerified())
-                        .build();
-                } catch (Exception e) {
-                    log.warn("Failed to load user {}: {}", userId, e.getMessage());
-                    return null;
-                }
-            })
-            .filter(user -> user != null)
-            .collect(Collectors.toList());
-        
-        // Convert last message
-        LastMessageDTO lastMessageDTO = null;
-        if (conversation.getLastMessage() != null) {
-            try {
-                User sender = getUserById(conversation.getLastMessage().getSenderId());
-                lastMessageDTO = LastMessageDTO.builder()
-                    .messageId(conversation.getLastMessage().getMessageId())
-                    .content(conversation.getLastMessage().getContent())
-                    .senderId(conversation.getLastMessage().getSenderId())
-                    .senderUsername(sender.getUsername())
-                    .timestamp(conversation.getLastMessage().getTimestamp())
-                    .build();
-            } catch (Exception e) {
-                log.warn("Failed to load last message sender: {}", e.getMessage());
-            }
-        }
-        
-        return ConversationDTO.builder()
-            .id(conversation.getId())
-            .type(conversation.getType())
-            .name(conversation.getName())
-            .avatar(conversation.getAvatar())
-            .participants(participants)
-            .lastMessage(lastMessageDTO)
-            .createdAt(conversation.getCreatedAt())
-            .build();
-    }
-    
-    /**
-     * Convert Message entity to MessageDTO.
-     *
-     * @param message the Message entity
-     * @param currentUserId the current user ID (to determine if message is deleted by user)
-     * @return MessageDTO
-     */
-    public MessageDTO convertToMessageDTO(Message message, String currentUserId) {
-        if (message == null) {
-            return null;
-        }
-        
-        // Get sender info
-        UserSummaryDTO sender = null;
-        if (message.getSender() != null) {
-            try {
-                User senderUser = message.getSender();
-                sender = UserSummaryDTO.builder()
-                    .id(senderUser.getId())
-                    .username(senderUser.getUsername())
-                    .avatar(senderUser.getProfile() != null && senderUser.getProfile().getAvatar() != null
-                        ? senderUser.getProfile().getAvatar()
-                        : null)
-                    .isVerified(senderUser.isVerified())
-                    .build();
-            } catch (Exception e) {
-                log.warn("Failed to load sender for message {}: {}", message.getId(), e.getMessage());
-            }
-        }
-        
-        // Get reply-to message if exists
-        MessageDTO replyTo = null;
-        if (message.getReplyToMessageId() != null) {
-            try {
-                Message replyToMessage = getMessageById(message.getReplyToMessageId());
-                replyTo = MessageDTO.builder()
-                    .id(replyToMessage.getId())
-                    .sender(UserSummaryDTO.builder()
-                        .id(replyToMessage.getSender().getId())
-                        .username(replyToMessage.getSender().getUsername())
-                        .build())
-                    .content(replyToMessage.getContent())
-                    .createdAt(replyToMessage.getCreatedAt())
-                    .build();
-            } catch (Exception e) {
-                log.warn("Failed to load reply-to message {}: {}", message.getReplyToMessageId(), e.getMessage());
-            }
-        }
-        
-        return MessageDTO.builder()
-            .id(message.getId())
-            .conversationId(message.getConversation() != null ? message.getConversation().getId() : null)
-            .sender(sender)
-            .content(message.getContent())
-            .mediaUrl(message.getMediaUrl())
-            .readBy(new ArrayList<>(message.getReadBy()))
-            .replyTo(replyTo)
-            .createdAt(message.getCreatedAt())
-            .isDeleted(message.getDeletedBy().contains(currentUserId))
-            .build();
+        return messageMapper.toConversationDTO(conversation, userId);
     }
 }
 
