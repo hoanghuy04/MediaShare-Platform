@@ -31,18 +31,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ConversationService {
+public class ConversationServiceImpl implements ConversationService {
     
     private final ConversationRepository conversationRepository;
     
-    /**
-     * Get or create a direct conversation between two users.
-     *
-     * @param userId1 first user ID
-     * @param userId2 second user ID
-     * @return Conversation entity
-     */
     @Transactional
+    @Override
     public Conversation getOrCreateDirectConversation(String userId1, String userId2) {
         log.info("Getting or creating direct conversation between {} and {}", userId1, userId2);
         
@@ -84,21 +78,13 @@ public class ConversationService {
         return conversation;
     }
     
-    /**
-     * Create a group conversation.
-     *
-     * @param creatorId the user ID who creates the group
-     * @param participantIds list of participant user IDs
-     * @param groupName the name of the group
-     * @param avatar the avatar URL of the group
-     * @return Conversation entity
-     */
     @Transactional
+    @Override
     public Conversation createGroupConversation(
-        String creatorId, 
-        List<String> participantIds, 
-        String groupName, 
-        String avatar
+            String creatorId,
+            List<String> participantIds,
+            String groupName,
+            String avatar
     ) {
         log.info("Creating group conversation: {} by user {}", groupName, creatorId);
         
@@ -135,14 +121,8 @@ public class ConversationService {
         return conversation;
     }
     
-    /**
-     * Add member to a group conversation.
-     *
-     * @param conversationId the conversation ID
-     * @param userId the user ID to add
-     * @param addedBy the user ID who adds the member
-     */
     @Transactional
+    @Override
     public void addMember(String conversationId, String userId, String addedBy) {
         log.info("Adding member {} to conversation {} by {}", userId, conversationId, addedBy);
         
@@ -180,14 +160,8 @@ public class ConversationService {
         log.info("Member added successfully");
     }
     
-    /**
-     * Remove member from a group conversation.
-     *
-     * @param conversationId the conversation ID
-     * @param userId the user ID to remove
-     * @param removedBy the user ID who removes the member
-     */
     @Transactional
+    @Override
     public void removeMember(String conversationId, String userId, String removedBy) {
         log.info("Removing member {} from conversation {} by {}", userId, conversationId, removedBy);
         
@@ -228,13 +202,8 @@ public class ConversationService {
         log.info("Member removed successfully");
     }
     
-    /**
-     * Leave a group conversation.
-     *
-     * @param conversationId the conversation ID
-     * @param userId the user ID who leaves
-     */
     @Transactional
+    @Override
     public void leaveGroup(String conversationId, String userId) {
         log.info("User {} leaving group conversation {}", userId, conversationId);
         
@@ -291,15 +260,8 @@ public class ConversationService {
         log.info("User left successfully");
     }
     
-    /**
-     * Update group information.
-     *
-     * @param conversationId the conversation ID
-     * @param name the new group name
-     * @param avatar the new avatar URL
-     * @return updated Conversation entity
-     */
     @Transactional
+    @Override
     public Conversation updateGroupInfo(String conversationId, String name, String avatar) {
         log.info("Updating group info for conversation {}", conversationId);
         
@@ -324,26 +286,16 @@ public class ConversationService {
         return conversation;
     }
     
-    /**
-     * Get all conversations for a user (excluding deleted conversations).
-     *
-     * @param userId the user ID
-     * @return List of conversations
-     */
     @Transactional(readOnly = true)
+    @Override
     public List<Conversation> getUserConversations(String userId) {
         log.debug("Getting conversations for user: {}", userId);
         
         return conversationRepository.findByParticipantsContainingAndDeletedByNotContaining(userId, userId);
     }
     
-    /**
-     * Update the last message in a conversation.
-     *
-     * @param conversationId the conversation ID
-     * @param message the message to set as last message
-     */
     @Transactional
+    @Override
     public void updateLastMessage(String conversationId, Message message) {
         log.debug("Updating last message for conversation {}", conversationId);
         
@@ -361,26 +313,15 @@ public class ConversationService {
         conversationRepository.save(conversation);
     }
     
-    /**
-     * Check if a user is a participant in a conversation.
-     *
-     * @param conversationId the conversation ID
-     * @param userId the user ID
-     * @return true if user is participant, false otherwise
-     */
     @Transactional(readOnly = true)
+    @Override
     public boolean isParticipant(String conversationId, String userId) {
         Conversation conversation = getConversationById(conversationId);
         return conversation.getParticipants().contains(userId);
     }
     
-    /**
-     * Get conversation by ID.
-     *
-     * @param conversationId the conversation ID
-     * @return Conversation entity
-     */
     @Transactional(readOnly = true)
+    @Override
     public Conversation getConversationById(String conversationId) {
         return conversationRepository.findById(conversationId)
             .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));

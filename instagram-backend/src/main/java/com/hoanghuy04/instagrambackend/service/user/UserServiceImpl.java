@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.user;
 
 import com.hoanghuy04.instagrambackend.dto.request.UpdateUserRequest;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
@@ -30,19 +30,14 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final FollowRepository followRepository;
 
-    /**
-     * Get user by ID.
-     *
-     * @param userId the user ID
-     * @return UserResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public UserResponse getUserById(String userId) {
         log.debug("Getting user by ID: {}", userId);
 
@@ -52,13 +47,8 @@ public class UserService {
         return convertToUserResponse(user);
     }
 
-    /**
-     * Get all users with pagination.
-     *
-     * @param pageable pagination information
-     * @return PageResponse of UserResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<UserResponse> getAllUsers(Pageable pageable) {
         log.debug("Getting all users");
 
@@ -68,14 +58,8 @@ public class UserService {
         return PageResponse.of(page);
     }
 
-    /**
-     * Update user profile.
-     *
-     * @param userId  the user ID
-     * @param request the update request
-     * @return updated UserResponse
-     */
     @Transactional
+    @Override
     public UserResponse updateUser(String userId, UpdateUserRequest request) {
         log.info("Updating user: {}", userId);
 
@@ -114,12 +98,8 @@ public class UserService {
         return convertToUserResponse(user);
     }
 
-    /**
-     * Delete user account.
-     *
-     * @param userId the user ID
-     */
     @Transactional
+    @Override
     public void deleteUser(String userId) {
         log.info("Deleting user: {}", userId);
 
@@ -130,13 +110,8 @@ public class UserService {
         log.info("User deleted successfully: {}", userId);
     }
 
-    /**
-     * Get user followers.
-     *
-     * @param userId the user ID
-     * @return List of UserResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public List<UserResponse> getUserFollowers(String userId) {
         log.debug("Getting followers for user: {}", userId);
 
@@ -148,13 +123,8 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get users that the user is following.
-     *
-     * @param userId the user ID
-     * @return List of UserResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public List<UserResponse> getUserFollowing(String userId) {
         log.debug("Getting following for user: {}", userId);
 
@@ -166,14 +136,8 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Search users by query.
-     *
-     * @param query    the search query
-     * @param pageable pagination information
-     * @return PageResponse of UserResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<UserResponse> searchUsers(String query, Pageable pageable) {
         log.debug("Searching users with query: '{}', page: {}, size: {}", query, pageable.getPageNumber(), pageable.getPageSize());
 
@@ -189,13 +153,8 @@ public class UserService {
         return PageResponse.of(page);
     }
 
-    /**
-     * Get user statistics.
-     *
-     * @param userId the user ID
-     * @return UserStatsResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public UserStatsResponse getUserStats(String userId) {
         log.debug("Getting stats for user: {}", userId);
 
@@ -214,24 +173,14 @@ public class UserService {
                 .build();
     }
 
-    /**
-     * Get user entity by ID.
-     *
-     * @param userId the user ID
-     * @return User entity
-     */
     @Transactional(readOnly = true)
+    @Override
     public User getUserEntityById(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
-    /**
-     * Convert User entity to UserResponse DTO.
-     *
-     * @param user the User entity
-     * @return UserResponse DTO
-     */
+    @Override
     public UserResponse convertToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())

@@ -7,7 +7,7 @@ import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
-import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
+import com.hoanghuy04.instagrambackend.mapper.MessageRequestMapper;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,22 +30,15 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MessageRequestService {
+public class MessageRequestServiceImpl implements MessageRequestService {
     
     private final MessageRequestRepository messageRequestRepository;
-    private final ConversationService conversationService;
+    private final ConversationServiceImpl conversationService;
     private final MessageRepository messageRepository;
-    private final MessageMapper messageMapper;
+    private final MessageRequestMapper messageRequestMapper;
     
-    /**
-     * Create a new message request.
-     *
-     * @param senderId the sender user ID
-     * @param receiverId the receiver user ID
-     * @param firstMessage the first message in the request
-     * @return MessageRequest entity
-     */
     @Transactional
+    @Override
     public MessageRequest createMessageRequest(String senderId, String receiverId, Message firstMessage) {
         log.info("Creating message request from {} to {}", senderId, receiverId);
         
@@ -81,13 +74,8 @@ public class MessageRequestService {
         return request;
     }
     
-    /**
-     * Get pending message requests for a user.
-     *
-     * @param userId the user ID
-     * @return List of pending message requests as DTOs
-     */
     @Transactional(readOnly = true)
+    @Override
     public List<MessageRequestDTO> getPendingRequests(String userId) {
         log.debug("Getting pending requests for user: {}", userId);
         
@@ -97,19 +85,12 @@ public class MessageRequestService {
         );
         
         return requests.stream()
-            .map(this::convertToDTO)
+            .map(messageRequestMapper::toMessageRequestDTO)
             .collect(Collectors.toList());
     }
     
-    /**
-     * Accept a message request.
-     * This will create a conversation and move pending messages to it.
-     *
-     * @param requestId the request ID
-     * @param userId the user who accepts the request
-     * @return Conversation entity
-     */
     @Transactional
+    @Override
     public Conversation acceptRequest(String requestId, String userId) {
         log.info("Accepting message request {} by user {}", requestId, userId);
         
@@ -151,13 +132,8 @@ public class MessageRequestService {
         return conversation;
     }
     
-    /**
-     * Reject a message request.
-     *
-     * @param requestId the request ID
-     * @param userId the user who rejects the request
-     */
     @Transactional
+    @Override
     public void rejectRequest(String requestId, String userId) {
         log.info("Rejecting message request {} by user {}", requestId, userId);
         
@@ -176,13 +152,8 @@ public class MessageRequestService {
         log.info("Request rejected successfully");
     }
     
-    /**
-     * Ignore a message request.
-     *
-     * @param requestId the request ID
-     * @param userId the user who ignores the request
-     */
     @Transactional
+    @Override
     public void ignoreRequest(String requestId, String userId) {
         log.info("Ignoring message request {} by user {}", requestId, userId);
         
@@ -201,24 +172,14 @@ public class MessageRequestService {
         log.info("Request ignored successfully");
     }
     
-    /**
-     * Get count of pending message requests for a user.
-     *
-     * @param userId the user ID
-     * @return number of pending requests
-     */
     @Transactional(readOnly = true)
+    @Override
     public int getPendingRequestsCount(String userId) {
         return (int) messageRequestRepository.countByReceiverIdAndStatus(userId, RequestStatus.PENDING);
     }
     
-    /**
-     * Add a message to an existing pending request.
-     *
-     * @param requestId the request ID
-     * @param message the message to add
-     */
     @Transactional
+    @Override
     public void addPendingMessage(String requestId, Message message) {
         log.debug("Adding message to request: {}", requestId);
         
@@ -232,14 +193,8 @@ public class MessageRequestService {
         messageRequestRepository.save(request);
     }
     
-    /**
-     * Check if an active request exists between two users.
-     *
-     * @param senderId the sender ID
-     * @param receiverId the receiver ID
-     * @return true if active request exists
-     */
     @Transactional(readOnly = true)
+    @Override
     public boolean hasActiveRequest(String senderId, String receiverId) {
         return messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
             senderId, 
@@ -248,35 +203,12 @@ public class MessageRequestService {
         ).isPresent();
     }
     
-    /**
-     * Get request by ID.
-     *
-     * @param requestId the request ID
-     * @return MessageRequest entity
-     */
     @Transactional(readOnly = true)
+    @Override
     public MessageRequest getRequestById(String requestId) {
         return messageRequestRepository.findById(requestId)
             .orElseThrow(() -> new ResourceNotFoundException("Message request not found with id: " + requestId));
     }
     
-    /**
-     * Convert MessageRequest entity to DTO.
-     *
-     * @param request the message request entity
-     * @return MessageRequestDTO
-     */
-    private MessageRequestDTO convertToDTO(MessageRequest request) {
-        // Get receiver ID for converting message
-        String receiverId = request.getReceiver().getId();
-        
-        return MessageRequestDTO.builder()
-            .id(request.getId())
-            .sender(messageMapper.toUserSummaryDTO(request.getSender()))
-            .firstMessage(messageMapper.toMessageDTO(request.getFirstMessage(), receiverId))
-            .status(request.getStatus())
-            .createdAt(request.getCreatedAt())
-            .build();
-    }
 }
 

@@ -4,8 +4,8 @@ import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
-import com.hoanghuy04.instagrambackend.service.message.MessageRequestService;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
+import com.hoanghuy04.instagrambackend.service.message.MessageRequestServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +25,8 @@ import java.util.List;
 @Tag(name = "Message Requests", description = "APIs for managing message requests")
 public class MessageRequestController {
     
-    private final MessageRequestService messageRequestService;
-    private final ConversationMessageService conversationMessageService;
+    private final MessageRequestServiceImpl messageRequestService;
+    private final MessageMapper messageMapper;
     
     /**
      * Get all pending message requests for a user.
@@ -81,7 +81,7 @@ public class MessageRequestController {
         Conversation conversation = messageRequestService.acceptRequest(requestId, userId);
         
         // Convert to DTO
-        ConversationDTO conversationDTO = conversationMessageService.convertToConversationDTO(conversation, userId);
+        ConversationDTO conversationDTO = messageMapper.toConversationDTO(conversation, userId);
         
         return ResponseEntity.ok(
             ApiResponse.success("Message request accepted successfully", conversationDTO)

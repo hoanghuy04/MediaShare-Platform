@@ -22,17 +22,11 @@ import java.time.LocalDateTime;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class WebSocketMessageService {
+public class WebSocketMessageServiceImpl implements WebSocketMessageService {
 
     private final SimpMessagingTemplate messagingTemplate;
 
-    /**
-     * Push a message via WebSocket to all recipients.
-     * For direct messages: push to receiver.
-     * For group messages: push to all participants except sender.
-     *
-     * @param message the Message entity
-     */
+    @Override
     public void pushMessage(Message message) {
         try {
             User sender = message.getSender();
@@ -56,12 +50,7 @@ public class WebSocketMessageService {
         }
     }
 
-    /**
-     * Push a read receipt via WebSocket.
-     *
-     * @param message the Message entity
-     * @param readByUserId the user ID who read the message
-     */
+    @Override
     public void pushReadReceipt(Message message, String readByUserId) {
         try {
             User sender = message.getSender();
@@ -92,13 +81,7 @@ public class WebSocketMessageService {
         }
     }
 
-    /**
-     * Push typing indicator via WebSocket.
-     *
-     * @param senderId the sender user ID
-     * @param receiverId the receiver user ID
-     * @param isTyping true if typing, false if stopped typing
-     */
+    @Override
     public void pushTypingIndicator(String senderId, String receiverId, boolean isTyping) {
         try {
             ChatMessage typingMessage = ChatMessage.builder()
@@ -128,12 +111,7 @@ public class WebSocketMessageService {
         }
     }
 
-    /**
-     * Push error message via WebSocket.
-     *
-     * @param userId the user ID to send error to
-     * @param errorMessage the error message
-     */
+    @Override
     public void pushError(String userId, String errorMessage) {
         try {
             ChatMessage error = ChatMessage.builder()

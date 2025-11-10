@@ -11,7 +11,7 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
-import com.hoanghuy04.instagrambackend.service.FileStorageService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 public class PostService {
 
     private final PostRepository postRepository;
-    private final UserService userService;
+    private final UserServiceImpl userService;
     private final FollowRepository followRepository;
     private final FileStorageService fileStorageService;
 

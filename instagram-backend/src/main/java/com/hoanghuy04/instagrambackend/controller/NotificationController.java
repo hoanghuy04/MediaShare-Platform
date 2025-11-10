@@ -3,7 +3,7 @@ package com.hoanghuy04.instagrambackend.controller;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.NotificationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.service.NotificationService;
+import com.hoanghuy04.instagrambackend.service.notification.NotificationServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class NotificationController {
     
-    private final NotificationService notificationService;
+    private final NotificationServiceImpl notificationService;
     
     /**
      * Get notifications for a user.

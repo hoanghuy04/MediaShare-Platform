@@ -9,9 +9,10 @@ import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
-import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
-import com.hoanghuy04.instagrambackend.service.message.ConversationService;
-import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageService;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
+import com.hoanghuy04.instagrambackend.service.message.ConversationMessageServiceImpl;
+import com.hoanghuy04.instagrambackend.service.message.ConversationServiceImpl;
+import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,9 +41,10 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class ConversationController {
     
-    private final ConversationService conversationService;
-    private final ConversationMessageService conversationMessageService;
-    private final WebSocketMessageService webSocketMessageService;
+    private final ConversationServiceImpl conversationService;
+    private final ConversationMessageServiceImpl conversationMessageService;
+    private final WebSocketMessageServiceImpl webSocketMessageService;
+    private final MessageMapper messageMapper;
     
     /**
      * Get all conversations for a user.
@@ -242,7 +244,7 @@ public class ConversationController {
         // Push via WebSocket
         webSocketMessageService.pushMessage(message);
         
-        MessageDTO dto = conversationMessageService.convertToMessageDTO(message, senderId);
+        MessageDTO dto = messageMapper.toMessageDTO(message, senderId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Message sent successfully", dto));
     }
@@ -286,7 +288,7 @@ public class ConversationController {
         // Push via WebSocket
         webSocketMessageService.pushMessage(message);
         
-        MessageDTO dto = conversationMessageService.convertToMessageDTO(message, senderId);
+        MessageDTO dto = messageMapper.toMessageDTO(message, senderId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Message sent successfully", dto));
     }

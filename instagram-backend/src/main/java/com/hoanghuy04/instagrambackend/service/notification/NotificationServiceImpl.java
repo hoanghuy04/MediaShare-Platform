@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.notification;
 
 import com.hoanghuy04.instagrambackend.dto.response.NotificationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
@@ -6,6 +6,7 @@ import com.hoanghuy04.instagrambackend.entity.Notification;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.NotificationRepository;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,10 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class NotificationService {
+public class NotificationServiceImpl implements NotificationService {
     
     private final NotificationRepository notificationRepository;
-    private final UserService userService;
+    private final UserServiceImpl userService;
     
     /**
      * Create a new notification.
@@ -34,6 +35,7 @@ public class NotificationService {
      * @param notification the notification to create
      */
     @Transactional
+    @Override
     public void createNotification(Notification notification) {
         log.info("Creating notification for user: {}", notification.getUser().getId());
         
@@ -50,6 +52,7 @@ public class NotificationService {
      * @return PageResponse of NotificationResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<NotificationResponse> getNotifications(String userId, Pageable pageable) {
         log.debug("Getting notifications for user: {}", userId);
         
@@ -65,6 +68,7 @@ public class NotificationService {
      * @param notificationId the notification ID
      */
     @Transactional
+    @Override
     public void markAsRead(String notificationId) {
         log.info("Marking notification as read: {}", notificationId);
         
@@ -83,6 +87,7 @@ public class NotificationService {
      * @param notificationId the notification ID
      */
     @Transactional
+    @Override
     public void deleteNotification(String notificationId) {
         log.info("Deleting notification: {}", notificationId);
         
@@ -100,6 +105,7 @@ public class NotificationService {
      * @return unread count
      */
     @Transactional(readOnly = true)
+    @Override
     public long getUnreadCount(String userId) {
         log.debug("Getting unread notification count for user: {}", userId);
         

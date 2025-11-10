@@ -5,7 +5,7 @@ import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
-import com.hoanghuy04.instagrambackend.service.UserService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,7 +34,7 @@ import java.util.List;
 @SecurityRequirement(name = "Bearer Authentication")
 public class UserController {
     
-    private final UserService userService;
+    private final UserServiceImpl userService;
     
     /**
      * Get user by ID.
@@ -75,7 +75,7 @@ public class UserController {
      */
     @PutMapping("/{id}")
     @Operation(summary = "Update user profile")
-    @PreAuthorize("@userService.getUserEntityById(#id).username == authentication.name")
+    @PreAuthorize("@userServiceImpl.getUserEntityById(#id).username == authentication.name")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable String id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -93,7 +93,7 @@ public class UserController {
      */
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete user account")
-    @PreAuthorize("@userService.getUserEntityById(#id).username == authentication.name or hasRole('ADMIN')")
+    @PreAuthorize("@userServiceImpl.getUserEntityById(#id).username == authentication.name or hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable String id) {
         log.info("Delete user request received for ID: {}", id);
         

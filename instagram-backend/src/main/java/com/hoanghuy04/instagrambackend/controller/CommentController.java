@@ -4,7 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.request.CreateCommentRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.service.CommentService;
+import com.hoanghuy04.instagrambackend.service.comment.CommentServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class CommentController {
     
-    private final CommentService commentService;
+    private final CommentServiceImpl commentService;
     
     /**
      * Create a new comment.
