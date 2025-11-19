@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -26,6 +25,7 @@ interface CreateTabbedFlowProps {
 export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreated }) => {
   const [activeTab, setActiveTab] = useState<TabType>('post');
   const [postStep, setPostStep] = useState(1);
+  const [tabsHidden, setTabsHidden] = useState(false);
 
   // useFocusEffect(
   //   React.useCallback(() => {
@@ -41,6 +41,12 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
     setPostStep(step);
   };
 
+  useEffect(() => {
+    if (activeTab !== 'reels' && tabsHidden) {
+      setTabsHidden(false);
+    }
+  }, [activeTab, tabsHidden]);
+
   const renderContent = () => {
     switch (activeTab) {
         case 'post':
@@ -52,7 +58,7 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
           </View>
         );
       case 'reels':
-        return <ReelsCreationScreen />;
+        return <ReelsCreationScreen onMultiSelectModeChange={setTabsHidden} />;
       default:
         return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} />;
     }
@@ -91,6 +97,9 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
     );
   };
 
+  const shouldHideBottomTabs =
+    tabsHidden || (activeTab === 'post' && (postStep === 2 || postStep === 3));
+
   return (
     <View style={styles.container}>
       <StatusBar hidden />
@@ -98,7 +107,7 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
       <View style={styles.contentContainer}>{renderContent()}</View>
 
       {/* Ẩn tabbed flow khi ở step 2 và 3 của posts */}
-      {!(activeTab === 'post' && (postStep === 2 || postStep === 3)) && renderBottomTabs()}
+      {!shouldHideBottomTabs && renderBottomTabs()}
     </View>
   );
 };
