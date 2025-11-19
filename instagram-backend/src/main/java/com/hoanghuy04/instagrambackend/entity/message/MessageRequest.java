@@ -40,16 +40,27 @@ public class MessageRequest {
     private String id;
     
     /**
-     * Reference to the user who sent the request
+     * ID of the user who sent the request (for queries)
      */
-    @DocumentReference
+    @Indexed
+    private String senderId;
+    
+    /**
+     * ID of the user who receives the request (for queries)
+     */
+    @Indexed
+    private String receiverId;
+    
+    /**
+     * Reference to the user who sent the request (for convenience, may not be populated)
+     */
+    @DocumentReference(lazy = true)
     private User sender;
     
     /**
-     * Reference to the user who receives the request
+     * Reference to the user who receives the request (for convenience, may not be populated)
      */
-    @DocumentReference
-    @Indexed
+    @DocumentReference(lazy = true)
     private User receiver;
     
     /**
@@ -58,10 +69,14 @@ public class MessageRequest {
     private RequestStatus status;
     
     /**
-     * Reference to the first message in this request
+     * Content of the last message in this request
      */
-    @DocumentReference
-    private Message firstMessage;
+    private String lastMessageContent;
+    
+    /**
+     * Timestamp of the last message
+     */
+    private LocalDateTime lastMessageTimestamp;
     
     /**
      * List of pending message IDs waiting for approval

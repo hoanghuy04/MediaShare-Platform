@@ -1,11 +1,12 @@
 package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
-import com.hoanghuy04.instagrambackend.service.message.MessageRequestServiceImpl;
+import com.hoanghuy04.instagrambackend.service.message.MessageRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ import java.util.List;
 @Tag(name = "Message Requests", description = "APIs for managing message requests")
 public class MessageRequestController {
     
-    private final MessageRequestServiceImpl messageRequestService;
+    private final MessageRequestService messageRequestService;
     private final MessageMapper messageMapper;
     
     /**
@@ -125,6 +126,27 @@ public class MessageRequestController {
         messageRequestService.ignoreRequest(requestId, userId);
         return ResponseEntity.ok(
             ApiResponse.success("Message request ignored successfully", null)
+        );
+    }
+    
+    /**
+     * Get all pending messages for a message request between sender and receiver.
+     * This is used when the sender wants to view their sent messages that haven't been accepted yet.
+     *
+     * @param senderId the sender user ID
+     * @param receiverId the receiver user ID
+     * @return List of pending messages
+     */
+    @GetMapping("/pending-messages")
+    @Operation(summary = "Get pending messages for a message request")
+    public ResponseEntity<ApiResponse<List<MessageDTO>>> getPendingMessages(
+            @RequestParam String senderId,
+            @RequestParam String receiverId) {
+        
+        log.info("Get pending messages from {} to {}", senderId, receiverId);
+        List<MessageDTO> messages = messageRequestService.getPendingMessages(senderId, receiverId);
+        return ResponseEntity.ok(
+            ApiResponse.success("Pending messages loaded successfully", messages)
         );
     }
 }

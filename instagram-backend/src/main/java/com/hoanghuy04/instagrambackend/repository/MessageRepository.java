@@ -111,5 +111,14 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      * @return List of messages
      */
     List<Message> findBySenderAndReceiverOrderByCreatedAtDesc(User sender, User receiver);
+    
+    /**
+     * Find messages by list of IDs.
+     * Used for loading pending messages from message requests.
+     *
+     * @param ids list of message IDs
+     * @return List of messages matching the IDs
+     */
+    List<Message> findByIdIn(List<String> ids);
 }
 

@@ -21,7 +21,7 @@ import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { messageAPI, userAPI } from '../../services/api';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
-import { UserProfile, Conversation, Message } from '../../types';
+import { UserProfile, Conversation, Message, InboxItem } from '../../types';
 import {
   getConversationName,
   getConversationAvatar,
@@ -43,20 +43,37 @@ export default function MessagesScreen() {
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const typingTimeouts = useRef<{ [conversationId: string]: number }>({});
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInitiallyLoaded = useRef(false);
 
   const {
-    data: conversations,
+    data: inboxItems,
     isLoading,
     refresh,
-  } = useInfiniteScroll({
-    fetchFunc: messageAPI.getConversations,
+  } = useInfiniteScroll<InboxItem>({
+    fetchFunc: messageAPI.getInbox,
     limit: 20,
     onError: error => showAlert('Error', error.message),
   });
 
+  // Debounced refresh to prevent multiple rapid calls
+  const debouncedRefresh = React.useCallback(() => {
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+    refreshTimeoutRef.current = setTimeout(() => {
+      console.log('Debounced refresh triggered');
+      refresh();
+    }, 300);
+  }, [refresh]);
+  
+
   useEffect(() => {
-    refresh();
-    loadPendingRequestsCount();
+    // Only load on initial mount
+    if (!hasInitiallyLoaded.current) {
+      hasInitiallyLoaded.current = true;
+      refresh();
+      loadPendingRequestsCount();
+    }
   }, []);
 
   const loadPendingRequestsCount = async () => {
@@ -74,13 +91,8 @@ export default function MessagesScreen() {
       console.log('Messages screen received WebSocket message:', message);
 
       if (message.type === 'CHAT' && message.conversationId) {
-        // Simply refresh conversations to get latest data
-        if (refreshTimeoutRef.current) {
-          clearTimeout(refreshTimeoutRef.current);
-        }
-        refreshTimeoutRef.current = setTimeout(() => {
-          refresh();
-        }, 500);
+        // Use debounced refresh to prevent multiple rapid calls
+        debouncedRefresh();
       }
     };
 
@@ -115,8 +127,8 @@ export default function MessagesScreen() {
 
     const handleReadReceipt = (messageId: string, conversationId: string) => {
       console.log('Read receipt:', { messageId, conversationId });
-      // Refresh to get updated unread counts
-      refresh();
+      // Use debounced refresh to prevent multiple rapid calls
+      debouncedRefresh();
     };
 
     onMessage(handleWebSocketMessage);
@@ -131,14 +143,14 @@ export default function MessagesScreen() {
         refreshTimeoutRef.current = null;
       }
     };
-  }, [currentUser?.id, onMessage, onTyping, onReadReceipt]);
+  }, [onMessage, onTyping, onReadReceipt, debouncedRefresh]);
 
-  // Refresh data when screen comes into focus
+  // Refresh data when screen comes into focus (debounced)
   useFocusEffect(
     React.useCallback(() => {
       console.log('Messages screen focused, refreshing...');
-      setTimeout(() => refresh(), 100);
-    }, [])
+      debouncedRefresh();
+    }, [debouncedRefresh])
   );
 
   const handleRefresh = async () => {
@@ -240,8 +252,8 @@ export default function MessagesScreen() {
       >
         <Text style={styles.pendingText}>Tin nhắn đang chờ</Text>
         {pendingRequestsCount > 0 && (
-          <View style={styles.pendingBadge}>
-            <Text style={styles.pendingBadgeText}>
+          <View style={styles.pendingBadgeTab}>
+            <Text style={styles.pendingBadgeTabText}>
               {pendingRequestsCount > 99 ? '99+' : pendingRequestsCount}
             </Text>
           </View>
@@ -250,57 +262,63 @@ export default function MessagesScreen() {
     </View>
   );
 
-  const renderConversationItem = ({ item }: { item: Conversation }) => {
+  // Render inbox item (conversation or message request)
+  const renderInboxItem = ({ item }: { item: InboxItem }) => {
+    console.log('item', item);
+    
     if (!currentUser) return null;
 
-    const conversationName = getConversationName(item, currentUser.id);
-    const conversationAvatar = getConversationAvatar(item, currentUser.id);
-    const lastMessage = item.lastMessage;
-    const isTyping = typingUsers[item.id] || false;
+    // Handle conversation type
+    if (item.type === 'CONVERSATION' && item.conversation) {
+      const conversation = item.conversation;
+      const conversationName = getConversationName(conversation, currentUser.id);
+      const conversationAvatar = getConversationAvatar(conversation, currentUser.id);
+      const lastMessage = conversation.lastMessage;
+      const isTyping = typingUsers[conversation.id] || false;
 
-    // Calculate unread count from messages (will be fetched on demand)
-    const messages = conversationMessages[item.id] || [];
-    const unreadCount = calculateUnreadCount(messages, currentUser.id);
-    const isUnread = unreadCount > 0;
+      // Calculate unread count from messages (will be fetched on demand)
+      const messages = conversationMessages[conversation.id] || [];
+      const unreadCount = calculateUnreadCount(messages, currentUser.id);
+      const isUnread = unreadCount > 0;
 
-    // Display text
-    let displayText = lastMessage?.content || 'Chưa có tin nhắn';
-    if (isTyping) {
-      displayText = 'Đang nhắn tin...';
-    }
+      // Display text
+      let displayText = lastMessage?.content || 'Chưa có tin nhắn';
+      if (isTyping) {
+        displayText = 'Đang nhắn tin...';
+      }
 
-    return (
-      <TouchableOpacity
-        style={styles.messageItem}
-        onPress={() => handleMessagePress(item.id)}
-        onLongPress={() => handleLongPress(item)}
-      >
-        <Avatar uri={conversationAvatar} name={conversationName} size={50} />
-        <View style={styles.messageContent}>
-          <View style={styles.messageHeader}>
-            <View style={styles.messageHeaderLeft}>
-              <Text
-                style={[
-                  styles.messageUsername,
-                  {
-                    color: theme.colors.text,
-                    fontWeight: isUnread ? '700' : '600',
-                  },
-                ]}
-              >
-                {conversationName}
-              </Text>
-              {item.type === 'GROUP' && (
-                <Ionicons
-                  name="people"
-                  size={14}
-                  color={theme.colors.textSecondary}
-                  style={{ marginLeft: 4 }}
-                />
-              )}
-            </View>
-            {lastMessage?.timestamp && (
-              <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
+      return (
+        <TouchableOpacity
+          style={styles.messageItem}
+          onPress={() => handleMessagePress(conversation.id)}
+          onLongPress={() => handleLongPress(conversation)}
+        >
+          <Avatar uri={conversationAvatar} name={conversationName} size={50} />
+          <View style={styles.messageContent}>
+            <View style={styles.messageHeader}>
+              <View style={styles.messageHeaderLeft}>
+                <Text
+                  style={[
+                    styles.messageUsername,
+                    {
+                      color: theme.colors.text,
+                      fontWeight: isUnread ? '700' : '600',
+                    },
+                  ]}
+                >
+                  {conversationName}
+                </Text>
+                {conversation.type === 'GROUP' && (
+                  <Ionicons
+                    name="people"
+                    size={14}
+                    color={theme.colors.textSecondary}
+                    style={{ marginLeft: 4 }}
+                  />
+                )}
+              </View>
+              {lastMessage?.timestamp && (
+                <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
                 {formatMessageTime(lastMessage.timestamp)}
               </Text>
             )}
@@ -327,7 +345,68 @@ export default function MessagesScreen() {
           </View>
         )}
       </TouchableOpacity>
-    );
+      );
+    }
+
+    // Handle message request type
+    if (item.type === 'MESSAGE_REQUEST' && item.messageRequest) {
+      const messageRequest = item.messageRequest;
+      // Current user is the sender, show receiver's info
+      const receiverName = messageRequest.receiver?.username || 'Unknown';
+      const receiverAvatar = messageRequest.receiver?.avatar;
+      const lastMessageContent = messageRequest.lastMessageContent || 'Gửi yêu cầu nhắn tin';
+      const timestamp = messageRequest.lastMessageTimestamp || messageRequest.createdAt;
+
+      return (
+        <TouchableOpacity
+          style={styles.messageItem}
+          onPress={() => {
+            // Navigate to conversation with the receiver
+            router.push(`/messages/${messageRequest.receiver.id}`);
+          }}
+        >
+          <Avatar uri={receiverAvatar} name={receiverName} size={50} />
+          <View style={styles.messageContent}>
+            <View style={styles.messageHeader}>
+              <View style={styles.messageHeaderLeft}>
+                <Text
+                  style={[
+                    styles.messageUsername,
+                    {
+                      color: theme.colors.text,
+                      fontWeight: '600',
+                    },
+                  ]}
+                >
+                  {receiverName}
+                </Text>
+                <View style={styles.pendingRequestBadge}>
+                  <Text style={styles.pendingRequestBadgeText}>Pending</Text>
+                </View>
+              </View>
+              <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
+                {formatMessageTime(timestamp)}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.messageText,
+                {
+                  fontWeight: '400',
+                  color: theme.colors.textSecondary,
+                  fontStyle: 'italic',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              You: {lastMessageContent}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -336,10 +415,10 @@ export default function MessagesScreen() {
       <SafeAreaView style={styles.safeArea}>
         {renderHeader()}
 
-        <FlatList
-          data={sortConversationsByRecent(conversations || [])}
-          renderItem={renderConversationItem}
-          keyExtractor={(item) => item.id}
+        <FlatList<InboxItem>
+          data={inboxItems || []}
+          renderItem={renderInboxItem}
+          keyExtractor={(item) => item.type === 'CONVERSATION' ? item.conversation?.id || '' : item.messageRequest?.id || ''}
           showsVerticalScrollIndicator={false}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
@@ -545,7 +624,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1877F2', // xanh kiểu Facebook Messenger
   },
-  pendingBadge: {
+  pendingBadgeTab: {
     position: 'absolute',
     top: -8,
     right: -12,
@@ -557,7 +636,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
   },
-  pendingBadgeText: {
+  pendingBadgeTabText: {
     color: 'white',
     fontSize: 11,
     fontWeight: '700',
@@ -629,6 +708,18 @@ const styles = StyleSheet.create({
   unreadText: {
     color: 'white',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  pendingRequestBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+    backgroundColor: '#FFA500',
+  },
+  pendingRequestBadgeText: {
+    color: 'white',
+    fontSize: 10,
     fontWeight: '600',
   },
   messageTime: {

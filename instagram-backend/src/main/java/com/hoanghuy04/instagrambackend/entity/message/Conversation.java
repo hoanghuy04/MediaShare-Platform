@@ -27,8 +27,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "conversations")
-@CompoundIndex(name = "participants_idx", def = "{'participants': 1}")
-@CompoundIndex(name = "type_participants_idx", def = "{'type': 1, 'participants': 1}")
+@CompoundIndex(name = "participants_userId_idx", def = "{'participants.userId': 1}")
+@CompoundIndex(name = "type_participants_idx", def = "{'type': 1, 'participants.userId': 1}")
 public class Conversation {
     
     /**
@@ -53,10 +53,11 @@ public class Conversation {
     private String avatar;
     
     /**
-     * List of user IDs participating in the conversation
+     * List of participants with their details (username, avatar, role, etc.)
+     * Replaces the old 'participants' (List<String>) and 'members' fields
      */
     @Builder.Default
-    private List<String> participants = new ArrayList<>();
+    private List<ConversationMember> participants = new ArrayList<>();
     
     /**
      * List of admin user IDs (only for GROUP conversations)
@@ -68,12 +69,6 @@ public class Conversation {
      * User ID who created the conversation
      */
     private String createdBy;
-    
-    /**
-     * List of current members with their details
-     */
-    @Builder.Default
-    private List<ConversationMember> members = new ArrayList<>();
     
     /**
      * List of members who left the conversation

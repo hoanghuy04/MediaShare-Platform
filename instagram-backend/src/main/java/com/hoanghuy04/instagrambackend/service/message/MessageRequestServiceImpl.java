@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
@@ -7,6 +8,7 @@ import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.mapper.MessageRequestMapper;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -33,9 +37,10 @@ import java.util.stream.Collectors;
 public class MessageRequestServiceImpl implements MessageRequestService {
     
     private final MessageRequestRepository messageRequestRepository;
-    private final ConversationServiceImpl conversationService;
+    private final ConversationService conversationService;
     private final MessageRepository messageRepository;
     private final MessageRequestMapper messageRequestMapper;
+    private final MessageMapper messageMapper;
     
     @Transactional
     @Override
@@ -60,10 +65,13 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         
         // Create new request
         MessageRequest request = MessageRequest.builder()
+            .senderId(senderId)
+            .receiverId(receiverId)
             .sender(firstMessage.getSender())
             .receiver(firstMessage.getReceiver())
             .status(RequestStatus.PENDING)
-            .firstMessage(firstMessage)
+            .lastMessageContent(firstMessage.getContent())
+            .lastMessageTimestamp(firstMessage.getCreatedAt())
             .pendingMessageIds(List.of(firstMessage.getId()))
             .createdAt(LocalDateTime.now())
             .build();
@@ -208,6 +216,53 @@ public class MessageRequestServiceImpl implements MessageRequestService {
     public MessageRequest getRequestById(String requestId) {
         return messageRequestRepository.findById(requestId)
             .orElseThrow(() -> new ResourceNotFoundException("Message request not found with id: " + requestId));
+    }
+    
+    @Transactional(readOnly = true)
+    @Override
+    public List<MessageDTO> getPendingMessages(String senderId, String receiverId) {
+        log.info("Getting pending messages from {} to {}", senderId, receiverId);
+        
+        // Find pending message request between sender and receiver
+        Optional<MessageRequest> requestOptional = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+            senderId, 
+            receiverId, 
+            RequestStatus.PENDING
+        );
+        
+        // If no request exists, return empty list
+        if (requestOptional.isEmpty() || requestOptional.get().getPendingMessageIds() == null 
+                || requestOptional.get().getPendingMessageIds().isEmpty()) {
+            log.info("No pending messages found between {} and {}", senderId, receiverId);
+            return new ArrayList<>();
+        }
+        
+        MessageRequest request = requestOptional.get();
+        List<String> pendingMessageIds = request.getPendingMessageIds();
+        
+        log.info("Found {} pending message IDs for request {}", pendingMessageIds.size(), request.getId());
+        
+        // Load all messages by IDs
+        List<Message> messages = messageRepository.findByIdIn(pendingMessageIds);
+        
+        if (messages.isEmpty()) {
+            log.warn("No messages found for pending message IDs: {}", pendingMessageIds);
+            return new ArrayList<>();
+        }
+        
+        log.info("Loaded {} pending messages", messages.size());
+        
+        // Sort messages by createdAt ascending (oldest first)
+        messages.sort(Comparator.comparing(Message::getCreatedAt));
+        
+        // Map to DTOs
+        List<MessageDTO> messageDTOs = messages.stream()
+            .map(message -> messageMapper.toMessageDTO(message, senderId))
+            .collect(Collectors.toList());
+        
+        log.info("Successfully mapped {} pending messages to DTOs", messageDTOs.size());
+        
+        return messageDTOs;
     }
     
 }

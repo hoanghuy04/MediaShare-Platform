@@ -10,6 +10,7 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.CommentRepository;
 import com.hoanghuy04.instagrambackend.service.PostService;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentServiceImpl implements CommentService {
     
     private final CommentRepository commentRepository;
-    private final UserServiceImpl userService;
+    private final UserService userService;
     private final PostService postService;
     
     @Transactional

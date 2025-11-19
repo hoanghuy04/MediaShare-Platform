@@ -1,7 +1,10 @@
 package com.hoanghuy04.instagrambackend.mapper;
 
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
+import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +23,9 @@ public abstract class MessageRequestMapper {
     @Autowired
     protected MessageMapper messageMapper;
     
+    @Autowired
+    protected UserRepository userRepository;
+    
     /**
      * Map MessageRequest entity to MessageRequestDTO.
      * Uses MessageMapper for nested sender and firstMessage mappings.
@@ -28,40 +34,46 @@ public abstract class MessageRequestMapper {
      * @return MessageRequestDTO
      */
     @Mapping(target = "sender", ignore = true)
-    @Mapping(target = "firstMessage", ignore = true)
+    @Mapping(target = "receiver", ignore = true)
     public abstract MessageRequestDTO toMessageRequestDTO(MessageRequest request);
     
     /**
-     * Enrich MessageRequestDTO with nested sender and firstMessage.
+     * Enrich MessageRequestDTO with nested sender and receiver.
      * Uses MessageMapper for the conversions with proper context.
+     * NOTE: Must be called manually in service layer (MapStruct doesn't auto-call @AfterMapping in abstract classes)
      *
      * @param dto the target MessageRequestDTO
      * @param request the source MessageRequest entity
      */
     @AfterMapping
-    protected void enrichMessageRequest(@MappingTarget MessageRequestDTO dto, MessageRequest request) {
+    public void enrichMessageRequest(@MappingTarget MessageRequestDTO dto, MessageRequest request) {
         if (request == null) {
             return;
         }
         
-        // Map sender using MessageMapper
-        if (request.getSender() != null) {
+        // Map sender: fetch from repository using senderId
+        if (request.getSenderId() != null) {
             try {
-                dto.setSender(messageMapper.toUserSummaryDTO(request.getSender()));
+                User sender = userRepository.findById(request.getSenderId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Sender not found: " + request.getSenderId()));
+                dto.setSender(messageMapper.toUserSummaryDTO(sender));
             } catch (Exception e) {
                 log.warn("Failed to load sender for message request {}: {}", request.getId(), e.getMessage());
             }
         }
         
-        // Map first message using MessageMapper with receiver context
-        if (request.getFirstMessage() != null && request.getReceiver() != null) {
+        // Map receiver: fetch from repository using receiverId
+        if (request.getReceiverId() != null) {
             try {
-                String receiverId = request.getReceiver().getId();
-                dto.setFirstMessage(messageMapper.toMessageDTO(request.getFirstMessage(), receiverId));
+                User receiver = userRepository.findById(request.getReceiverId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Receiver not found: " + request.getReceiverId()));
+                dto.setReceiver(messageMapper.toUserSummaryDTO(receiver));
             } catch (Exception e) {
-                log.warn("Failed to load first message for message request {}: {}", request.getId(), e.getMessage());
+                log.warn("Failed to load receiver for message request {}: {}", request.getId(), e.getMessage());
             }
         }
+        
+        // lastMessageContent and lastMessageTimestamp are already mapped by MapStruct
     }
 }
 

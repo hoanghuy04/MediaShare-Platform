@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
 import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.ConversationMember;
 import com.hoanghuy04.instagrambackend.entity.message.LastMessageInfo;
@@ -8,6 +9,7 @@ import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import com.hoanghuy04.instagrambackend.enums.MemberRole;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 public class ConversationServiceImpl implements ConversationService {
     
     private final ConversationRepository conversationRepository;
+    private final UserRepository userRepository;
     
     @Transactional
     @Override
@@ -62,12 +65,13 @@ public class ConversationServiceImpl implements ConversationService {
             return existing.get();
         }
         
-        // Create new conversation
+        // Create new conversation with participant details
+        List<ConversationMember> participantMembers = createConversationMembers(participants, userId1, MemberRole.MEMBER);
+        
         Conversation conversation = Conversation.builder()
             .type(ConversationType.DIRECT)
-            .participants(participants)
+            .participants(participantMembers)
             .createdBy(userId1)
-            .members(createInitialMembers(participants, userId1))
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
@@ -102,15 +106,16 @@ public class ConversationServiceImpl implements ConversationService {
             throw new BadRequestException("Group must have at least 2 participants");
         }
         
-        // Create conversation
+        // Create conversation with participant details
+        List<ConversationMember> participantMembers = createConversationMembers(allParticipants, creatorId, null);
+        
         Conversation conversation = Conversation.builder()
             .type(ConversationType.GROUP)
             .name(groupName)
             .avatar(avatar)
-            .participants(allParticipants)
+            .participants(participantMembers)
             .admins(Collections.singletonList(creatorId))
             .createdBy(creatorId)
-            .members(createGroupMembers(allParticipants, creatorId))
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
@@ -139,20 +144,25 @@ public class ConversationServiceImpl implements ConversationService {
         }
         
         // Check if user is already a participant
-        if (conversation.getParticipants().contains(userId)) {
+        boolean isAlreadyMember = conversation.getParticipants().stream()
+            .anyMatch(p -> p.getUserId().equals(userId));
+        if (isAlreadyMember) {
             throw new BadRequestException("User is already a member");
         }
         
-        // Add to participants
-        conversation.getParticipants().add(userId);
+        // Fetch user info and create new member
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
         
-        // Add to members
         ConversationMember member = ConversationMember.builder()
             .userId(userId)
+            .username(user.getUsername())
+            .avatar(user.getProfile() != null ? user.getProfile().getAvatar() : null)
+            .isVerified(user.isVerified())
             .joinedAt(LocalDateTime.now())
             .role(MemberRole.MEMBER)
             .build();
-        conversation.getMembers().add(member);
+        conversation.getParticipants().add(member);
         
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -182,11 +192,8 @@ public class ConversationServiceImpl implements ConversationService {
             throw new BadRequestException("Use leave group to remove yourself");
         }
         
-        // Remove from participants
-        conversation.getParticipants().remove(userId);
-        
-        // Move to left members
-        conversation.getMembers().stream()
+        // Find and move member to left members
+        conversation.getParticipants().stream()
             .filter(m -> m.getUserId().equals(userId) && m.getLeftAt() == null)
             .findFirst()
             .ifPresent(member -> {
@@ -194,7 +201,8 @@ public class ConversationServiceImpl implements ConversationService {
                 conversation.getLeftMembers().add(member);
             });
         
-        conversation.getMembers().removeIf(m -> m.getUserId().equals(userId) && m.getLeftAt() == null);
+        // Remove from participants
+        conversation.getParticipants().removeIf(m -> m.getUserId().equals(userId));
         
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -209,7 +217,10 @@ public class ConversationServiceImpl implements ConversationService {
         
         Conversation conversation = getConversationById(conversationId);
         
-        if (!conversation.getParticipants().contains(userId)) {
+        // Check if user is a member
+        boolean isMember = conversation.getParticipants().stream()
+            .anyMatch(p -> p.getUserId().equals(userId));
+        if (!isMember) {
             throw new BadRequestException("You are not a member of this conversation");
         }
         
@@ -220,17 +231,18 @@ public class ConversationServiceImpl implements ConversationService {
         
         // If user is the last admin, promote another member to admin
         if (conversation.getAdmins().contains(userId) && conversation.getAdmins().size() == 1) {
-            List<String> regularMembers = conversation.getParticipants().stream()
-                .filter(p -> !p.equals(userId))
+            List<String> regularMemberIds = conversation.getParticipants().stream()
+                .map(ConversationMember::getUserId)
+                .filter(id -> !id.equals(userId))
                 .collect(Collectors.toList());
             
-            if (!regularMembers.isEmpty()) {
+            if (!regularMemberIds.isEmpty()) {
                 // Promote first regular member to admin
-                String newAdminId = regularMembers.get(0);
+                String newAdminId = regularMemberIds.get(0);
                 conversation.setAdmins(Collections.singletonList(newAdminId));
                 
                 // Update member role
-                conversation.getMembers().stream()
+                conversation.getParticipants().stream()
                     .filter(m -> m.getUserId().equals(newAdminId))
                     .findFirst()
                     .ifPresent(m -> m.setRole(MemberRole.ADMIN));
@@ -240,11 +252,8 @@ public class ConversationServiceImpl implements ConversationService {
         // Remove admin status if applicable
         conversation.getAdmins().remove(userId);
         
-        // Remove from participants
-        conversation.getParticipants().remove(userId);
-        
-        // Move to left members
-        conversation.getMembers().stream()
+        // Find and move member to left members
+        conversation.getParticipants().stream()
             .filter(m -> m.getUserId().equals(userId) && m.getLeftAt() == null)
             .findFirst()
             .ifPresent(member -> {
@@ -252,7 +261,8 @@ public class ConversationServiceImpl implements ConversationService {
                 conversation.getLeftMembers().add(member);
             });
         
-        conversation.getMembers().removeIf(m -> m.getUserId().equals(userId) && m.getLeftAt() == null);
+        // Remove from participants
+        conversation.getParticipants().removeIf(m -> m.getUserId().equals(userId));
         
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -290,8 +300,9 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     public List<Conversation> getUserConversations(String userId) {
         log.debug("Getting conversations for user: {}", userId);
-        
-        return conversationRepository.findByParticipantsContainingAndDeletedByNotContaining(userId, userId);
+
+        List<Conversation> conversations = conversationRepository.findByParticipantsContainingAndDeletedByNotContaining(userId, userId);
+        return conversations;
     }
     
     @Transactional
@@ -317,7 +328,8 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     public boolean isParticipant(String conversationId, String userId) {
         Conversation conversation = getConversationById(conversationId);
-        return conversation.getParticipants().contains(userId);
+        return conversation.getParticipants().stream()
+            .anyMatch(p -> p.getUserId().equals(userId));
     }
     
     @Transactional(readOnly = true)
@@ -328,31 +340,35 @@ public class ConversationServiceImpl implements ConversationService {
     }
     
     /**
-     * Create initial members list for a direct conversation.
+     * Create conversation members list with user details.
+     * 
+     * @param userIds list of user IDs to add
+     * @param creatorId creator of the conversation (will be ADMIN if role is null)
+     * @param defaultRole default role for all members (if null, creator becomes ADMIN, others MEMBER)
+     * @return list of ConversationMember with populated user info
      */
-    private List<ConversationMember> createInitialMembers(List<String> participants, String createdBy) {
+    private List<ConversationMember> createConversationMembers(List<String> userIds, String creatorId, MemberRole defaultRole) {
         List<ConversationMember> members = new ArrayList<>();
-        for (String userId : participants) {
+        LocalDateTime now = LocalDateTime.now();
+        
+        for (String userId : userIds) {
+            // Fetch user info
+            User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+            
+            // Determine role
+            MemberRole role = defaultRole;
+            if (role == null) {
+                role = userId.equals(creatorId) ? MemberRole.ADMIN : MemberRole.MEMBER;
+            }
+            
             ConversationMember member = ConversationMember.builder()
                 .userId(userId)
-                .joinedAt(LocalDateTime.now())
-                .role(MemberRole.MEMBER)
-                .build();
-            members.add(member);
-        }
-        return members;
-    }
-    
-    /**
-     * Create members list for a group conversation.
-     */
-    private List<ConversationMember> createGroupMembers(List<String> participants, String createdBy) {
-        List<ConversationMember> members = new ArrayList<>();
-        for (String userId : participants) {
-            ConversationMember member = ConversationMember.builder()
-                .userId(userId)
-                .joinedAt(LocalDateTime.now())
-                .role(userId.equals(createdBy) ? MemberRole.ADMIN : MemberRole.MEMBER)
+                .username(user.getUsername())
+                .avatar(user.getProfile() != null ? user.getProfile().getAvatar() : null)
+                .isVerified(user.isVerified())
+                .joinedAt(now)
+                .role(role)
                 .build();
             members.add(member);
         }

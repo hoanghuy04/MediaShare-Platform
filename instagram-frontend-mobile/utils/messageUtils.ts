@@ -1,4 +1,4 @@
-import { Message, Conversation, UserSummary } from '../types/message';
+import { Message, Conversation, ConversationMember, UserSummary } from '../types/message';
 
 /**
  * Check if a message has been read by the current user
@@ -75,7 +75,11 @@ export const getConversationName = (
   }
 
   // Direct chat: show other user's name
-  const otherUser = conversation.participants.find((p) => p.id !== currentUserId);
+  if (!conversation.participants || conversation.participants.length === 0) {
+    return 'Unknown User';
+  }
+  
+  const otherUser = conversation.participants.find((p) => p.userId !== currentUserId);
   return otherUser?.username || 'Unknown User';
 };
 
@@ -93,7 +97,11 @@ export const getConversationAvatar = (
   }
 
   // Direct chat: show other user's avatar
-  const otherUser = conversation.participants.find((p) => p.id !== currentUserId);
+  if (!conversation.participants || conversation.participants.length === 0) {
+    return undefined;
+  }
+  
+  const otherUser = conversation.participants.find((p) => p.userId !== currentUserId);
   return otherUser?.avatar;
 };
 
@@ -103,9 +111,10 @@ export const getConversationAvatar = (
 export const getOtherUser = (
   conversation: Conversation,
   currentUserId: string
-): UserSummary | undefined => {
+): ConversationMember | undefined => {
   if (conversation.type === 'GROUP') return undefined;
-  return conversation.participants.find((p) => p.id !== currentUserId);
+  if (!conversation.participants || conversation.participants.length === 0) return undefined;
+  return conversation.participants.find((p) => p.userId !== currentUserId);
 };
 
 /**
@@ -139,8 +148,9 @@ export const areUsersInConversation = (
   conversation: Conversation,
   userIds: string[]
 ): boolean => {
+  if (!conversation.participants || conversation.participants.length === 0) return false;
   return userIds.every((userId) =>
-    conversation.participants.some((p) => p.id === userId)
+    conversation.participants.some((p) => p.userId === userId)
   );
 };
 

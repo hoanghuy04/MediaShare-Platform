@@ -31,9 +31,19 @@ public class MessageRequestDTO {
     private UserSummaryDTO sender;
     
     /**
-     * The first message in the request
+     * Information about the receiver
      */
-    private MessageDTO firstMessage;
+    private UserSummaryDTO receiver;
+    
+    /**
+     * Content of the last message in the request
+     */
+    private String lastMessageContent;
+    
+    /**
+     * Timestamp of the last message
+     */
+    private LocalDateTime lastMessageTimestamp;
     
     /**
      * Current status of the request

@@ -155,7 +155,9 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
 
         // For GROUP conversations: push to all participants
         if (conversation.getType() == ConversationType.GROUP) {
-            for (String participantId : conversation.getParticipants()) {
+            for (String participantId : conversation.getParticipants().stream()
+                    .map(p -> p.getUserId())
+                    .collect(java.util.stream.Collectors.toList())) {
                 chatMessage.setReceiverId(participantId);
                 messagingTemplate.convertAndSendToUser(
                         participantId,
@@ -167,6 +169,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
         } else {
             // For DIRECT conversations: push to the other participant
             String receiverId = conversation.getParticipants().stream()
+                    .map(p -> p.getUserId())
                     .filter(id -> !id.equals(sender.getId()))
                     .findFirst()
                     .orElse(null);

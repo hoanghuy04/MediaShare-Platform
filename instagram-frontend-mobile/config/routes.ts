@@ -61,7 +61,7 @@ export const API_ENDPOINTS = {
   UNLIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
 
   // Messages / Conversations
-  CONVERSATIONS: '/api/conversations',
+  INBOX: '/api/conversations/inbox',
   CONVERSATION_DETAIL: (id: string) => `/api/conversations/${id}`,
   CONVERSATION_MESSAGES: (id: string) => `/api/conversations/${id}/messages`,
   SEND_DIRECT_MESSAGE: '/api/conversations/direct/messages',
@@ -80,6 +80,7 @@ export const API_ENDPOINTS = {
   // Message Requests
   MESSAGE_REQUESTS: '/api/message-requests',
   MESSAGE_REQUESTS_COUNT: '/api/message-requests/count',
+  MESSAGE_REQUESTS_PENDING_MESSAGES: '/api/message-requests/pending-messages',
   ACCEPT_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/accept`,
   REJECT_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/reject`,
   IGNORE_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/ignore`,
@@ -92,4 +93,8 @@ export const API_ENDPOINTS = {
 
   // Upload
   UPLOAD: '/api/upload',
+  UPLOAD_PROFILE_IMAGE: '/api/upload/profile',
+  UPLOAD_POST_MEDIA: '/api/upload/post',
+  UPLOAD_POST_MEDIA_BATCH: '/api/upload/post/batch',
+  DELETE_FILE: (fileId: string) => `/api/upload/${fileId}`,
 } as const;

@@ -5,6 +5,7 @@ import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class FollowServiceImpl implements FollowService {
     
     private final FollowRepository followRepository;
-    private final UserServiceImpl userService;
+    private final UserService userService;
     private final UserRepository userRepository;
 
     @Transactional

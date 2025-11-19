@@ -5,7 +5,9 @@ import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage.MessageType;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
-import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
+import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
+import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageService;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.message.ConversationMessageServiceImpl;
 import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageServiceImpl;
 import lombok.RequiredArgsConstructor;
@@ -32,9 +34,9 @@ import java.util.Map;
 public class WebSocketMessageController {
 
     private final MessageRepository messageRepository;
-    private final UserServiceImpl userService;
-    private final ConversationMessageServiceImpl conversationMessageService;
-    private final WebSocketMessageServiceImpl webSocketMessageService;
+    private final UserService userService;
+    private final ConversationMessageService conversationMessageService;
+    private final WebSocketMessageService webSocketMessageService;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**

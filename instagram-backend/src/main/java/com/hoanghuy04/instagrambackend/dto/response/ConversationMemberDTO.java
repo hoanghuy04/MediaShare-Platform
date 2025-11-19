@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.entity.message;
+package com.hoanghuy04.instagrambackend.dto.response;
 
 import com.hoanghuy04.instagrambackend.enums.MemberRole;
 import lombok.AllArgsConstructor;
@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * Embedded class representing a member in a conversation.
- * Tracks member participation, roles, user info, and join/leave times.
+ * DTO for conversation member data.
+ * Contains user info and participation details.
  * 
  * @author Instagram Backend Team
  * @version 2.0.0
@@ -19,20 +19,20 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConversationMember {
+public class ConversationMemberDTO {
     
     /**
-     * Reference to the user ID
+     * User ID
      */
     private String userId;
     
     /**
-     * Username of the member (denormalized for performance)
+     * Username
      */
     private String username;
     
     /**
-     * Avatar URL of the member (denormalized for performance)
+     * Avatar URL
      */
     private String avatar;
     
@@ -42,19 +42,18 @@ public class ConversationMember {
     private boolean isVerified;
     
     /**
-     * Timestamp when the member joined the conversation
+     * Timestamp when the member joined
      */
     private LocalDateTime joinedAt;
     
     /**
-     * Timestamp when the member left the conversation (null if still active)
+     * Timestamp when the member left (null if still active)
      */
     private LocalDateTime leftAt;
     
     /**
-     * Role of the member (ADMIN or MEMBER)
+     * Member role (ADMIN or MEMBER)
      */
     private MemberRole role;
 }
-
 

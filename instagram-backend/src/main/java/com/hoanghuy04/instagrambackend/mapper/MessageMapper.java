@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.mapper;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationMemberDTO;
 import com.hoanghuy04.instagrambackend.dto.response.LastMessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
@@ -68,8 +69,6 @@ public abstract class MessageMapper {
      * @param currentUserId the current user ID for context
      * @return ConversationDTO
      */
-    @Mapping(target = "participants", ignore = true)
-    @Mapping(target = "lastMessage", ignore = true)
     public abstract ConversationDTO toConversationDTO(Conversation conversation, @Context String currentUserId);
 
     /**
@@ -87,12 +86,42 @@ public abstract class MessageMapper {
         }
         
         // Map sender
+        boolean senderMapped = false;
         if (message.getSender() != null) {
             try {
                 dto.setSender(toUserSummaryDTO(message.getSender()));
+                senderMapped = true;
             } catch (Exception e) {
-                log.warn("Failed to load sender for message {}: {}", message.getId(), e.getMessage());
+                log.warn("Failed to load sender from message {}: {}", message.getId(), e.getMessage());
             }
+        }
+        
+        // Fallback: If sender not mapped (either null or mapping failed), fetch from repository
+        if (!senderMapped) {
+            if (currentUserId == null || currentUserId.isBlank()) {
+                log.error("Cannot fetch sender for message {}: currentUserId is null or blank", message.getId());
+                return;
+            }
+            
+            log.warn("Sender not populated/mapped for message {}, fetching from repository using currentUserId: {}", 
+                message.getId(), currentUserId);
+            try {
+                User sender = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Sender not found: " + currentUserId));
+                dto.setSender(toUserSummaryDTO(sender));
+                log.info("Successfully fetched and mapped sender {} for message {}", sender.getId(), message.getId());
+            } catch (ResourceNotFoundException e) {
+                log.error("Sender not found in repository for message {} using currentUserId {}: {}", 
+                    message.getId(), currentUserId, e.getMessage());
+            } catch (Exception e) {
+                log.error("Failed to fetch sender for message {} using currentUserId {}: {}", 
+                    message.getId(), currentUserId, e.getMessage(), e);
+            }
+        }
+        
+        // Final check: ensure sender is set
+        if (dto.getSender() == null) {
+            log.error("CRITICAL: Sender is still null in DTO for message {} after all fallback attempts", message.getId());
         }
         
         // Map reply-to message (nested)
@@ -137,20 +166,21 @@ public abstract class MessageMapper {
             return;
         }
         
-        // Map participants
-        List<UserSummaryDTO> participants = conversation.getParticipants().stream()
-            .map(userId -> {
-                try {
-                    User user = userRepository.findById(userId)
-                        .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-                    return toUserSummaryDTO(user);
-                } catch (Exception e) {
-                    log.warn("Failed to load user {}: {}", userId, e.getMessage());
-                    return null;
-                }
-            })
-            .filter(user -> user != null)
-            .collect(Collectors.toList());
+        // Map participants - convert ConversationMember to ConversationMemberDTO
+        List<ConversationMemberDTO> participants = new java.util.ArrayList<>();
+        if (conversation.getParticipants() != null && !conversation.getParticipants().isEmpty()) {
+            participants = conversation.getParticipants().stream()
+                .map(member -> ConversationMemberDTO.builder()
+                    .userId(member.getUserId())
+                    .username(member.getUsername())
+                    .avatar(member.getAvatar())
+                    .isVerified(member.isVerified())
+                    .joinedAt(member.getJoinedAt())
+                    .leftAt(member.getLeftAt())
+                    .role(member.getRole())
+                    .build())
+                .collect(Collectors.toList());
+        }
         
         dto.setParticipants(participants);
         

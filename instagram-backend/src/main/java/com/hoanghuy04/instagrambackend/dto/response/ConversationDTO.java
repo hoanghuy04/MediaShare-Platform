@@ -42,9 +42,9 @@ public class ConversationDTO {
     private String avatar;
     
     /**
-     * List of participants in the conversation
+     * List of participants in the conversation with their roles and join times
      */
-    private List<UserSummaryDTO> participants;
+    private List<ConversationMemberDTO> participants;
     
     /**
      * Information about the last message

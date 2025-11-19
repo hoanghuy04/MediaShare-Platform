@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
+import com.hoanghuy04.instagrambackend.service.follow.FollowService;
 import com.hoanghuy04.instagrambackend.service.follow.FollowServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class FollowController {
     
-    private final FollowServiceImpl followService;
+    private final FollowService followService;
     
     /**
      * Follow a user.

@@ -6,6 +6,7 @@ import com.hoanghuy04.instagrambackend.entity.Notification;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.NotificationRepository;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationServiceImpl implements NotificationService {
     
     private final NotificationRepository notificationRepository;
-    private final UserServiceImpl userService;
+    private final UserService userService;
     
     /**
      * Create a new notification.

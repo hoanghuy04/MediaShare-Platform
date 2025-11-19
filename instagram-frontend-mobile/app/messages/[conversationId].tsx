@@ -21,7 +21,7 @@ import { MessageInput } from '../../components/messages/MessageInput';
 import { TypingIndicator } from '../../components/messages/TypingIndicator';
 import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { messageAPI } from '../../services/api';
+import { messageAPI, userAPI, messageRequestAPI } from '../../services/api';
 import { Message } from '../../types';
 import { showAlert } from '../../utils/helpers';
 
@@ -45,6 +45,8 @@ export default function ConversationScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [otherUser, setOtherUser] = useState<any>(null);
+  const [actualConversationId, setActualConversationId] = useState<string>(conversationId);
+  const [isNewConversation, setIsNewConversation] = useState(false); // Track if this is a new conversation (no existing conversation)
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [localConnectionStatus, setLocalConnectionStatus] = useState<
@@ -70,34 +72,32 @@ export default function ConversationScreen() {
     // Listen for incoming messages
     const handleWebSocketMessage = (message: any) => {
       console.log('Received WebSocket message:', message);
+      // Check if message is for this conversation (use otherUser.id if available, fallback to conversationId)
+      const otherUserId = otherUser?.id || conversationId;
       if (
         message.type === 'CHAT' &&
-        (message.senderId === conversationId || message.receiverId === conversationId)
+        (message.senderId === otherUserId || message.receiverId === otherUserId)
       ) {
         // Convert WebSocket message to Message type
+        // Safety check: ensure we have sender info
+        if (!message.senderId) {
+          console.warn('WebSocket message missing senderId:', message);
+          return;
+        }
+        
         const newMessage: Message = {
           id: message.id || '',
           sender: {
             id: message.senderId,
             username: message.senderUsername || '',
-            email: '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            profile: {
-              avatar: message.senderProfileImage,
-            },
-          },
-          receiver: {
-            id: user?.id || '',
-            username: user?.username || '',
-            email: user?.email || '',
-            createdAt: user?.createdAt || new Date().toISOString(),
-            updatedAt: user?.updatedAt || new Date().toISOString(),
+            avatar: message.senderProfileImage,
+            isVerified: false,
           },
           content: message.content || '',
           mediaUrl: message.mediaUrl,
-          isRead: message.status === 'READ',
+          readBy: message.status === 'READ' ? [user?.id || ''] : [],
           createdAt: message.timestamp,
+          isDeleted: false,
         };
 
         setMessages(prev => {
@@ -114,12 +114,8 @@ export default function ConversationScreen() {
           return [...prev, newMessage];
         });
 
-        // Notify parent messages screen about new message for real-time updates
-        // This will trigger the WebSocket message handler in messages.tsx
-        console.log('New message received in conversation, should update messages screen');
-
         // Mark message as read if it's from the other user and not sent by current user
-        if (message.senderId === conversationId && message.id && message.senderId !== user?.id) {
+        if (message.senderId === otherUserId && message.id && message.senderId !== user?.id) {
           sendReadReceipt(message.id, message.senderId);
         }
       }
@@ -127,16 +123,20 @@ export default function ConversationScreen() {
 
     // Listen for read receipts
     const handleReadReceipt = (messageId: string, senderId: string) => {
-      if (senderId === conversationId) {
+      const otherUserId = otherUser?.id || conversationId;
+      if (senderId === otherUserId) {
         setMessages(prev =>
-          prev.map(msg => (msg.id === messageId ? { ...msg, isRead: true } : msg))
+          prev.map(msg =>
+            msg.id === messageId ? { ...msg, readBy: [...msg.readBy, senderId] } : msg
+          )
         );
       }
     };
 
     // Listen for typing indicators
     const handleTyping = (isTyping: boolean, userId: string) => {
-      if (userId === conversationId) {
+      const otherUserId = otherUser?.id || conversationId;
+      if (userId === otherUserId) {
         setTypingUsers(prev => {
           if (isTyping) {
             return prev.includes(userId) ? prev : [...prev, userId];
@@ -150,7 +150,7 @@ export default function ConversationScreen() {
     onMessage(handleWebSocketMessage);
     onReadReceipt(handleReadReceipt);
     onTyping(handleTyping);
-  }, [conversationId, user?.id, onMessage, onReadReceipt, onTyping, sendReadReceipt]);
+  }, [conversationId, otherUser, user?.id, onMessage, onReadReceipt, onTyping, sendReadReceipt]);
 
   const showDevelopmentNotice = (title: string, message: string) => {
     setDevelopmentTitle(title);
@@ -160,15 +160,93 @@ export default function ConversationScreen() {
 
   const loadMessages = async () => {
     try {
-      // conversationId is the other user's ID
-      // Try to get messages, if no conversation exists, it will return empty
-      const response = await messageAPI.getMessages(conversationId);
+      // conversationId might be the other user's ID or actual conversation ID
+      // First, try to get or create direct conversation if conversationId looks like a userId
+      let actualConversationId = conversationId;
+      let isNewConv = false; // Track if this is a new conversation locally
+      
+      try {
+        // Try to get conversation as-is first
+        const conversation = await messageAPI.getConversation(conversationId);
+        actualConversationId = conversation.id;
+        
+        // Set other user from participants
+        if (conversation.participants && conversation.participants.length > 0) {
+          const otherUserFromConv = conversation.participants.find(p => p.userId !== user?.id);
+          if (otherUserFromConv) {
+            setOtherUser({
+              id: otherUserFromConv.userId,
+              username: otherUserFromConv.username,
+              email: '',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              profile: { avatar: otherUserFromConv.avatar },
+            });
+          }
+        }
+      } catch (error: any) {
+        // If conversation not found (404), this is a new conversation
+        // The conversationId is actually the other user's ID
+        if (error.response?.status === 404) {
+          console.log('Conversation not found. This is a new conversation with user:', conversationId);
+          
+          // Mark this as a new conversation (no existing conversation)
+          isNewConv = true;
+          setIsNewConversation(true);
+          
+          // Load the other user's profile
+          try {
+            const userProfile = await userAPI.getUserProfile(conversationId);
+            setOtherUser(userProfile);
+            console.log('Loaded other user profile:', userProfile);
+            
+            // No actual conversation ID yet - will be created when first message is sent
+            // Keep conversationId as is (it's the userId)
+            actualConversationId = conversationId;
+          } catch (userError) {
+            console.error('Failed to fetch user profile:', userError);
+            showAlert('Error', 'Unable to load user information. Please try again.');
+            router.back();
+            return;
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // Save the actual conversation ID to state
+      setActualConversationId(actualConversationId);
+      
+      // If this is a new conversation, try to load pending messages
+      if (isNewConv) {
+        try {
+          // Try to load pending messages from message request
+          const pendingMessages = await messageRequestAPI.getPendingMessages(user?.id || '', conversationId);
+          
+          if (pendingMessages && pendingMessages.length > 0) {
+            console.log(`Loaded ${pendingMessages.length} pending messages`);
+            setMessages(pendingMessages);
+          } else {
+            console.log('No pending messages found');
+            setMessages([]); // Empty messages for new conversation
+          }
+        } catch (error) {
+          console.error('Error loading pending messages:', error);
+          setMessages([]); // Empty messages on error
+        }
+        
+        setIsLoading(false);
+        return;
+      }
+      
+      // Now load messages with the actual conversation ID
+      const response = await messageAPI.getMessages(actualConversationId);
       setMessages(response.content.reverse() || []);
 
       // Mark all messages from other user as read via WebSocket
       if (response.content.length > 0) {
         const unreadMessages = response.content.filter(
-          msg => msg.sender.id !== user?.id && !msg.isRead
+          msg => msg.sender.id !== user?.id && !msg.readBy.includes(user?.id || '')
         );
 
         // Send read receipts for unread messages via WebSocket
@@ -182,28 +260,22 @@ export default function ConversationScreen() {
             'WebSocket not connected, read receipts will be sent when connection is restored'
           );
         }
-      }
-
-      // If no messages exist, we need to get the other user's info
-      if (response.content.length === 0) {
-        // Load other user's profile info
-        try {
-          const { userAPI } = await import('../../services/api');
-          const otherUserProfile = await userAPI.getUserProfile(conversationId);
-          setOtherUser({
-            id: otherUserProfile.id,
-            username: otherUserProfile.username,
-            profile: otherUserProfile.profile,
-          });
-        } catch (profileError) {
-          console.error('Error loading user profile:', profileError);
+        
+        // Extract other user from messages if not already set
+        if (!otherUser && response.content.length > 0) {
+          // If we have messages but no otherUser set, try to infer from the first message
+          // where the sender is not the current user
+          const messageFromOther = response.content.find(msg => msg.sender.id !== user?.id);
+          if (messageFromOther) {
+            // We have the sender as UserSummary, need to fetch full profile for consistency
+            try {
+              const userProfile = await userAPI.getUserProfile(messageFromOther.sender.id);
+              setOtherUser(userProfile);
+            } catch (error) {
+              console.error('Failed to fetch other user profile:', error);
+            }
+          }
         }
-      } else {
-        // Extract other user from messages
-        const firstMessage = response.content[0];
-        const other =
-          firstMessage.sender.id === user?.id ? firstMessage.receiver : firstMessage.sender;
-        setOtherUser(other);
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -215,6 +287,12 @@ export default function ConversationScreen() {
   };
 
   const handleSendMessage = async (content: string) => {
+    if (!otherUser) {
+      console.error('Cannot send message: other user not loaded');
+      showAlert('Error', 'Unable to send message. Please try again.');
+      return;
+    }
+
     try {
       // Create optimistic message immediately
       const optimisticMessage: Message = {
@@ -222,58 +300,105 @@ export default function ConversationScreen() {
         sender: {
           id: user?.id || '',
           username: user?.username || '',
-          email: user?.email || '',
-          createdAt: user?.createdAt || new Date().toISOString(),
-          updatedAt: user?.updatedAt || new Date().toISOString(),
-          profile: {
-            avatar: user?.profile?.avatar,
-          },
-        },
-        receiver: {
-          id: conversationId,
-          username: otherUser?.username || '',
-          email: otherUser?.email || '',
-          createdAt: otherUser?.createdAt || new Date().toISOString(),
-          updatedAt: otherUser?.updatedAt || new Date().toISOString(),
+          avatar: user?.profile?.avatar,
+          isVerified: user?.verified || false,
         },
         content,
-        isRead: false,
+        readBy: [],
         createdAt: new Date().toISOString(),
+        isDeleted: false,
       };
 
       // Add optimistic message immediately
       console.log('Adding optimistic message:', optimisticMessage);
       setMessages(prev => [...prev, optimisticMessage]);
 
-      if (isConnected) {
-        // Send via WebSocket for real-time delivery
-        sendWebSocketMessage(conversationId, content);
-      } else {
-        // Fallback to REST API if WebSocket is not connected
+      // If this is a new conversation (no existing conversation), send via direct message endpoint
+      // This will create a message request (if users are not connected)
+      if (isNewConversation) {
+        console.log('Sending message to new conversation (creates message request if not connected)');
         try {
-          const newMessage = await messageAPI.sendMessage({
-            receiverId: conversationId,
-            content,
-          });
+          const newMessage = await messageAPI.sendDirectMessage(
+            otherUser.id,
+            content
+          );
+          
+          console.log('Received message from API:', newMessage);
+
+          // Safety check: ensure message has sender
+          if (!newMessage.sender) {
+            console.error('API returned message without sender:', newMessage);
+            // Keep optimistic message if API response is invalid
+            return;
+          }
 
           // Replace optimistic message with real message
           setMessages(prev =>
             prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
           );
-        } catch (apiError) {
+
+          // If backend returned a conversationId, update and mark as no longer new
+          if (newMessage.conversationId) {
+            console.log('Conversation created:', newMessage.conversationId);
+            setActualConversationId(newMessage.conversationId);
+            setIsNewConversation(false);
+          } else {
+            console.log('Message sent as request (no conversation created yet)');
+            // Show info that message is sent as request (needs acceptance)
+            showAlert(
+              'Message Sent',
+              'Your message has been sent. The recipient will need to accept your message request before you can continue chatting.'
+            );
+          }
+        } catch (apiError: any) {
           // Remove optimistic message if API call fails
           setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
           throw apiError;
         }
+      } else {
+        // Existing conversation - use normal flow
+        if (isConnected) {
+          // Send via WebSocket for real-time delivery to the other user
+          console.log('Sending WebSocket message to user:', otherUser.id);
+          sendWebSocketMessage(otherUser.id, content);
+        } else {
+          // Fallback to REST API if WebSocket is not connected
+          console.log('WebSocket not connected, using REST API with conversation:', actualConversationId);
+          try {
+            const newMessage = await messageAPI.sendMessage(actualConversationId, content);
+            console.log('Received message from API:', newMessage);
+
+            // Safety check: ensure message has sender
+            if (!newMessage.sender) {
+              console.error('API returned message without sender:', newMessage);
+              // Keep optimistic message
+              return;
+            }
+
+            // Replace optimistic message with real message
+            setMessages(prev =>
+              prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
+            );
+          } catch (apiError) {
+            // Remove optimistic message if API call fails
+            setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+            throw apiError;
+          }
+        }
       }
     } catch (error: any) {
-      showAlert('Error', error.message);
+      showAlert('Error', error.message || 'Failed to send message');
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <ChatMessage message={item} isOwn={item.sender.id === user?.id} />
-  );
+  const renderMessage = ({ item }: { item: Message }) => {
+    // Safety check: ensure sender exists
+    if (!item.sender) {
+      console.warn('Message missing sender:', item);
+      return null;
+    }
+    return <ChatMessage message={item} isOwn={item.sender.id === user?.id} />;
+  };
 
   const renderHeader = () => (
     <SafeAreaView style={[styles.header, { backgroundColor: theme.colors.background }]}>

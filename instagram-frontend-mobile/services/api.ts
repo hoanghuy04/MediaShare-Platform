@@ -14,6 +14,7 @@ import {
   Message,
   SendMessageRequest,
   MessageRequest,
+  InboxItem,
   Notification,
   PaginatedResponse,
 } from '../types';
@@ -276,14 +277,13 @@ export const commentAPI = {
 
 // Message API
 export const messageAPI = {
-  // Get all conversations for current user
-  getConversations: async (page = 0, limit = 20): Promise<PaginatedResponse<Conversation>> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'] as string;
-    console.log('Getting conversations with userId:', userId);
-    const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATIONS, {
-      params: { userId, page, limit },
+  // Get inbox items (conversations + sent message requests)
+  getInbox: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
+    // userId will be automatically added by axios interceptor
+    const response = await axiosInstance.get(API_ENDPOINTS.INBOX, {
+      params: { page, limit },
     });
-    return response.data.data;
+    return response.data.data; // Backend returns ApiResponse<PageResponse<InboxItemDTO>>
   },
 
   // Get conversation details
@@ -410,6 +410,13 @@ export const messageRequestAPI = {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_COUNT, {
       params: { userId },
+    });
+    return response.data.data;
+  },
+
+  getPendingMessages: async (senderId: string, receiverId: string): Promise<Message[]> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_PENDING_MESSAGES, {
+      params: { senderId, receiverId },
     });
     return response.data.data;
   },

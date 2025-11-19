@@ -7,6 +7,7 @@ import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.repository.LikeRepository;
 import com.hoanghuy04.instagrambackend.service.PostService;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
 public class LikeServiceImpl implements LikeService {
     
     private final LikeRepository likeRepository;
-    private final UserServiceImpl userService;
+    private final UserService userService;
     private final PostService postService;
     
     @Transactional

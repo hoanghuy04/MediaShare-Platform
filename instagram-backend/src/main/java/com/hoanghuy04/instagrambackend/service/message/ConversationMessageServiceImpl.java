@@ -1,7 +1,9 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
@@ -12,6 +14,7 @@ import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
+import com.hoanghuy04.instagrambackend.mapper.MessageRequestMapper;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
@@ -56,6 +59,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     FollowRepository followRepository;
 
     MessageMapper messageMapper;
+    MessageRequestMapper messageRequestMapper;
     
     @Transactional
     @Override
@@ -80,6 +84,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         
         if (conversation.getType() == ConversationType.DIRECT) {
             String otherParticipantId = conversation.getParticipants().stream()
+                .map(p -> p.getUserId())
                 .filter(id -> !id.equals(senderId))
                 .findFirst()
                 .orElse(null);
@@ -245,7 +250,9 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         
         Conversation conversation = conversationService.getConversationById(conversationId);
         
-        if (!conversation.getParticipants().contains(userId)) {
+        boolean isParticipant = conversation.getParticipants().stream()
+            .anyMatch(p -> p.getUserId().equals(userId));
+        if (!isParticipant) {
             throw new BadRequestException("You are not a participant in this conversation");
         }
         
@@ -356,28 +363,79 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<ConversationDTO> getUserConversationsAsDTO(String userId, Pageable pageable) {
-        log.debug("Getting conversations for user: {} with pagination", userId);
+    public PageResponse<InboxItemDTO> getInboxItems(String userId, Pageable pageable) {
+        log.debug("Getting inbox items for user: {} with page {} and size {}", 
+            userId, pageable.getPageNumber(), pageable.getPageSize());
         
+        List<InboxItemDTO> allInboxItems = new ArrayList<>();
+        
+        // 1. Get all conversations
         List<Conversation> conversations = conversationService.getUserConversations(userId);
+        for (Conversation conv : conversations) {
+            ConversationDTO convDTO = messageMapper.toConversationDTO(conv, userId);
+            InboxItemDTO item = InboxItemDTO.builder()
+                .type(InboxItemDTO.InboxItemType.CONVERSATION)
+                .conversation(convDTO)
+                .timestamp(conv.getUpdatedAt())
+                .build();
+            allInboxItems.add(item);
+        }
         
-        List<ConversationDTO> conversationDTOs = conversations.stream()
-            .map(conv -> messageMapper.toConversationDTO(conv, userId))
+        // 2. Get message requests sent by user (status=PENDING)
+        List<MessageRequest> sentRequests = messageRequestRepository.findBySenderIdOrderByCreatedAtDesc(userId)
+            .stream()
+            .filter(req -> req.getStatus() == RequestStatus.PENDING)
             .collect(Collectors.toList());
         
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), conversationDTOs.size());
-        List<ConversationDTO> paginatedConversations = start < conversationDTOs.size() 
-            ? conversationDTOs.subList(start, end) 
+        for (MessageRequest req : sentRequests) {
+            MessageRequestDTO reqDTO = messageRequestMapper.toMessageRequestDTO(req);
+            // Manually enrich sender and receiver (MapStruct doesn't auto-call @AfterMapping)
+            messageRequestMapper.enrichMessageRequest(reqDTO, req);
+            
+            InboxItemDTO item = InboxItemDTO.builder()
+                .type(InboxItemDTO.InboxItemType.MESSAGE_REQUEST)
+                .messageRequest(reqDTO)
+                .timestamp(req.getCreatedAt())
+                .build();
+            allInboxItems.add(item);
+        }
+        
+        // 3. Sort by timestamp (most recent first)
+        allInboxItems.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()));
+        
+        // 4. Apply pagination
+        int totalElements = allInboxItems.size();
+        int pageNumber = pageable.getPageNumber();
+        int pageSize = pageable.getPageSize();
+        int startIndex = pageNumber * pageSize;
+        int endIndex = Math.min(startIndex + pageSize, totalElements);
+        
+        List<InboxItemDTO> pageContent = (startIndex < totalElements) 
+            ? allInboxItems.subList(startIndex, endIndex) 
             : new ArrayList<>();
         
-        Page<ConversationDTO> page = new org.springframework.data.domain.PageImpl<>(
-            paginatedConversations,
-            pageable,
-            conversationDTOs.size()
-        );
+        int totalPages = (int) Math.ceil((double) totalElements / pageSize);
+        boolean hasNext = pageNumber < (totalPages - 1);
+        boolean hasPrevious = pageNumber > 0;
+        boolean isFirst = pageNumber == 0;
+        boolean isLast = pageNumber >= (totalPages - 1);
+        boolean isEmpty = pageContent.isEmpty();
         
-        return PageResponse.of(page);
+        log.debug("Found {} total inbox items for user {}: {} conversations, {} message requests. Returning page {} with {} items", 
+            totalElements, userId, conversations.size(), sentRequests.size(), pageNumber, pageContent.size());
+        
+        return PageResponse.<InboxItemDTO>builder()
+            .content(pageContent)
+            .pageNumber(pageNumber)
+            .pageSize(pageSize)
+            .totalElements(totalElements)
+            .totalPages(totalPages)
+            .hasNext(hasNext)
+            .hasPrevious(hasPrevious)
+            .first(isFirst)
+            .last(isLast)
+            .empty(isEmpty)
+            .build();
     }
     
     @Transactional(readOnly = true)

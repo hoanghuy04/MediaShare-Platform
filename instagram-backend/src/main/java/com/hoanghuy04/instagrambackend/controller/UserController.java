@@ -5,7 +5,7 @@ import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
-import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,7 +34,7 @@ import java.util.List;
 @SecurityRequirement(name = "Bearer Authentication")
 public class UserController {
     
-    private final UserServiceImpl userService;
+    private final UserService userService;
     
     /**
      * Get user by ID.

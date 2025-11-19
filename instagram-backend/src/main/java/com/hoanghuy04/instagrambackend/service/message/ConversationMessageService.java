@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
@@ -118,14 +119,17 @@ public interface ConversationMessageService {
     boolean areUsersConnected(String userId1, String userId2);
 
     /**
-     * Get all conversations for a user as DTOs with pagination.
+     * Get inbox items for a user (conversations + sent message requests).
+     * Inbox includes:
+     * - All conversations the user participates in
+     * - Message requests sent by the user (status=PENDING)
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @return PageResponse of ConversationDTO
+     * @return PageResponse of InboxItemDTO sorted by timestamp
      */
     @Transactional(readOnly = true)
-    PageResponse<ConversationDTO> getUserConversationsAsDTO(String userId, Pageable pageable);
+    PageResponse<InboxItemDTO> getInboxItems(String userId, Pageable pageable);
 
     /**
      * Get conversation details as DTO.

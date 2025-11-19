@@ -5,14 +5,14 @@ import com.hoanghuy04.instagrambackend.dto.request.CreateGroupRequest;
 import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.request.UpdateGroupRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
-import com.hoanghuy04.instagrambackend.service.message.ConversationMessageServiceImpl;
-import com.hoanghuy04.instagrambackend.service.message.ConversationServiceImpl;
-import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageServiceImpl;
+import com.hoanghuy04.instagrambackend.service.message.*;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,27 +41,32 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "Bearer Authentication")
 public class ConversationController {
     
-    private final ConversationServiceImpl conversationService;
-    private final ConversationMessageServiceImpl conversationMessageService;
-    private final WebSocketMessageServiceImpl webSocketMessageService;
+    private final ConversationService conversationService;
+    private final ConversationMessageService conversationMessageService;
+    private final WebSocketMessageService webSocketMessageService;
     private final MessageMapper messageMapper;
+    private final UserService userService;
     
     /**
-     * Get all conversations for a user.
+     * Get inbox items for a user (conversations + sent message requests).
+     * Inbox includes:
+     * - All conversations the user participates in
+     * - Message requests sent by the user (status=PENDING)
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @return ResponseEntity with PageResponse of ConversationDTO
+     * @return ResponseEntity with PageResponse of InboxItemDTO
      */
-    @GetMapping
-    @Operation(summary = "Get all conversations for a user")
-    public ResponseEntity<ApiResponse<PageResponse<ConversationDTO>>> getConversations(
+    @GetMapping("/inbox")
+    @Operation(summary = "Get inbox items (conversations + sent message requests)")
+    public ResponseEntity<ApiResponse<PageResponse<InboxItemDTO>>> getInbox(
             @RequestParam String userId,
             @PageableDefault(sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        log.info("Get all conversations request received for user: {}", userId);
+        log.info("Get inbox items request received for user: {} (page: {}, size: {})", 
+            userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        PageResponse<ConversationDTO> response = conversationMessageService.getUserConversationsAsDTO(userId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        PageResponse<InboxItemDTO> pageResponse = conversationMessageService.getInboxItems(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Inbox retrieved successfully", pageResponse));
     }
     
     /**
@@ -241,10 +246,35 @@ public class ConversationController {
             request.getMediaUrl()
         );
         
+        log.debug("Message created: id={}, sender={}, receiver={}, conversation={}", 
+            message.getId(), 
+            message.getSender() != null ? message.getSender().getId() : "NULL",
+            message.getReceiver() != null ? message.getReceiver().getId() : "NULL",
+            message.getConversation() != null ? message.getConversation().getId() : "NULL"
+        );
+        
         // Push via WebSocket
         webSocketMessageService.pushMessage(message);
         
         MessageDTO dto = messageMapper.toMessageDTO(message, senderId);
+        
+        // Safety net: Ensure sender is set in DTO (fallback if mapper didn't set it)
+        if (dto.getSender() == null) {
+            log.warn("Sender is null in DTO for message {}, manually setting from UserService", message.getId());
+            try {
+                com.hoanghuy04.instagrambackend.entity.User sender = userService.getUserEntityById(senderId);
+                dto.setSender(messageMapper.toUserSummaryDTO(sender));
+                log.info("Manually set sender {} for message {}", senderId, message.getId());
+            } catch (Exception e) {
+                log.error("Failed to manually set sender for message {}: {}", message.getId(), e.getMessage());
+            }
+        }
+        
+        log.debug("MessageDTO created: id={}, sender={}", 
+            dto.getId(),
+            dto.getSender() != null ? dto.getSender().getId() : "NULL"
+        );
+        
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Message sent successfully", dto));
     }

@@ -26,6 +26,7 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      * @param userId the user ID to search for
      * @return List of conversations the user is part of
      */
+    @Query("{ 'participants.userId': ?0 }")
     List<Conversation> findByParticipantsContaining(String userId);
     
     /**
@@ -35,7 +36,7 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      * @param participants list of participant IDs (should contain exactly 2)
      * @return Optional conversation if found
      */
-    @Query("{'type': ?0, 'participants': {$all: ?1, $size: ?2}}")
+    @Query("{'type': ?0, 'participants.userId': {$all: ?1, $size: ?2}}")
     Optional<Conversation> findByTypeAndParticipants(
         ConversationType type, 
         List<String> participants,
@@ -49,6 +50,7 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      * @param after the timestamp threshold
      * @return List of conversations with recent messages
      */
+    @Query("{ 'participants.userId': ?0, 'lastMessage.timestamp': { $gt: ?1 } }")
     List<Conversation> findByParticipantsContainingAndLastMessage_TimestampAfter(
         String userId, 
         LocalDateTime after
@@ -61,7 +63,7 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      * @param userId the user ID to count for
      * @return number of unread conversations
      */
-    @Query("{ 'participants': ?0, 'lastMessage.senderId': { $ne: ?0 } }")
+    @Query("{ 'participants.userId': ?0, 'lastMessage.senderId': { $ne: ?0 } }")
     long countUnreadConversations(String userId);
     
     /**
@@ -71,7 +73,7 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      * @param userId the user ID to check
      * @return Optional conversation if user is participant
      */
-    @Query("{ '_id': ?0, 'participants': ?1 }")
+    @Query("{ '_id': ?0, 'participants.userId': ?1 }")
     Optional<Conversation> findByIdAndParticipantsContaining(String conversationId, String userId);
     
     /**
@@ -80,7 +82,7 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      * @param userId the user ID to search for
      * @return List of conversations not deleted by the user
      */
-    @Query("{ 'participants': ?0, 'deletedBy': { $nin: [?1] } }")
+    @Query("{ 'participants.userId': ?0, 'deletedBy': { $nin: [?1] } }")
     List<Conversation> findByParticipantsContainingAndDeletedByNotContaining(String userId, String userId2);
 }
 

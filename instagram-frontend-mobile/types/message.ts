@@ -1,11 +1,22 @@
 import { UserProfile } from './user';
 
-// User summary for conversation participants
+// User summary for message sender (lightweight)
 export interface UserSummary {
   id: string;
   username: string;
   avatar?: string;
   isVerified: boolean;
+}
+
+// Conversation member with role and participation details
+export interface ConversationMember {
+  userId: string;
+  username: string;
+  avatar?: string;
+  isVerified: boolean;
+  joinedAt: string;
+  leftAt?: string;
+  role: 'ADMIN' | 'MEMBER';
 }
 
 // Last message info
@@ -23,7 +34,7 @@ export interface Conversation {
   type: 'DIRECT' | 'GROUP';
   name?: string; // Group name
   avatar?: string; // Group avatar
-  participants: UserSummary[];
+  participants: ConversationMember[]; // Changed from UserSummary[] to ConversationMember[]
   lastMessage?: LastMessage;
   createdAt: string;
   // Note: unreadCount removed - calculate on frontend from messages
@@ -55,8 +66,9 @@ export interface SendMessageRequest {
 export interface MessageRequest {
   id: string;
   sender: UserSummary;
-  firstMessage?: Message;
-  pendingCount: number;
+  receiver: UserSummary;
+  lastMessageContent?: string;
+  lastMessageTimestamp?: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'IGNORED';
   createdAt: string;
 }
@@ -65,5 +77,13 @@ export interface MessageRequest {
 export interface WebSocketMessage {
   type: 'MESSAGE' | 'TYPING' | 'READ' | 'ONLINE' | 'OFFLINE';
   data: any;
+  timestamp: string;
+}
+
+// Inbox item (conversation or message request) - matches backend InboxItemDTO
+export interface InboxItem {
+  type: 'CONVERSATION' | 'MESSAGE_REQUEST';
+  conversation?: Conversation;
+  messageRequest?: MessageRequest;
   timestamp: string;
 }

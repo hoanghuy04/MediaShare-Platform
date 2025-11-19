@@ -104,4 +104,15 @@ public interface MessageRequestService {
      */
     @Transactional(readOnly = true)
     MessageRequest getRequestById(String requestId);
+    
+    /**
+     * Get all pending messages for a message request between sender and receiver.
+     * This is used when the sender wants to view their sent messages that haven't been accepted yet.
+     *
+     * @param senderId the sender user ID
+     * @param receiverId the receiver user ID
+     * @return List of pending messages as DTOs
+     */
+    @Transactional(readOnly = true)
+    List<com.hoanghuy04.instagrambackend.dto.response.MessageDTO> getPendingMessages(String senderId, String receiverId);
 }

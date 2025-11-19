@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { PaginatedResponse } from '@types';
+import { PaginatedResponse } from '../types';
 
 interface UseInfiniteScrollOptions<T> {
   fetchFunc: (page: number, limit: number) => Promise<PaginatedResponse<T>>;
@@ -55,9 +55,11 @@ export const useInfiniteScroll = <T>({
       try {
         console.log(`Fetching data for page ${pageNum}, limit ${limitRef.current}`);
         const response = await fetchFuncRef.current(pageNum, limitRef.current);
+        
         console.log('API response:', response);
         console.log('Response content:', response.content);
         console.log('Response hasNext:', response.hasNext);
+        
 
         if (isRefresh || pageNum === 0) {
           setData(response.content);

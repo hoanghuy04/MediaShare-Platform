@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.request.LoginRequest;
 import com.hoanghuy04.instagrambackend.dto.request.RegisterRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.AuthResponse;
+import com.hoanghuy04.instagrambackend.service.authentication.AuthService;
 import com.hoanghuy04.instagrambackend.service.authentication.AuthServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Authentication", description = "Authentication management APIs")
 public class AuthController {
     
-    private final AuthServiceImpl authService;
+    private final AuthService authService;
     
     /**
      * Register a new user.
