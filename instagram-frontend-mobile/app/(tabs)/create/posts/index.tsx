@@ -1,5 +1,10 @@
-import PostCreationScreen from '@/components/create/posts/PostCreationScreen';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
 
-export default function PostsPage() {
-  return <PostCreationScreen />;
+export default function PostsIndex() {
+  useEffect(() => {
+    router.replace('./pick-media');
+  }, []);
+
+  return null;
 }

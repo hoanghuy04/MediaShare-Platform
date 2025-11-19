@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import ReelsCreationScreen from './reels/ReelsCreationScreen';
-import PostCreationScreen from './posts/PostCreationScreen';
+import { router } from 'expo-router';
 
 
 const { width } = Dimensions.get('window');
@@ -27,11 +27,11 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
   const [activeTab, setActiveTab] = useState<TabType>('post');
   const [postStep, setPostStep] = useState(1);
 
-  // useFocusEffect(
-  //   React.useCallback(() => {
-  //     setActiveTab('post');
-  //   }, [])
-  // );
+  useFocusEffect(
+    React.useCallback(() => {
+      setActiveTab('post');
+    }, [])
+  );
 
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
@@ -43,8 +43,13 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
 
   const renderContent = () => {
     switch (activeTab) {
-        case 'post':
-          return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} onPostCreated={onPostCreated} />;
+      case 'post':
+        router.push('/(tabs)/create/posts/pick-media');
+        return (
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>Đang mở bộ chọn phương tiện...</Text>
+          </View>
+        );
       case 'story':
         return (
           <View style={styles.placeholder}>
@@ -54,7 +59,11 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
       case 'reels':
         return <ReelsCreationScreen />;
       default:
-        return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} />;
+        return (
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>Chọn một tuỳ chọn tạo nội dung</Text>
+          </View>
+        );
     }
   };
 

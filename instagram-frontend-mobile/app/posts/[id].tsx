@@ -59,7 +59,6 @@ export default function PostDetailScreen() {
   const handleLikeComment = async (commentId: string) => {
     try {
       await commentAPI.likeComment(commentId);
-      // TODO: Update comment in local state
     } catch (error: any) {
       showAlert('Error', error.message);
     }
@@ -68,7 +67,6 @@ export default function PostDetailScreen() {
   const handleLikePost = async (postId: string) => {
     try {
       await postAPI.likePost(postId);
-      // Update post in local state
       setPost(prev => prev ? {
         ...prev,
         isLikedByCurrentUser: !prev.isLikedByCurrentUser,
@@ -80,7 +78,6 @@ export default function PostDetailScreen() {
   };
 
   const handleCommentPost = (postId: string) => {
-    // Already in comment screen, no need to navigate
   };
 
   const handleSharePost = (postId: string) => {
@@ -89,7 +86,6 @@ export default function PostDetailScreen() {
 
   const handleBookmarkPost = async (postId: string) => {
     try {
-      // TODO: Implement bookmark API
       showAlert('Saved', 'Post saved to your collection');
     } catch (error: any) {
       showAlert('Error', error.message);
@@ -98,7 +94,6 @@ export default function PostDetailScreen() {
 
   const handleFollowUser = async (userId: string) => {
     try {
-      // TODO: Implement follow API
       showAlert('Success', 'You are now following this user');
     } catch (error: any) {
       showAlert('Error', error.message);
