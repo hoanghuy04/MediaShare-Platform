@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * Web configuration for serving static files.
  * Handles static file serving from uploads directory.
- * 
+ *
  * @author Instagram Backend Team
  * @version 1.0.0
  */

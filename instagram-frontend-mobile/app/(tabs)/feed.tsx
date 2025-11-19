@@ -13,6 +13,7 @@ export default function FeedScreen() {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasInitialized = useRef(false);
+  const flatListRef = useRef<any>(null);
 
   const {
     data: posts,
@@ -39,7 +40,12 @@ export default function FeedScreen() {
     React.useCallback(() => {
       if (hasInitialized.current) {
         console.log('Feed screen focused, refreshing...');
-        refresh();
+        refresh().then(() => {
+          // Scroll to top sau khi refresh để hiển thị post mới ở đầu
+          setTimeout(() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }, 100);
+        });
       }
     }, [refresh])
   );
@@ -106,6 +112,7 @@ export default function FeedScreen() {
         hasNotifications={false}
       />
       <FeedList
+        ref={flatListRef}
         posts={posts}
         isLoading={isLoading}
         isRefreshing={isRefreshing}

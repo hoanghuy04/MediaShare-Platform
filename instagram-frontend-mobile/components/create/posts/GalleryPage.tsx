@@ -10,9 +10,11 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_GAP = 1; 
@@ -53,6 +55,7 @@ export function GalleryPage({
 }: GalleryPageProps) {
   const scrollY = useRef(new Animated.Value(0)).current;
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const gridItems = [
     { type: 'camera' as const },
@@ -81,7 +84,7 @@ export function GalleryPage({
   return (
     <View style={[styles.page, { height }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.push('/(tabs)/feed')}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
@@ -170,6 +173,12 @@ export function GalleryPage({
                         source={{ uri: asset.uri }}
                         style={styles.assetImage}
                         resizeMode="cover"
+                        onError={(error) => {
+                          // Suppress ph:// URI warnings - images are already loaded via localUri
+                          if (!asset.uri.includes('ph://')) {
+                            console.warn('Image load error:', error.nativeEvent.error);
+                          }
+                        }}
                       />
                       
                       {asset.mediaType === 'video' && (

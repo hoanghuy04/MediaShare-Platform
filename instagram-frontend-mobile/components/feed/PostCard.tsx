@@ -8,6 +8,7 @@ import { useTheme } from '@hooks/useTheme';
 import { Avatar } from '../common/Avatar';
 import { formatDate, formatNumber } from '@utils/formatters';
 import { isVideoFormatSupported } from '@utils/videoUtils';
+import apiConfig from '@config/apiConfig';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 9 / 16; // 16:9 aspect ratio
@@ -137,11 +138,17 @@ export const PostCard: React.FC<PostCardProps> = ({
         );
       }
 
+      let videoUrl = media.url;
+      if (videoUrl && (videoUrl.includes('localhost:8080') || videoUrl.includes('127.0.0.1:8080'))) {
+        videoUrl = videoUrl.replace(/https?:\/\/localhost:8080/g, apiConfig.apiUrl);
+        videoUrl = videoUrl.replace(/https?:\/\/127\.0\.0\.1:8080/g, apiConfig.apiUrl);
+      }
+
       return (
         <View style={styles.mediaContainer}>
           <Video
             ref={videoRef}
-            source={{ uri: media.url }}
+            source={{ uri: videoUrl }}
             style={styles.media}
             resizeMode={ResizeMode.COVER}
             shouldPlay={false}
@@ -150,11 +157,12 @@ export const PostCard: React.FC<PostCardProps> = ({
             onPlaybackStatusUpdate={handleVideoStatusUpdate}
             onError={(error) => {
               console.error('Video load error:', error);
-              console.error('Video URL:', media.url);
+              console.error('Video URL:', videoUrl);
+              console.error('Original URL:', media.url);
               setVideoError(true);
             }}
             onLoad={() => {
-              console.log('Video loaded successfully:', media.url);
+              console.log('Video loaded successfully:', videoUrl);
               setVideoError(false);
             }}
           />
@@ -363,9 +371,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           </Text>
           {post.caption.length > 100 && (
             <TouchableOpacity onPress={handlePostPress}>
-              <Text style={[styles.seeMore, { color: theme.colors.textSecondary }]}>
-                xem thêm
-              </Text>
+              <Text style={[styles.seeMore, { color: theme.colors.textSecondary }]}>xem thêm</Text>
             </TouchableOpacity>
           )}
         </View>

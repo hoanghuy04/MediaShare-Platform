@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashMode } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type TopOverlayProps = {
   recordState: 'idle' | 'recording' | 'postrecord';
@@ -20,9 +21,11 @@ export function TopOverlay({
   onAvatarPress,
   onClose,
 }: TopOverlayProps) {
+  const insets = useSafeAreaInsets();
+
   if (recordState === 'recording') {
     return (
-      <View style={styles.topRowRecordingOnlyRight}>
+      <View style={[styles.topRowRecordingOnlyRight, { top: insets.top + 16 }]}>
         <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={styles.avatarBubble}>
           <View style={styles.avatarBadge}>
             <Text style={styles.avatarBadgeText}>2</Text>
@@ -37,7 +40,7 @@ export function TopOverlay({
   }
 
   return (
-    <View style={styles.topRowWrapper}>
+    <View style={[styles.topRowWrapper, { top: insets.top + 16 }]}>
       <View style={styles.topLeft}>
         <TouchableOpacity style={styles.roundBubbleDark} onPress={onClose}>
           <Ionicons name="close" size={22} color="#fff" />
@@ -76,7 +79,6 @@ export function TopOverlay({
 const styles = StyleSheet.create({
   topRowWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 16 : 10,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -88,7 +90,6 @@ const styles = StyleSheet.create({
 
   topRowRecordingOnlyRight: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 16 : 10,
     right: 12,
     zIndex: 20,
   },

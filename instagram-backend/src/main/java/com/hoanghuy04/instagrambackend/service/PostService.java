@@ -11,11 +11,14 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
-import com.hoanghuy04.instagrambackend.service.FileStorageService;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,7 +104,14 @@ public class PostService {
     public PageResponse<PostResponse> getAllPosts(Pageable pageable, String currentUserId) {
         log.debug("Getting all posts");
 
-        Page<PostResponse> page = postRepository.findAll(pageable)
+        // Sort by createdAt DESC (newest first)
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Page<PostResponse> page = postRepository.findAll(sortedPageable)
                 .map(post -> convertToPostResponse(post, currentUserId));
 
         return PageResponse.of(page);
@@ -119,7 +129,13 @@ public class PostService {
     public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable, String currentUserId) {
         log.debug("Getting posts for user: {}", userId);
 
-        Page<PostResponse> page = postRepository.findByAuthorId(userId, pageable)
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Page<PostResponse> page = postRepository.findByAuthorId(userId, sortedPageable)
                 .map(post -> convertToPostResponse(post, currentUserId));
 
         return PageResponse.of(page);
@@ -151,7 +167,14 @@ public class PostService {
                 .map(follow -> follow.getFollowing().getId())
                 .collect(Collectors.toList());
         followingIds.add(userId);
-        Page<PostResponse> page = postRepository.findAll(pageable)
+        
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+        
+        Page<PostResponse> page = postRepository.findAll(sortedPageable)
                 .map(post -> {
                     PostResponse postResponse = convertToPostResponse(post, userId);
                     if (followingIds.contains(post.getAuthor().getId())) {
@@ -186,7 +209,14 @@ public class PostService {
     public PageResponse<PostResponse> getExplore(Pageable pageable, String currentUserId) {
         log.debug("Getting explore posts");
 
-        Page<PostResponse> page = postRepository.findAll(pageable)
+        // Sort by createdAt DESC (newest first)
+        Pageable sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Page<PostResponse> page = postRepository.findAll(sortedPageable)
                 .map(post -> convertToPostResponse(post, currentUserId));
 
         return PageResponse.of(page);

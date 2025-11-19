@@ -3,6 +3,7 @@ package com.hoanghuy04.instagrambackend.controller;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.enums.FileType;
 import com.hoanghuy04.instagrambackend.service.FileStorageService;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,22 +32,18 @@ import java.util.List;
 public class FileUploadController {
     
     private final FileStorageService fileStorageService;
-    
+
     /**
      * Upload profile image.
      *
      * @param file the file to upload
-     * @param userId the user ID uploading the file
      * @return ResponseEntity with file path
      */
     @PostMapping("/profile-image")
     @Operation(summary = "Upload profile image")
     public ResponseEntity<ApiResponse<String>> uploadProfileImage(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam String userId) {
-        log.info("Upload profile image request received from user: {}", userId);
-        
-        String filePath = fileStorageService.uploadFile(file, userId, FileType.PROFILE_IMAGE);
+            @RequestParam("file") MultipartFile file) {
+        String filePath = fileStorageService.uploadFile(file, FileType.PROFILE_IMAGE);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("File uploaded successfully", filePath));
     }
@@ -55,17 +52,13 @@ public class FileUploadController {
      * Upload post media.
      *
      * @param file the file to upload
-     * @param userId the user ID uploading the file
      * @return ResponseEntity with file path
      */
     @PostMapping("/post-media")
     @Operation(summary = "Upload post media")
     public ResponseEntity<ApiResponse<String>> uploadPostMedia(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam String userId) {
-        log.info("Upload post media request received from user: {}", userId);
-        
-        String filePath = fileStorageService.uploadFile(file, userId, FileType.POST_MEDIA);
+            @RequestParam("file") MultipartFile file) {
+        String filePath = fileStorageService.uploadFile(file, FileType.POST_MEDIA);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("File uploaded successfully", filePath));
     }
@@ -74,17 +67,14 @@ public class FileUploadController {
      * Upload multiple post media files (batch upload).
      *
      * @param files the list of files to upload
-     * @param userId the user ID uploading the files
      * @return ResponseEntity with list of file paths
      */
     @PostMapping("/post-media/batch")
     @Operation(summary = "Upload multiple post media files")
     public ResponseEntity<ApiResponse<List<String>>> uploadMultiplePostMedia(
-            @RequestParam("files") List<MultipartFile> files,
-            @RequestParam String userId) {
-        log.info("Upload multiple post media request received from user: {} - {} files", userId, files.size());
-        
-        List<String> filePaths = fileStorageService.uploadMultipleFiles(files, userId, FileType.POST_MEDIA);
+            @RequestParam("files") List<MultipartFile> files) {
+
+        List<String> filePaths = fileStorageService.uploadMultipleFiles(files, FileType.POST_MEDIA);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Files uploaded successfully", filePaths));
     }

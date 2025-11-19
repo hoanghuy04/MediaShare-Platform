@@ -1,32 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@hooks/useTheme';
+import { useTheme } from '../../hooks/useTheme';
 
 interface MessageInputProps {
   onSend: (message: string) => void;
+  onTyping?: () => void;
+  onStopTyping?: () => void;
   placeholder?: string;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
+  onTyping,
+  onStopTyping,
   placeholder = 'Message...',
 }) => {
   const { theme } = useTheme();
   const [message, setMessage] = useState('');
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
 
   const handleSend = () => {
     if (message.trim()) {
       onSend(message.trim());
       setMessage('');
+      handleStopTyping();
     }
   };
+
+  const handleTextChange = (text: string) => {
+    setMessage(text);
+    
+    if (text.trim() && !isTyping) {
+      setIsTyping(true);
+      onTyping?.();
+    }
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set new timeout to stop typing
+    typingTimeoutRef.current = setTimeout(() => {
+      handleStopTyping();
+    }, 1000);
+  };
+
+  const handleStopTyping = () => {
+    if (isTyping) {
+      setIsTyping(false);
+      onStopTyping?.();
+    }
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <TextInput
         value={message}
-        onChangeText={setMessage}
+        onChangeText={handleTextChange}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.placeholder}
         style={[

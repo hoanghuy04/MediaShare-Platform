@@ -86,17 +86,35 @@ export default function ReelsCreationScreen() {
           first: 80,
         });
 
-        const mapped: GalleryAsset[] = assets.assets.map(a => ({
-          id: a.id,
-          uri: a.uri,
-          mediaType: a.mediaType,
-          duration: a.duration,
-        }));
+       
+        const mapped: GalleryAsset[] = await Promise.all(
+          assets.assets.map(async (a) => {
+            try {
+              const assetInfo = await MediaLibrary.getAssetInfoAsync(a.id, {
+                shouldDownloadFromNetwork: false,
+              });
+              return {
+                id: a.id,
+                uri: assetInfo.localUri || a.uri, 
+                mediaType: a.mediaType,
+                duration: a.duration,
+              };
+            } catch (err) {
+              return {
+                id: a.id,
+                uri: a.uri,
+                mediaType: a.mediaType,
+                duration: a.duration,
+              };
+            }
+          })
+        );
 
         const videoCount = mapped.filter(a => a.mediaType === 'video').length;
 
         setGallery(mapped);
       } catch (err) {
+        console.error('Error loading gallery:', err);
       } finally {
         setLoadingGallery(false);
       }
@@ -139,7 +157,7 @@ export default function ReelsCreationScreen() {
       const asset = gallery.find(a => a.uri === uri);
       const mediaType = asset?.mediaType === 'video' ? 'video' : 'photo';
       router.push({
-        pathname: '/(tabs)/create/reels/preview',
+        pathname: '/create/reels/preview',
         params: { mediaUri: uri, mediaType },
       });
     },

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Message } from '@types';
 import { useTheme } from '@hooks/useTheme';
 import { formatTime } from '@utils/formatters';
@@ -7,10 +8,21 @@ import { formatTime } from '@utils/formatters';
 interface ChatMessageProps {
   message: Message;
   isOwn: boolean;
+  showStatus?: boolean;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isOwn }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isOwn, showStatus = true }) => {
   const { theme } = useTheme();
+
+  const getStatusIcon = () => {
+    if (!isOwn || !showStatus) return null;
+    
+    if (message.isRead) {
+      return <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.7)" />;
+    } else {
+      return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.7)" />;
+    }
+  };
 
   return (
     <View style={[styles.container, isOwn ? styles.ownMessage : styles.otherMessage]}>
@@ -25,14 +37,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isOwn }) => {
         <Text style={[styles.content, { color: isOwn ? '#fff' : theme.colors.text }]}>
           {message.content}
         </Text>
-        <Text
-          style={[
-            styles.timestamp,
-            { color: isOwn ? 'rgba(255,255,255,0.7)' : theme.colors.textSecondary },
-          ]}
-        >
-          {formatTime(message.createdAt)}
-        </Text>
+        <View style={styles.footer}>
+          <Text
+            style={[
+              styles.timestamp,
+              { color: isOwn ? 'rgba(255,255,255,0.7)' : theme.colors.textSecondary },
+            ]}
+          >
+            {formatTime(message.createdAt)}
+          </Text>
+          {getStatusIcon()}
+        </View>
       </View>
     </View>
   );
@@ -59,9 +74,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
   },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
   timestamp: {
     fontSize: 10,
-    marginTop: 4,
+    marginRight: 4,
   },
 });
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef, useImperativeHandle } from 'react';
 import { FlatList, RefreshControl, View, StyleSheet } from 'react-native';
 import { Post } from '@types';
 import { useTheme } from '@hooks/useTheme';
@@ -26,7 +26,7 @@ interface FeedListProps {
   suggestedAccount?: any;
 }
 
-export const FeedList: React.FC<FeedListProps> = ({
+export const FeedList = forwardRef<FlatList, FeedListProps>(({
   posts = [],
   isLoading,
   isRefreshing,
@@ -41,8 +41,11 @@ export const FeedList: React.FC<FeedListProps> = ({
   showStories = true,
   showCaughtUp = true,
   suggestedAccount,
-}) => {
+}, ref) => {
   const { theme } = useTheme();
+  const flatListRef = React.useRef<FlatList>(null);
+
+  useImperativeHandle(ref, () => flatListRef.current as any);
 
   // Mock stories data - in production, fetch from API
   const mockStories = [
@@ -106,6 +109,7 @@ export const FeedList: React.FC<FeedListProps> = ({
 
   return (
     <FlatList
+      ref={flatListRef}
       data={posts}
       renderItem={renderPost}
       keyExtractor={item => item.id}
@@ -125,7 +129,7 @@ export const FeedList: React.FC<FeedListProps> = ({
       showsVerticalScrollIndicator={false}
     />
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

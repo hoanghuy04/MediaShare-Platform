@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_GAP = 2;
@@ -46,6 +47,8 @@ export function GalleryPage({
   onScrollEndDrag,
   onOpenPreview,
 }: GalleryPageProps) {
+  const insets = useSafeAreaInsets();
+  
   const gridItems = [
     { type: 'camera' as const },
     ...gallery.map(a => ({ type: 'asset' as const, item: a })),
@@ -58,7 +61,7 @@ export function GalleryPage({
 
   return (
     <View style={[styles.page, { height }]}>
-      <View style={styles.galleryHeaderBar}>
+      <View style={[styles.galleryHeaderBar, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.closeBtn} onPress={onGoToCamera}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>

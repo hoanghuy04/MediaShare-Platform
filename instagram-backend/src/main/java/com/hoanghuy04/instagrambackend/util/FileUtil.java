@@ -29,7 +29,7 @@ public class FileUtil {
             "mp4", "mov", "avi", "wmv", "flv", "mkv"
     );
     
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final long DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     
     private FileUtil() {
         throw new UnsupportedOperationException("Utility class cannot be instantiated");
@@ -124,8 +124,9 @@ public class FileUtil {
      * @param fileSize the file size in bytes
      * @return true if file size is within limit, false otherwise
      */
-    public static boolean isValidFileSize(long fileSize) {
-        return fileSize > 0 && fileSize <= MAX_FILE_SIZE;
+    public static boolean isValidFileSize(long fileSize, long maxFileSize) {
+        long limit = maxFileSize > 0 ? maxFileSize : DEFAULT_MAX_FILE_SIZE;
+        return fileSize > 0 && fileSize <= limit;
     }
     
     /**
@@ -146,9 +147,11 @@ public class FileUtil {
      * @param fileSize the file size in bytes
      * @throws FileUploadException if file size exceeds limit
      */
-    public static void validateFileSize(long fileSize) {
-        if (!isValidFileSize(fileSize)) {
-            throw new FileUploadException("File size exceeds the maximum limit of " + (MAX_FILE_SIZE / 1024 / 1024) + "MB");
+    public static void validateFileSize(long fileSize, long maxFileSize) {
+        long limit = maxFileSize > 0 ? maxFileSize : DEFAULT_MAX_FILE_SIZE;
+        if (!isValidFileSize(fileSize, limit)) {
+            throw new FileUploadException(
+                    "File size exceeds the maximum limit of " + (limit / 1024 / 1024) + "MB");
         }
     }
     

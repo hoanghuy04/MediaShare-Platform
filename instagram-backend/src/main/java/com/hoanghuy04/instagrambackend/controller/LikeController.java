@@ -2,7 +2,8 @@ package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
-import com.hoanghuy04.instagrambackend.service.LikeService;
+import com.hoanghuy04.instagrambackend.service.like.LikeService;
+import com.hoanghuy04.instagrambackend.service.like.LikeServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

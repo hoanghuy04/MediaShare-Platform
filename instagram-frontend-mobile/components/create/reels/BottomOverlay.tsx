@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type GalleryAsset = {
   id: string;
@@ -30,9 +31,11 @@ export function BottomOverlay({
   onNext,
   onGoToGallery,
 }: BottomOverlayProps) {
+  const insets = useSafeAreaInsets();
+
   if (recordState === 'idle') {
     return (
-      <View style={styles.bottomSectionIdle}>
+      <View style={[styles.bottomSectionIdle, { bottom: 100 + insets.bottom }]}>
         <TouchableOpacity style={styles.galleryPreviewBtn} onPress={onGoToGallery}>
           {gallery[0] ? (
             <Image source={{ uri: gallery[0].uri }} style={styles.galleryPreviewThumb} />
@@ -60,7 +63,7 @@ export function BottomOverlay({
 
   if (recordState === 'recording') {
     return (
-      <View style={styles.bottomSectionRecording}>
+      <View style={[styles.bottomSectionRecording, { bottom: 100 + insets.bottom }]}>
         <TouchableOpacity onPress={onRecordPress} activeOpacity={0.8}>
           <View style={styles.recordingBubble}>
             <View style={styles.stopSquare} />
@@ -78,7 +81,7 @@ export function BottomOverlay({
 
   return (
     <>
-      <View style={styles.bottomSectionPost}>
+      <View style={[styles.bottomSectionPost, { bottom: 100 + insets.bottom }]}>
         <TouchableOpacity style={styles.undoPill} onPress={onUndo}>
           <Text style={styles.undoText}>Hoàn tác</Text>
         </TouchableOpacity>
@@ -95,7 +98,7 @@ export function BottomOverlay({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.bottomLeftFloating}>
+      <View style={[styles.bottomLeftFloating, { bottom: 28 + insets.bottom }]}>
         <TouchableOpacity style={styles.galleryPreviewSmall} onPress={onGoToGallery}>
           {lastClipUri || gallery[0] ? (
             <Image
@@ -110,7 +113,7 @@ export function BottomOverlay({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.bottomRightFloating}>
+      <View style={[styles.bottomRightFloating, { bottom: insets.bottom }]}>
         <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
           <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
         </TouchableOpacity>
@@ -124,7 +127,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 100,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,7 +186,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 100,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 30,
@@ -210,14 +211,12 @@ const styles = StyleSheet.create({
   bottomRightFloating: {
     position: 'absolute',
     right: 16,
-    bottom: 0,
   },
 
   bottomSectionPost: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 100,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -272,7 +271,6 @@ const styles = StyleSheet.create({
   bottomLeftFloating: {
     position: 'absolute',
     left: 16,
-    bottom: 28,
     zIndex: 45,
   },
   galleryPreviewSmall: {

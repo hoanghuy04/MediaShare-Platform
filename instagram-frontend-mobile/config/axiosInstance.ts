@@ -47,13 +47,51 @@ axiosInstance.interceptors.request.use(
           config.params.userId = userId;
         }
 
-        // Endpoints that need senderId (specifically for messages)
-        if (url.includes('/messages')) {
-          // GET /messages needs userId for getConversations and getConversation
+        // Conversation endpoints (new chat system)
+        if (url.includes('/conversations')) {
+          // GET /conversations - needs userId
+          // GET /conversations/{id} - needs userId
+          // GET /conversations/{id}/messages - needs userId
           if (method === 'GET' && !config.params.userId) {
             config.params.userId = userId;
           }
-          // POST /messages needs senderId for sendMessage
+          // POST /conversations/{id}/messages - needs senderId
+          // POST /conversations/direct/messages - needs senderId
+          // POST /conversations/group - needs creatorId
+          if (method === 'POST' && !config.params.senderId && !config.params.creatorId) {
+            if (url.includes('/group')) {
+              config.params.creatorId = userId;
+            } else {
+              config.params.senderId = userId;
+            }
+          }
+          // PUT /conversations/{id} - needs userId
+          if (method === 'PUT' && !config.params.userId) {
+            config.params.userId = userId;
+          }
+          // DELETE /conversations/{id} - needs userId
+          // DELETE /conversations/messages/{id} - needs userId
+          if (method === 'DELETE' && !config.params.userId) {
+            config.params.userId = userId;
+          }
+        }
+
+        // Message request endpoints
+        if (url.includes('/message-requests')) {
+          if (!config.params.userId) {
+            config.params.userId = userId;
+          }
+        }
+
+        // Legacy: Endpoints that need senderId (specifically for old /messages)
+        if (url.includes('/messages') && !url.includes('/conversations')) {
+          const hasPathParam = url.match(/\/messages\/[^\/?]+/);
+          if (method === 'GET' && !hasPathParam && !config.params.userId) {
+            config.params.userId = userId;
+          }
+          if (method === 'GET' && hasPathParam && !config.params.userId) {
+            config.params.userId = userId;
+          }
           if (method === 'POST' && !config.params.senderId) {
             config.params.senderId = userId;
           }

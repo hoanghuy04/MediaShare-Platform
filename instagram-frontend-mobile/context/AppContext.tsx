@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { notificationService } from '@services/notifications';
 import * as Notifications from 'expo-notifications';
+import { WebSocketProvider } from './WebSocketContext';
 
 interface AppContextType {
   pushToken: string | null;
@@ -99,7 +100,9 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setNetworkConnected,
       }}
     >
-      {children}
+      <WebSocketProvider>
+        {children}
+      </WebSocketProvider>
     </AppContext.Provider>
   );
 };

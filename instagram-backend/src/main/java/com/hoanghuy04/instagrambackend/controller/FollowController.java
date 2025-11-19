@@ -1,7 +1,8 @@
 package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
-import com.hoanghuy04.instagrambackend.service.FollowService;
+import com.hoanghuy04.instagrambackend.service.follow.FollowService;
+import com.hoanghuy04.instagrambackend.service.follow.FollowServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;

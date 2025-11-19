@@ -17,7 +17,7 @@ import java.nio.file.Paths;
 /**
  * REST controller for serving static files.
  * Handles file serving from uploads directory.
- * 
+ *
  * @author Instagram Backend Team
  * @version 1.0.0
  */
