@@ -57,7 +57,14 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         if (existing.isPresent()) {
             // Add message to existing request
             MessageRequest request = existing.get();
-            request.getPendingMessageIds().add(firstMessage.getId());
+            List<String> pendingIds = request.getPendingMessageIds();
+            if (pendingIds == null) {
+                pendingIds = new ArrayList<>();
+                request.setPendingMessageIds(pendingIds);
+            }
+            pendingIds.add(firstMessage.getId());
+            request.setLastMessageContent(resolvePreviewContent(firstMessage));
+            request.setLastMessageTimestamp(firstMessage.getCreatedAt());
             request = messageRequestRepository.save(request);
             log.info("Added message to existing request: {}", request.getId());
             return request;
@@ -70,9 +77,9 @@ public class MessageRequestServiceImpl implements MessageRequestService {
             .sender(firstMessage.getSender())
             .receiver(firstMessage.getReceiver())
             .status(RequestStatus.PENDING)
-            .lastMessageContent(firstMessage.getContent())
+            .lastMessageContent(resolvePreviewContent(firstMessage))
             .lastMessageTimestamp(firstMessage.getCreatedAt())
-            .pendingMessageIds(List.of(firstMessage.getId()))
+            .pendingMessageIds(new ArrayList<>(List.of(firstMessage.getId())))
             .createdAt(LocalDateTime.now())
             .build();
         
@@ -105,36 +112,35 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         MessageRequest request = getRequestById(requestId);
         
         // Verify user is the receiver
-        if (!request.getReceiver().getId().equals(userId)) {
+        if (!request.getReceiverId().equals(userId)) {
             throw new BadRequestException("You can only accept your own requests");
+        }
+
+        if (request.getStatus() == RequestStatus.ACCEPTED) {
+            log.info("Request {} already accepted earlier. Returning existing conversation", requestId);
+            return conversationService.getExistingDirectConversation(request.getSenderId(), request.getReceiverId())
+                .orElseThrow(() -> new BadRequestException("Conversation missing for an already accepted request"));
+        }
+
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new BadRequestException("Request is no longer pending");
         }
         
         // Update request status
         request.setStatus(RequestStatus.ACCEPTED);
         request.setRespondedAt(LocalDateTime.now());
-        messageRequestRepository.save(request);
-        
-        // Create or get conversation
-        Conversation conversation = conversationService.getOrCreateDirectConversation(
-            request.getSender().getId(), 
-            request.getReceiver().getId()
-        );
-        
-        // Link all pending messages to the conversation
-        if (request.getPendingMessageIds() != null && !request.getPendingMessageIds().isEmpty()) {
-            for (String messageId : request.getPendingMessageIds()) {
-                try {
-                    Message message = messageRepository.findById(messageId).orElse(null);
-                    if (message != null && message.getConversation() == null) {
-                        message.setConversation(conversation);
-                        messageRepository.save(message);
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to link message {} to conversation: {}", messageId, e.getMessage());
-                }
-            }
-            log.info("Linked {} pending messages to conversation", request.getPendingMessageIds().size());
+
+        Conversation conversation = conversationService
+            .getExistingDirectConversation(request.getSenderId(), request.getReceiverId())
+            .orElseGet(() -> conversationService.createDirectConversation(userId, request.getSenderId()));
+
+        Message lastLinkedMessage = linkPendingMessages(conversation, request.getPendingMessageIds());
+        if (lastLinkedMessage != null) {
+            conversationService.updateLastMessage(conversation.getId(), lastLinkedMessage);
         }
+
+        request.setPendingMessageIds(new ArrayList<>());
+        messageRequestRepository.save(request);
         
         log.info("Request accepted successfully, conversation: {}", conversation.getId());
         return conversation;
@@ -197,7 +203,12 @@ public class MessageRequestServiceImpl implements MessageRequestService {
             throw new BadRequestException("Can only add messages to pending requests");
         }
         
+        if (request.getPendingMessageIds() == null) {
+            request.setPendingMessageIds(new ArrayList<>());
+        }
         request.getPendingMessageIds().add(message.getId());
+        request.setLastMessageContent(resolvePreviewContent(message));
+        request.setLastMessageTimestamp(message.getCreatedAt());
         messageRequestRepository.save(request);
     }
     
@@ -263,6 +274,43 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         log.info("Successfully mapped {} pending messages to DTOs", messageDTOs.size());
         
         return messageDTOs;
+    }
+
+    private String resolvePreviewContent(Message message) {
+        return message.getContent() != null ? message.getContent() : "[Media]";
+    }
+
+    private Message linkPendingMessages(Conversation conversation, List<String> pendingMessageIds) {
+        if (pendingMessageIds == null || pendingMessageIds.isEmpty()) {
+            return null;
+        }
+
+        List<Message> messages = messageRepository.findByIdIn(pendingMessageIds);
+        if (messages.isEmpty()) {
+            log.warn("No persisted messages found for pending IDs: {}", pendingMessageIds);
+            return null;
+        }
+
+        messages.sort(Comparator.comparing(Message::getCreatedAt));
+        Message lastLinked = null;
+        int attachedCount = 0;
+        for (Message message : messages) {
+            if (message.getConversation() != null) {
+                if (!conversation.getId().equals(message.getConversation().getId())) {
+                    log.warn("Message {} already linked to different conversation {}", message.getId(), message.getConversation().getId());
+                }
+                continue;
+            }
+            message.setConversation(conversation);
+            messageRepository.save(message);
+            lastLinked = message;
+            attachedCount++;
+        }
+
+        if (attachedCount > 0) {
+            log.info("Linked {} pending messages to conversation {}", attachedCount, conversation.getId());
+        }
+        return lastLinked;
     }
     
 }

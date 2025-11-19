@@ -37,7 +37,9 @@ export default function MessagesScreen() {
   const { onMessage, onTyping, onReadReceipt } = useWebSocket();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [conversationMessages, setConversationMessages] = useState<{ [conversationId: string]: Message[] }>({});
+  const [conversationMessages, setConversationMessages] = useState<{
+    [conversationId: string]: Message[];
+  }>({});
   const [unreadCounts, setUnreadCounts] = useState<{ [conversationId: string]: number }>({});
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: boolean }>({});
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
@@ -65,7 +67,6 @@ export default function MessagesScreen() {
       refresh();
     }, 300);
   }, [refresh]);
-  
 
   useEffect(() => {
     // Only load on initial mount
@@ -192,7 +193,7 @@ export default function MessagesScreen() {
   );
 
   const renderSearchBar = () => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.searchContainer}
       onPress={() => router.push('/messages/message-search')}
       activeOpacity={0.7}
@@ -209,7 +210,7 @@ export default function MessagesScreen() {
   );
 
   const renderNotesSection = () => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.notesSection}
       onPress={() => router.push('/messages/notes')}
       activeOpacity={0.7}
@@ -224,11 +225,7 @@ export default function MessagesScreen() {
         {/* Main note bubble */}
         <View style={styles.noteBubble}>
           <View style={styles.noteEmoji}>
-            <Avatar 
-              uri={currentUser?.profile?.avatar} 
-              name={currentUser?.username} 
-              size={60} 
-            />
+            <Avatar uri={currentUser?.profile?.avatar} name={currentUser?.username} size={60} />
           </View>
         </View>
 
@@ -246,7 +243,7 @@ export default function MessagesScreen() {
       <Text style={styles.headerTitle}>Tin nhắn </Text>
 
       {/* Nút "Tin nhắn đang chờ" bên phải */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.pendingButton}
         onPress={() => router.push('/messages/pending-messages')}
       >
@@ -265,7 +262,7 @@ export default function MessagesScreen() {
   // Render inbox item (conversation or message request)
   const renderInboxItem = ({ item }: { item: InboxItem }) => {
     console.log('item', item);
-    
+
     if (!currentUser) return null;
 
     // Handle conversation type
@@ -319,32 +316,32 @@ export default function MessagesScreen() {
               </View>
               {lastMessage?.timestamp && (
                 <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
-                {formatMessageTime(lastMessage.timestamp)}
-              </Text>
-            )}
-          </View>
-          <Text
-            style={[
-              styles.messageText,
-              {
-                fontWeight: isUnread ? '600' : '400',
-                color: isUnread || isTyping ? theme.colors.text : theme.colors.textSecondary,
-                fontStyle: isTyping ? 'italic' : 'normal',
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {displayText}
-          </Text>
-        </View>
-        {isUnread && !isTyping && (
-          <View style={styles.unreadContainer}>
-            <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.unreadText}>{unreadCount}</Text>
+                  {formatMessageTime(lastMessage.timestamp)}
+                </Text>
+              )}
             </View>
+            <Text
+              style={[
+                styles.messageText,
+                {
+                  fontWeight: isUnread ? '600' : '400',
+                  color: isUnread || isTyping ? theme.colors.text : theme.colors.textSecondary,
+                  fontStyle: isTyping ? 'italic' : 'normal',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {displayText}
+            </Text>
           </View>
-        )}
-      </TouchableOpacity>
+          {isUnread && !isTyping && (
+            <View style={styles.unreadContainer}>
+              <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.unreadText}>{unreadCount}</Text>
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
       );
     }
 
@@ -360,10 +357,16 @@ export default function MessagesScreen() {
       return (
         <TouchableOpacity
           style={styles.messageItem}
-          onPress={() => {
-            // Navigate to conversation with the receiver
-            router.push(`/messages/${messageRequest.receiver.id}`);
-          }}
+          onPress={() =>
+            router.push({
+              pathname: '/messages/[conversationId]',
+              params: {
+                conversationId: messageRequest.receiver.id,
+                isNewConversation: 'true',
+                requestId: messageRequest.id,
+              },
+            })
+          }
         >
           <Avatar uri={receiverAvatar} name={receiverName} size={50} />
           <View style={styles.messageContent}>
@@ -418,7 +421,11 @@ export default function MessagesScreen() {
         <FlatList<InboxItem>
           data={inboxItems || []}
           renderItem={renderInboxItem}
-          keyExtractor={(item) => item.type === 'CONVERSATION' ? item.conversation?.id || '' : item.messageRequest?.id || ''}
+          keyExtractor={item =>
+            item.type === 'CONVERSATION'
+              ? item.conversation?.id || ''
+              : item.messageRequest?.id || ''
+          }
           showsVerticalScrollIndicator={false}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}

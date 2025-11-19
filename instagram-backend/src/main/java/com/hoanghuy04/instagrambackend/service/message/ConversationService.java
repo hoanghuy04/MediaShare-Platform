@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service interface for conversation operations.
@@ -18,14 +19,24 @@ import java.util.List;
 public interface ConversationService {
     
     /**
-     * Get or create a direct conversation between two users.
+     * Get existing direct conversation (if any) between two users.
      *
      * @param userId1 first user ID
      * @param userId2 second user ID
-     * @return Conversation entity
+     * @return Optional conversation
+     */
+    @Transactional(readOnly = true)
+    Optional<Conversation> getExistingDirectConversation(String userId1, String userId2);
+
+    /**
+     * Create a new direct conversation between two users.
+     *
+     * @param userId1 first user ID (creator)
+     * @param userId2 second user ID
+     * @return newly created Conversation
      */
     @Transactional
-    Conversation getOrCreateDirectConversation(String userId1, String userId2);
+    Conversation createDirectConversation(String userId1, String userId2);
 
     /**
      * Create a group conversation.

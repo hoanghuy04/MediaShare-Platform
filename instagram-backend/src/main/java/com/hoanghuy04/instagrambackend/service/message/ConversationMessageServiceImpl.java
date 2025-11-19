@@ -30,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -110,40 +109,40 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         User sender = userService.getUserEntityById(senderId);
         User receiver = userService.getUserEntityById(receiverId);
         
-        boolean areConnected = areUsersConnected(senderId, receiverId);
-        
-        if (areConnected) {
-            Conversation conversation = conversationService.getOrCreateDirectConversation(senderId, receiverId);
-            return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
-        } else {
-            Optional<MessageRequest> incomingRequest = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                receiverId, senderId, RequestStatus.PENDING
-            );
-            
-            if (incomingRequest.isPresent()) {
-                log.info("Auto-accepting message request from {} to {}", receiverId, senderId);
-                
-                MessageRequest request = incomingRequest.get();
-                messageRequestService.acceptRequest(request.getId(), senderId);
-                
-                Conversation conversation = conversationService.getOrCreateDirectConversation(senderId, receiverId);
-                return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
-            }
-            
-            Message message = Message.builder()
-                .conversation(null)
-                .sender(sender)
-                .receiver(receiver)
-                .content(content)
-                .mediaUrl(mediaUrl)
-                .build();
-            
-            message = messageRepository.save(message);
-            messageRequestService.createMessageRequest(senderId, receiverId, message);
-            
-            log.info("Message sent via request: {}", message.getId());
-            return message;
+        Optional<Conversation> existingConversation = conversationService.getExistingDirectConversation(senderId, receiverId);
+        if (existingConversation.isPresent()) {
+            return sendMessageToConversation(existingConversation.get().getId(), senderId, content, mediaUrl);
         }
+
+        boolean mutualFollow = isMutualFollow(senderId, receiverId);
+        if (mutualFollow) {
+            Conversation conversation = conversationService.createDirectConversation(senderId, receiverId);
+            return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
+        }
+
+        Optional<MessageRequest> incomingRequest = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+            receiverId, senderId, RequestStatus.PENDING
+        );
+
+        if (incomingRequest.isPresent()) {
+            log.info("Auto-accepting pending request {} when {} replies to {}", incomingRequest.get().getId(), senderId, receiverId);
+            Conversation conversation = messageRequestService.acceptRequest(incomingRequest.get().getId(), senderId);
+            return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
+        }
+
+        Message message = Message.builder()
+            .conversation(null)
+            .sender(sender)
+            .receiver(receiver)
+            .content(content)
+            .mediaUrl(mediaUrl)
+            .build();
+
+        message = messageRepository.save(message);
+        messageRequestService.createMessageRequest(senderId, receiverId, message);
+
+        log.info("Message sent via request: {}", message.getId());
+        return message;
     }
     
     @Transactional(readOnly = true)
@@ -300,30 +299,15 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     @Transactional(readOnly = true)
     @Override
     public boolean areUsersConnected(String userId1, String userId2) {
-        boolean user1FollowsUser2 = followRepository.existsByFollowerIdAndFollowingId(userId1, userId2);
-        boolean user2FollowsUser1 = followRepository.existsByFollowerIdAndFollowingId(userId2, userId1);
-        boolean followingEachOther = user1FollowsUser2 && user2FollowsUser1;
-        
-        if (followingEachOther) {
+        boolean mutualFollow = isMutualFollow(userId1, userId2);
+        if (mutualFollow) {
             return true;
         }
-        
-        List<String> participants = new ArrayList<>();
-        participants.add(userId1);
-        participants.add(userId2);
-        Collections.sort(participants);
-        
-        Optional<Conversation> existingConversation = conversationRepository.findByTypeAndParticipants(
-            ConversationType.DIRECT, participants, 2
-        );
-        
-        boolean hasConversation = existingConversation.isPresent();
-        
+        boolean hasConversation = conversationService.getExistingDirectConversation(userId1, userId2).isPresent();
         if (hasConversation) {
             log.debug("Users {} and {} have existing conversation - considered connected", userId1, userId2);
         }
-        
-        return followingEachOther || hasConversation;
+        return hasConversation;
     }
     
     private void autoMarkMessagesAsReadOnReply(String conversationId, String userId) {
@@ -359,6 +343,12 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     private Message getMessageById(String messageId) {
         return messageRepository.findById(messageId)
             .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
+    }
+
+    private boolean isMutualFollow(String userId1, String userId2) {
+        boolean user1FollowsUser2 = followRepository.existsByFollowerIdAndFollowingId(userId1, userId2);
+        boolean user2FollowsUser1 = followRepository.existsByFollowerIdAndFollowingId(userId2, userId1);
+        return user1FollowsUser2 && user2FollowsUser1;
     }
     
     @Transactional(readOnly = true)

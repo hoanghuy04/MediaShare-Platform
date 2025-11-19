@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   FlatList,
@@ -22,11 +22,21 @@ import { TypingIndicator } from '../../components/messages/TypingIndicator';
 import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { messageAPI, userAPI, messageRequestAPI } from '../../services/api';
-import { Message } from '../../types';
+import { Message, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
 
 export default function ConversationScreen() {
-  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
+  const params = useLocalSearchParams<{
+    conversationId?: string | string[];
+    isNewConversation?: string | string[];
+    requestId?: string | string[];
+  }>();
+  const normalizeParam = (value?: string | string[]): string | undefined =>
+    Array.isArray(value) ? value[0] : value;
+  const routeConversationId = normalizeParam(params.conversationId) || '';
+  const routePendingFlag = normalizeParam(params.isNewConversation);
+  const routeRequestId = normalizeParam(params.requestId);
+  const wantsPendingRoute = routePendingFlag === 'true';
   const router = useRouter();
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -44,113 +54,18 @@ export default function ConversationScreen() {
   } = useWebSocket();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [otherUser, setOtherUser] = useState<any>(null);
-  const [actualConversationId, setActualConversationId] = useState<string>(conversationId);
-  const [isNewConversation, setIsNewConversation] = useState(false); // Track if this is a new conversation (no existing conversation)
-  const [isTyping, setIsTyping] = useState(false);
+  const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
+  const [peerUserId, setPeerUserId] = useState<string | null>(
+    wantsPendingRoute ? routeConversationId : null
+  );
+  const [actualConversationId, setActualConversationId] = useState<string | null>(
+    wantsPendingRoute ? null : routeConversationId
+  );
+  const [isNewConversation, setIsNewConversation] = useState(wantsPendingRoute);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [localConnectionStatus, setLocalConnectionStatus] = useState<
-    'connected' | 'connecting' | 'disconnected' | 'reconnecting'
-  >('disconnected');
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
   const [developmentTitle, setDevelopmentTitle] = useState('');
   const [developmentMessage, setDevelopmentMessage] = useState('');
-
-  useEffect(() => {
-    loadMessages();
-  }, [conversationId]);
-
-  // Monitor connection status
-  useEffect(() => {
-    setLocalConnectionStatus(connectionStatus);
-  }, [connectionStatus]);
-
-  // Set up WebSocket listeners
-  useEffect(() => {
-    // Listen for incoming messages
-    const handleWebSocketMessage = (message: any) => {
-      console.log('Received WebSocket message:', message);
-      // Check if message is for this conversation (use otherUser.id if available, fallback to conversationId)
-      const otherUserId = otherUser?.id || conversationId;
-      if (
-        message.type === 'CHAT' &&
-        (message.senderId === otherUserId || message.receiverId === otherUserId)
-      ) {
-        // Convert WebSocket message to Message type
-        // Safety check: ensure we have sender info
-        if (!message.senderId) {
-          console.warn('WebSocket message missing senderId:', message);
-          return;
-        }
-        
-        const newMessage: Message = {
-          id: message.id || '',
-          sender: {
-            id: message.senderId,
-            username: message.senderUsername || '',
-            avatar: message.senderProfileImage,
-            isVerified: false,
-          },
-          content: message.content || '',
-          mediaUrl: message.mediaUrl,
-          readBy: message.status === 'READ' ? [user?.id || ''] : [],
-          createdAt: message.timestamp,
-          isDeleted: false,
-        };
-
-        setMessages(prev => {
-          // Check if message already exists
-          const exists = prev.some(msg => msg.id === message.id);
-          if (exists) return prev;
-
-          // If it's a message from current user, replace optimistic message
-          if (message.senderId === user?.id) {
-            return prev.map(msg => (msg.id.startsWith('temp-') ? newMessage : msg));
-          }
-
-          // Add new message from other user
-          return [...prev, newMessage];
-        });
-
-        // Mark message as read if it's from the other user and not sent by current user
-        if (message.senderId === otherUserId && message.id && message.senderId !== user?.id) {
-          sendReadReceipt(message.id, message.senderId);
-        }
-      }
-    };
-
-    // Listen for read receipts
-    const handleReadReceipt = (messageId: string, senderId: string) => {
-      const otherUserId = otherUser?.id || conversationId;
-      if (senderId === otherUserId) {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === messageId ? { ...msg, readBy: [...msg.readBy, senderId] } : msg
-          )
-        );
-      }
-    };
-
-    // Listen for typing indicators
-    const handleTyping = (isTyping: boolean, userId: string) => {
-      const otherUserId = otherUser?.id || conversationId;
-      if (userId === otherUserId) {
-        setTypingUsers(prev => {
-          if (isTyping) {
-            return prev.includes(userId) ? prev : [...prev, userId];
-          } else {
-            return prev.filter(id => id !== userId);
-          }
-        });
-      }
-    };
-
-    onMessage(handleWebSocketMessage);
-    onReadReceipt(handleReadReceipt);
-    onTyping(handleTyping);
-  }, [conversationId, otherUser, user?.id, onMessage, onReadReceipt, onTyping, sendReadReceipt]);
 
   const showDevelopmentNotice = (title: string, message: string) => {
     setDevelopmentTitle(title);
@@ -158,138 +73,275 @@ export default function ConversationScreen() {
     setShowDevelopmentModal(true);
   };
 
-  const loadMessages = async () => {
-    try {
-      // conversationId might be the other user's ID or actual conversation ID
-      // First, try to get or create direct conversation if conversationId looks like a userId
-      let actualConversationId = conversationId;
-      let isNewConv = false; // Track if this is a new conversation locally
-      
+  const ensureMessageSender = useCallback(
+    (message: Message): Message => {
+      const existingSender = (message as any).sender;
+      if (existingSender && existingSender.id) {
+        return message;
+      }
+
+      if (user) {
+        return {
+          ...message,
+          sender: {
+            id: user.id,
+            username: user.username,
+            avatar: user.profile?.avatar,
+            isVerified: !!user.isVerified,
+          },
+        };
+      }
+
+      return message;
+    },
+    [user]
+  );
+
+  const loadPendingThread = useCallback(
+    async (targetUserId: string) => {
+      if (!targetUserId || !user?.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
       try {
-        // Try to get conversation as-is first
-        const conversation = await messageAPI.getConversation(conversationId);
-        actualConversationId = conversation.id;
-        
-        // Set other user from participants
+        setIsNewConversation(true);
+        setActualConversationId(null);
+        setPeerUserId(targetUserId);
+
+        if (!otherUser || otherUser.id !== targetUserId) {
+          const profile = await userAPI.getUserProfile(targetUserId);
+          setOtherUser(profile);
+        }
+
+        const pendingMessages = await messageRequestAPI.getPendingMessages(user.id, targetUserId);
+        const orderedMessages = [...pendingMessages]
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+          .map(ensureMessageSender);
+        setMessages(orderedMessages);
+      } catch (error) {
+        console.error('Error loading pending messages:', error);
+        setMessages([]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureMessageSender, otherUser, user]
+  );
+
+  const loadExistingThread = useCallback(
+    async (conversationKey: string) => {
+      if (!conversationKey) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const conversation = await messageAPI.getConversation(conversationKey);
+        setActualConversationId(conversation.id);
+        setIsNewConversation(false);
+
         if (conversation.participants && conversation.participants.length > 0) {
-          const otherUserFromConv = conversation.participants.find(p => p.userId !== user?.id);
-          if (otherUserFromConv) {
-            setOtherUser({
-              id: otherUserFromConv.userId,
-              username: otherUserFromConv.username,
-              email: '',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              profile: { avatar: otherUserFromConv.avatar },
+          const otherParticipant =
+            conversation.participants.find(p => p.userId !== user?.id) ||
+            conversation.participants[0];
+
+          if (otherParticipant) {
+            setPeerUserId(otherParticipant.userId);
+            setOtherUser(prev =>
+              prev && prev.id === otherParticipant.userId
+                ? prev
+                : {
+                    id: otherParticipant.userId,
+                    username: otherParticipant.username,
+                    email: '',
+                    profile: { avatar: otherParticipant.avatar },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    isVerified: otherParticipant.isVerified,
+                  }
+            );
+          }
+        }
+
+        const response = await messageAPI.getMessages(conversation.id);
+        const orderedMessages = [...(response.content || [])].reverse().map(ensureMessageSender);
+        setMessages(orderedMessages);
+
+        if (response.content && response.content.length > 0) {
+          const unreadMessages = response.content.filter(
+            msg => msg.sender.id !== user?.id && !msg.readBy.includes(user?.id || '')
+          );
+
+          if (!isNewConversation && isConnected && unreadMessages.length > 0) {
+            unreadMessages.forEach(msg => {
+              sendReadReceipt(msg.id, msg.sender.id);
             });
           }
         }
       } catch (error: any) {
-        // If conversation not found (404), this is a new conversation
-        // The conversationId is actually the other user's ID
-        if (error.response?.status === 404) {
-          console.log('Conversation not found. This is a new conversation with user:', conversationId);
-          
-          // Mark this as a new conversation (no existing conversation)
-          isNewConv = true;
-          setIsNewConversation(true);
-          
-          // Load the other user's profile
-          try {
-            const userProfile = await userAPI.getUserProfile(conversationId);
-            setOtherUser(userProfile);
-            console.log('Loaded other user profile:', userProfile);
-            
-            // No actual conversation ID yet - will be created when first message is sent
-            // Keep conversationId as is (it's the userId)
-            actualConversationId = conversationId;
-          } catch (userError) {
-            console.error('Failed to fetch user profile:', userError);
-            showAlert('Error', 'Unable to load user information. Please try again.');
-            router.back();
-            return;
-          }
-        } else {
-          throw error;
+        if (error?.response?.status === 404) {
+          await loadPendingThread(conversationKey);
+          return;
         }
-      }
-      
-      // Save the actual conversation ID to state
-      setActualConversationId(actualConversationId);
-      
-      // If this is a new conversation, try to load pending messages
-      if (isNewConv) {
-        try {
-          // Try to load pending messages from message request
-          const pendingMessages = await messageRequestAPI.getPendingMessages(user?.id || '', conversationId);
-          
-          if (pendingMessages && pendingMessages.length > 0) {
-            console.log(`Loaded ${pendingMessages.length} pending messages`);
-            setMessages(pendingMessages);
-          } else {
-            console.log('No pending messages found');
-            setMessages([]); // Empty messages for new conversation
-          }
-        } catch (error) {
-          console.error('Error loading pending messages:', error);
-          setMessages([]); // Empty messages on error
-        }
-        
+
+        console.error('Error loading messages:', error);
+        setMessages([]);
+      } finally {
         setIsLoading(false);
+      }
+    },
+    [
+      ensureMessageSender,
+      isConnected,
+      isNewConversation,
+      loadPendingThread,
+      messageAPI,
+      sendReadReceipt,
+      user,
+    ]
+  );
+
+  const transitionToConversation = useCallback(
+    (nextConversationId: string) => {
+      if (!nextConversationId) {
         return;
       }
-      
-      // Now load messages with the actual conversation ID
-      const response = await messageAPI.getMessages(actualConversationId);
-      setMessages(response.content.reverse() || []);
+      setIsNewConversation(false);
+      setActualConversationId(nextConversationId);
+      router.replace({
+        pathname: '/messages/[conversationId]',
+        params: { conversationId: nextConversationId },
+      });
+      loadExistingThread(nextConversationId);
+    },
+    [loadExistingThread, router]
+  );
 
-      // Mark all messages from other user as read via WebSocket
-      if (response.content.length > 0) {
-        const unreadMessages = response.content.filter(
-          msg => msg.sender.id !== user?.id && !msg.readBy.includes(user?.id || '')
-        );
+  // Set up WebSocket listeners
+  useEffect(() => {
+    const handleWebSocketMessage = (message: any) => {
+      const peerId = otherUser?.id || peerUserId || routeConversationId;
+      const matchesPeer = peerId && (message.senderId === peerId || message.receiverId === peerId);
+      const matchesConversation =
+        !!message.conversationId &&
+        !!actualConversationId &&
+        message.conversationId === actualConversationId;
 
-        // Send read receipts for unread messages via WebSocket
-        if (isConnected && unreadMessages.length > 0) {
-          console.log(`Sending read receipts for ${unreadMessages.length} unread messages`);
-          unreadMessages.forEach(msg => {
-            sendReadReceipt(msg.id, msg.sender.id);
-          });
-        } else if (unreadMessages.length > 0) {
-          console.log(
-            'WebSocket not connected, read receipts will be sent when connection is restored'
-          );
-        }
-        
-        // Extract other user from messages if not already set
-        if (!otherUser && response.content.length > 0) {
-          // If we have messages but no otherUser set, try to infer from the first message
-          // where the sender is not the current user
-          const messageFromOther = response.content.find(msg => msg.sender.id !== user?.id);
-          if (messageFromOther) {
-            // We have the sender as UserSummary, need to fetch full profile for consistency
-            try {
-              const userProfile = await userAPI.getUserProfile(messageFromOther.sender.id);
-              setOtherUser(userProfile);
-            } catch (error) {
-              console.error('Failed to fetch other user profile:', error);
-            }
-          }
-        }
+      if (message.type !== 'CHAT' || (!matchesPeer && !matchesConversation)) {
+        return;
       }
-    } catch (error: any) {
-      console.error('Error loading messages:', error);
-      // Don't show error alert, just show empty conversation
-      setMessages([]);
-    } finally {
+
+      if (!message.senderId) {
+        console.warn('WebSocket message missing senderId:', message);
+        return;
+      }
+
+      const newMessage: Message = {
+        id: message.id || '',
+        sender: {
+          id: message.senderId,
+          username: message.senderUsername || '',
+          avatar: message.senderProfileImage,
+          isVerified: false,
+        },
+        conversationId: message.conversationId,
+        content: message.content || '',
+        mediaUrl: message.mediaUrl,
+        readBy: message.status === 'READ' ? [user?.id || ''] : [],
+        createdAt: message.timestamp,
+        isDeleted: false,
+      };
+
+      setMessages(prev => {
+        const exists = prev.some(msg => msg.id === message.id);
+        if (exists) return prev;
+
+        if (message.senderId === user?.id) {
+          return prev.map(msg => (msg.id.startsWith('temp-') ? newMessage : msg));
+        }
+
+        return [...prev, newMessage];
+      });
+
+      if (isNewConversation && message.conversationId) {
+        transitionToConversation(message.conversationId);
+      }
+
+      if (
+        !isNewConversation &&
+        peerId &&
+        message.senderId === peerId &&
+        message.id &&
+        message.senderId !== user?.id
+      ) {
+        sendReadReceipt(message.id, message.senderId);
+      }
+    };
+
+    const handleReadReceipt = (messageId: string, senderId: string) => {
+      const peerId = otherUser?.id || peerUserId || routeConversationId;
+      if (!peerId || senderId !== peerId) {
+        return;
+      }
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === messageId ? { ...msg, readBy: [...msg.readBy, senderId] } : msg
+        )
+      );
+    };
+
+    const handleTyping = (isTyping: boolean, userId: string) => {
+      const peerId = otherUser?.id || peerUserId || routeConversationId;
+      if (!peerId || userId !== peerId) {
+        return;
+      }
+
+      setTypingUsers(prev => {
+        if (isTyping) {
+          return prev.includes(userId) ? prev : [...prev, userId];
+        }
+        return prev.filter(id => id !== userId);
+      });
+    };
+
+    onMessage(handleWebSocketMessage);
+    onReadReceipt(handleReadReceipt);
+    onTyping(handleTyping);
+  }, [
+    actualConversationId,
+    isNewConversation,
+    onMessage,
+    onReadReceipt,
+    onTyping,
+    otherUser,
+    peerUserId,
+    routeConversationId,
+    sendReadReceipt,
+    transitionToConversation,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    if (!routeConversationId) {
       setIsLoading(false);
+      return;
     }
-  };
+
+    if (wantsPendingRoute) {
+      loadPendingThread(routeConversationId);
+    } else {
+      loadExistingThread(routeConversationId);
+    }
+  }, [routeConversationId, wantsPendingRoute, loadExistingThread, loadPendingThread]);
 
   const handleSendMessage = async (content: string) => {
-    if (!otherUser) {
-      console.error('Cannot send message: other user not loaded');
-      showAlert('Error', 'Unable to send message. Please try again.');
+    const targetUserId = otherUser?.id || peerUserId || routeConversationId;
+
+    if (!targetUserId) {
+      showAlert('Error', 'Unable to determine recipient.');
       return;
     }
 
@@ -301,7 +353,7 @@ export default function ConversationScreen() {
           id: user?.id || '',
           username: user?.username || '',
           avatar: user?.profile?.avatar,
-          isVerified: user?.verified || false,
+          isVerified: user?.isVerified || false,
         },
         content,
         readBy: [],
@@ -316,13 +368,12 @@ export default function ConversationScreen() {
       // If this is a new conversation (no existing conversation), send via direct message endpoint
       // This will create a message request (if users are not connected)
       if (isNewConversation) {
-        console.log('Sending message to new conversation (creates message request if not connected)');
+        console.log(
+          'Sending message to new conversation (creates message request if not connected)'
+        );
         try {
-          const newMessage = await messageAPI.sendDirectMessage(
-            otherUser.id,
-            content
-          );
-          
+          const newMessage = await messageAPI.sendDirectMessage(targetUserId, content);
+
           console.log('Received message from API:', newMessage);
 
           // Safety check: ensure message has sender
@@ -334,14 +385,15 @@ export default function ConversationScreen() {
 
           // Replace optimistic message with real message
           setMessages(prev =>
-            prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
+            prev.map(msg =>
+              msg.id === optimisticMessage.id ? ensureMessageSender(newMessage) : msg
+            )
           );
 
           // If backend returned a conversationId, update and mark as no longer new
           if (newMessage.conversationId) {
             console.log('Conversation created:', newMessage.conversationId);
-            setActualConversationId(newMessage.conversationId);
-            setIsNewConversation(false);
+            transitionToConversation(newMessage.conversationId);
           } else {
             console.log('Message sent as request (no conversation created yet)');
             // Show info that message is sent as request (needs acceptance)
@@ -357,13 +409,21 @@ export default function ConversationScreen() {
         }
       } else {
         // Existing conversation - use normal flow
-        if (isConnected) {
-          // Send via WebSocket for real-time delivery to the other user
-          console.log('Sending WebSocket message to user:', otherUser.id);
-          sendWebSocketMessage(otherUser.id, content);
+        if (isConnected && peerUserId) {
+          console.log('Sending WebSocket message to user:', peerUserId);
+          sendWebSocketMessage(peerUserId, content);
         } else {
+          if (!actualConversationId) {
+            console.warn('Missing conversationId for existing conversation send');
+            setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+            showAlert('Error', 'Conversation is still syncing. Please try again.');
+            return;
+          }
           // Fallback to REST API if WebSocket is not connected
-          console.log('WebSocket not connected, using REST API with conversation:', actualConversationId);
+          console.log(
+            'WebSocket not connected, using REST API with conversation:',
+            actualConversationId
+          );
           try {
             const newMessage = await messageAPI.sendMessage(actualConversationId, content);
             console.log('Received message from API:', newMessage);
@@ -377,7 +437,9 @@ export default function ConversationScreen() {
 
             // Replace optimistic message with real message
             setMessages(prev =>
-              prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
+              prev.map(msg =>
+                msg.id === optimisticMessage.id ? ensureMessageSender(newMessage) : msg
+              )
             );
           } catch (apiError) {
             // Remove optimistic message if API call fails
@@ -411,7 +473,11 @@ export default function ConversationScreen() {
         <TouchableOpacity
           style={styles.userInfo}
           onPress={() =>
-            router.push(`/messages/conversation-settings?conversationId=${conversationId}`)
+            router.push(
+              `/messages/conversation-settings?conversationId=${
+                actualConversationId || routeConversationId
+              }`
+            )
           }
         >
           <Image
@@ -425,31 +491,40 @@ export default function ConversationScreen() {
             <Text style={[styles.userHandle, { color: theme.colors.textSecondary }]}>
               @{otherUser?.username || 'user'}
             </Text>
+            {isNewConversation && (
+              <View style={styles.pendingChip}>
+                <Text style={styles.pendingChipText}>Pending</Text>
+              </View>
+            )}
           </View>
         </TouchableOpacity>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() =>
-              showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')
-            }
-          >
-            <Ionicons name="person-add" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}
-          >
-            <Ionicons name="call" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')}
-          >
-            <Ionicons name="videocam" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
+        {!isNewConversation && (
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() =>
+                showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')
+              }
+            >
+              <Ionicons name="person-add" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}
+            >
+              <Ionicons name="call" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() =>
+                showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')
+              }
+            >
+              <Ionicons name="videocam" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -474,6 +549,20 @@ export default function ConversationScreen() {
     </View>
   );
 
+  const renderPendingBanner = () => (
+    <View style={[styles.pendingBanner, { backgroundColor: theme.colors.surface }]}>
+      <Ionicons name="time-outline" size={18} color={theme.colors.warning || '#FF9500'} />
+      <View style={styles.pendingBannerText}>
+        <Text style={[styles.pendingBannerTitle, { color: theme.colors.text }]}>
+          Tin nhắn đang chờ
+        </Text>
+        <Text style={[styles.pendingBannerSubtitle, { color: theme.colors.textSecondary }]}>
+          Người nhận cần chấp nhận để bắt đầu cuộc trò chuyện.
+        </Text>
+      </View>
+    </View>
+  );
+
   const renderDateSeparator = () => (
     <View style={styles.dateSeparator}>
       <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
@@ -481,6 +570,9 @@ export default function ConversationScreen() {
       <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
     </View>
   );
+
+  const canUseRealtime = !isNewConversation && !!actualConversationId;
+  const typingChannelId = canUseRealtime ? actualConversationId : undefined;
 
   if (isLoading) {
     return (
@@ -499,6 +591,8 @@ export default function ConversationScreen() {
     >
       {renderHeader()}
 
+      {isNewConversation && renderPendingBanner()}
+
       {messages.length === 0 && otherUser && renderContactInfo()}
 
       {messages.length > 0 && renderDateSeparator()}
@@ -510,7 +604,7 @@ export default function ConversationScreen() {
         contentContainerStyle={styles.messagesList}
         inverted={false}
         ListHeaderComponent={
-          connectionStatus !== 'connected' ? (
+          canUseRealtime && connectionStatus !== 'connected' ? (
             <ConnectionStatus
               status={connectionStatus}
               onRetry={() => {
@@ -520,15 +614,16 @@ export default function ConversationScreen() {
           ) : null
         }
         ListFooterComponent={
-          typingUsers.length > 0 ? (
-            <TypingIndicator isVisible={typingUsers.length > 0} multipleUsers={typingUsers} />
+          canUseRealtime && typingUsers.length > 0 ? (
+            <TypingIndicator isVisible multipleUsers={typingUsers} />
           ) : null
         }
       />
       <MessageInput
         onSend={handleSendMessage}
-        onTyping={() => sendTyping(conversationId)}
-        onStopTyping={() => sendStopTyping(conversationId)}
+        onTyping={typingChannelId ? () => sendTyping(typingChannelId) : undefined}
+        onStopTyping={typingChannelId ? () => sendStopTyping(typingChannelId) : undefined}
+        placeholder={isNewConversation ? 'Tin nhắn sẽ được gửi dưới dạng yêu cầu' : 'Nhắn tin...'}
       />
     </KeyboardAvoidingView>
   );
@@ -582,6 +677,19 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
+  pendingChip: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    backgroundColor: '#FFA500',
+  },
+  pendingChipText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   contactInfo: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -610,6 +718,29 @@ const styles = StyleSheet.create({
   profileButtonText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF9500',
+  },
+  pendingBannerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  pendingBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pendingBannerSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
   dateSeparator: {
     flexDirection: 'row',

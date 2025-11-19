@@ -29,6 +29,12 @@ import java.util.List;
 @Document(collection = "conversations")
 @CompoundIndex(name = "participants_userId_idx", def = "{'participants.userId': 1}")
 @CompoundIndex(name = "type_participants_idx", def = "{'type': 1, 'participants.userId': 1}")
+@CompoundIndex(
+    name = "direct_participants_normalized_unique_idx",
+    def = "{'type': 1, 'participantsNormalized': 1}",
+    unique = true,
+    partialFilter = "{'type': 'DIRECT'}"
+)
 public class Conversation {
     
     /**
@@ -58,6 +64,12 @@ public class Conversation {
      */
     @Builder.Default
     private List<ConversationMember> participants = new ArrayList<>();
+
+    /**
+     * Normalized participant IDs (sorted) for enforcing uniqueness on DIRECT conversations
+     */
+    @Builder.Default
+    private List<String> participantsNormalized = new ArrayList<>();
     
     /**
      * List of admin user IDs (only for GROUP conversations)

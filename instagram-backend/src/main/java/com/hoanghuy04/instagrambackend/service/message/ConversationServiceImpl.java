@@ -13,6 +13,7 @@ import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,48 +39,52 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationRepository conversationRepository;
     private final UserRepository userRepository;
     
-    @Transactional
+    @Transactional(readOnly = true)
     @Override
-    public Conversation getOrCreateDirectConversation(String userId1, String userId2) {
-        log.info("Getting or creating direct conversation between {} and {}", userId1, userId2);
-        
-        if (userId1.equals(userId2)) {
-            throw new BadRequestException("Cannot create conversation with yourself");
+    public Optional<Conversation> getExistingDirectConversation(String userId1, String userId2) {
+        List<String> normalized = normalizeParticipants(userId1, userId2);
+        Optional<Conversation> conversation = conversationRepository.findByTypeAndParticipantsNormalized(
+            ConversationType.DIRECT, normalized
+        );
+        if (conversation.isPresent()) {
+            return conversation;
         }
-        
-        // Create sorted participant list for consistent lookup
-        List<String> participants = new ArrayList<>();
-        participants.add(userId1);
-        participants.add(userId2);
-        Collections.sort(participants);
-        
-        // Try to find existing conversation
-        Optional<Conversation> existing = conversationRepository.findByTypeAndParticipants(
-            ConversationType.DIRECT, 
-            participants, 
+
+        // Fallback for legacy records without participantsNormalized populated
+        return conversationRepository.findByTypeAndParticipants(
+            ConversationType.DIRECT,
+            normalized,
             2
         );
-        
-        if (existing.isPresent()) {
-            log.debug("Found existing direct conversation: {}", existing.get().getId());
-            return existing.get();
-        }
-        
-        // Create new conversation with participant details
-        List<ConversationMember> participantMembers = createConversationMembers(participants, userId1, MemberRole.MEMBER);
-        
+    }
+
+    @Transactional
+    @Override
+    public Conversation createDirectConversation(String userId1, String userId2) {
+        log.info("Creating direct conversation between {} and {}", userId1, userId2);
+
+        List<String> normalized = normalizeParticipants(userId1, userId2);
+        List<ConversationMember> participantMembers = createConversationMembers(normalized, userId1, MemberRole.MEMBER);
+
         Conversation conversation = Conversation.builder()
             .type(ConversationType.DIRECT)
             .participants(participantMembers)
+            .participantsNormalized(new ArrayList<>(normalized))
             .createdBy(userId1)
             .createdAt(LocalDateTime.now())
             .updatedAt(LocalDateTime.now())
             .build();
-        
-        conversation = conversationRepository.save(conversation);
-        log.info("Created new direct conversation: {}", conversation.getId());
-        
-        return conversation;
+
+        try {
+            conversation = conversationRepository.insert(conversation);
+            log.info("Created new direct conversation: {}", conversation.getId());
+            return conversation;
+        } catch (DuplicateKeyException ex) {
+            log.warn("Duplicate direct conversation detected for participants {}. Re-reading existing conversation", normalized);
+            return conversationRepository.findByTypeAndParticipantsNormalized(
+                ConversationType.DIRECT, normalized
+            ).orElseThrow(() -> new BadRequestException("Failed to create conversation after duplicate key"));
+        }
     }
     
     @Transactional
@@ -319,6 +324,7 @@ public class ConversationServiceImpl implements ConversationService {
             .timestamp(message.getCreatedAt())
             .build();
         
+        ensureParticipantsNormalized(conversation);
         conversation.setLastMessage(lastMessage);
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
@@ -339,6 +345,37 @@ public class ConversationServiceImpl implements ConversationService {
             .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
     }
     
+    private List<String> normalizeParticipants(String userId1, String userId2) {
+        if (userId1 == null || userId2 == null) {
+            throw new BadRequestException("Participant IDs cannot be null");
+        }
+        if (userId1.equals(userId2)) {
+            throw new BadRequestException("Cannot create conversation with yourself");
+        }
+        List<String> participants = new ArrayList<>();
+        participants.add(userId1);
+        participants.add(userId2);
+        participants.sort(String::compareTo);
+        return participants;
+    }
+
+    private void ensureParticipantsNormalized(Conversation conversation) {
+        if (conversation.getType() != ConversationType.DIRECT) {
+            return;
+        }
+        List<String> normalized = conversation.getParticipantsNormalized();
+        if (normalized != null && normalized.size() == 2) {
+            return;
+        }
+        List<String> participantIds = conversation.getParticipants().stream()
+            .map(ConversationMember::getUserId)
+            .collect(Collectors.toList());
+        if (participantIds.size() == 2) {
+            participantIds.sort(String::compareTo);
+            conversation.setParticipantsNormalized(participantIds);
+        }
+    }
+
     /**
      * Create conversation members list with user details.
      * 
