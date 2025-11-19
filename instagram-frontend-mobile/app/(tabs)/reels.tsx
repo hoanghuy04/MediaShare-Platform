@@ -72,7 +72,7 @@ export default function ReelsScreen() {
           console.warn('Error checking photos permission:', error);
         }
       } else {
-        setHasPhotosPermission(true); // Android doesn't need this permission
+        setHasPhotosPermission(true); 
       }
     };
 

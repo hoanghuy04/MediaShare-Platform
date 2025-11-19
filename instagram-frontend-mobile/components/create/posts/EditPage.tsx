@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.5; // Ảnh chiếm 50% screen height
+const PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.5; 
 
 type GalleryAsset = {
   id: string;

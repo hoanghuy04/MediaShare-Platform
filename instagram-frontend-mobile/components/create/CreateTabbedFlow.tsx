@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -14,27 +13,83 @@ import { Ionicons } from '@expo/vector-icons';
 import ReelsCreationScreen from './reels/ReelsCreationScreen';
 import { router } from 'expo-router';
 
-
 const { width } = Dimensions.get('window');
 
-type TabType = 'post' | 'story' | 'reels';
+export type TabType = 'post' | 'story' | 'reels';
+
+// Export BottomTabs component để sử dụng ở nơi khác
+export interface BottomTabsProps {
+  activeTab?: TabType;
+  onTabPress?: (tab: TabType) => void;
+}
+
+export const BottomTabs: React.FC<BottomTabsProps> = ({ activeTab = 'post', onTabPress }) => {
+  const handleTabPress = (tab: TabType) => {
+    if (onTabPress) {
+      onTabPress(tab);
+    } else {
+      // Default navigation nếu không có onTabPress
+      switch (tab) {
+        case 'post':
+          router.push('/(tabs)/create/posts/pick-media');
+          break;
+        case 'story':
+          // TODO: Implement story creation
+          break;
+        case 'reels':
+          router.push('/(tabs)/create/reels');
+          break;
+      }
+    }
+  };
+
+  return (
+    <View style={styles.bottomSegmentedControl}>
+      <TouchableOpacity
+        style={[styles.bottomTab, activeTab === 'post' && styles.activeBottomTab]}
+        onPress={() => handleTabPress('post')}
+      >
+        <Text style={[styles.bottomTabText, activeTab === 'post' && styles.activeBottomTabText]}>
+          BÀI VIẾT
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
+        onPress={() => handleTabPress('story')}
+      >
+        <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
+          TIN
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
+        onPress={() => handleTabPress('reels')}
+      >
+        <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
+          THƯỚC PHIM
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 interface CreateTabbedFlowProps {
-  onPostCreated?: () => void; // Callback để refresh feed
+  onPostCreated?: () => void; 
 }
 
 export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreated }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('post');
+  const [activeTab, setActiveTab] = useState<TabType | null>(null);
   const [postStep, setPostStep] = useState(1);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      setActiveTab('post');
-    }, [])
-  );
 
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
+    
+    // Chỉ navigate khi user click vào tab "BÀI VIẾT"
+    if (tab === 'post') {
+      router.push('/(tabs)/create/posts/pick-media');
+    }
   };
 
   const handlePostStepChange = (step: number) => {
@@ -44,10 +99,12 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
   const renderContent = () => {
     switch (activeTab) {
       case 'post':
-        router.push('/(tabs)/create/posts/pick-media');
+        // Không navigate tự động, chỉ hiển thị placeholder
         return (
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Đang mở bộ chọn phương tiện...</Text>
+            <Text style={styles.placeholderText}>
+              Nhấn "BÀI VIẾT" để bắt đầu tạo bài viết
+            </Text>
           </View>
         );
       case 'story':
@@ -59,6 +116,7 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
       case 'reels':
         return <ReelsCreationScreen />;
       default:
+        // Hiển thị màn hình mặc định khi chưa chọn tab
         return (
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>Chọn một tuỳ chọn tạo nội dung</Text>
@@ -68,36 +126,7 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
   };
 
   const renderBottomTabs = () => {
-    return (
-      <View style={styles.bottomSegmentedControl}>
-        <TouchableOpacity
-          style={[styles.bottomTab, activeTab === 'post' && styles.activeBottomTab]}
-          onPress={() => handleTabPress('post')}
-        >
-          <Text style={[styles.bottomTabText, activeTab === 'post' && styles.activeBottomTabText]}>
-            BÀI VIẾT
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
-          onPress={() => handleTabPress('story')}
-        >
-          <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
-            TIN
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
-          onPress={() => handleTabPress('reels')}
-        >
-          <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
-            THƯỚC PHIM
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <BottomTabs activeTab={activeTab || 'post'} onTabPress={handleTabPress} />;
   };
 
   return (
@@ -106,8 +135,8 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
 
       <View style={styles.contentContainer}>{renderContent()}</View>
 
-      {/* Ẩn tabbed flow khi ở step 2 và 3 của posts */}
-      {!(activeTab === 'post' && (postStep === 2 || postStep === 3)) && renderBottomTabs()}
+      {/* Luôn hiển thị bottom tabs */}
+      {renderBottomTabs()}
     </View>
   );
 };

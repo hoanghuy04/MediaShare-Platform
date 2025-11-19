@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TILE_GAP = 1; // Giảm gap để giống Instagram
-const TILE_SIZE = (SCREEN_WIDTH - TILE_GAP * 2) / 3; // Bỏ padding để full width
+const TILE_GAP = 1; 
+const TILE_SIZE = (SCREEN_WIDTH - TILE_GAP * 2) / 3; 
 const PREVIEW_HEIGHT = SCREEN_WIDTH * 0.8;
 
 type GalleryAsset = {
@@ -64,10 +64,8 @@ export function GalleryPage({
     rows.push(gridItems.slice(i, i + 3));
   }
 
-  // Get first selected asset for preview
   const previewAsset = gallery.find(asset => selectedMedia.includes(asset.id));
 
-  // Animation for preview height
   const previewHeight = scrollY.interpolate({
     inputRange: [0, PREVIEW_HEIGHT],
     outputRange: [PREVIEW_HEIGHT, 0],
