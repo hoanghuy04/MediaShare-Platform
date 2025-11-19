@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.like;
 
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.entity.Like;
@@ -6,6 +6,9 @@ import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.repository.LikeRepository;
+import com.hoanghuy04.instagrambackend.service.PostService;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,19 +27,14 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class LikeService {
+public class LikeServiceImpl implements LikeService {
     
     private final LikeRepository likeRepository;
     private final UserService userService;
     private final PostService postService;
     
-    /**
-     * Like a post.
-     *
-     * @param postId the post ID
-     * @param userId the user ID liking the post
-     */
     @Transactional
+    @Override
     public void likePost(String postId, String userId) {
         log.info("User {} liking post: {}", userId, postId);
         
@@ -61,13 +59,8 @@ public class LikeService {
         log.info("Post liked successfully");
     }
     
-    /**
-     * Unlike a post.
-     *
-     * @param postId the post ID
-     * @param userId the user ID unliking the post
-     */
     @Transactional
+    @Override
     public void unlikePost(String postId, String userId) {
         log.info("User {} unliking post: {}", userId, postId);
         
@@ -85,39 +78,24 @@ public class LikeService {
         log.info("Post unliked successfully");
     }
     
-    /**
-     * Like a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID liking the comment
-     */
     @Transactional
+    @Override
     public void likeComment(String commentId, String userId) {
         log.info("User {} liking comment: {}", userId, commentId);
         // Similar implementation to likePost but for comments
         log.info("Comment liked successfully");
     }
     
-    /**
-     * Unlike a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID unliking the comment
-     */
     @Transactional
+    @Override
     public void unlikeComment(String commentId, String userId) {
         log.info("User {} unliking comment: {}", userId, commentId);
         // Similar implementation to unlikePost but for comments
         log.info("Comment unliked successfully");
     }
     
-    /**
-     * Get users who liked a post.
-     *
-     * @param postId the post ID
-     * @return List of UserResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public List<UserResponse> getPostLikes(String postId) {
         log.debug("Getting likes for post: {}", postId);
         

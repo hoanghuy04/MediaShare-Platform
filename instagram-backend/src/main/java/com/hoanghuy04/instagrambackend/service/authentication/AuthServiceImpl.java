@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.authentication;
 
 import com.hoanghuy04.instagrambackend.dto.request.LoginRequest;
 import com.hoanghuy04.instagrambackend.dto.request.RegisterRequest;
@@ -12,6 +12,8 @@ import com.hoanghuy04.instagrambackend.exception.ConflictException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.security.JwtUtil;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,7 +37,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AuthService {
+public class AuthServiceImpl implements AuthService {
     
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -43,13 +45,8 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
     
-    /**
-     * Register a new user.
-     *
-     * @param request the registration request
-     * @return AuthResponse with tokens and user data
-     */
     @Transactional
+    @Override
     public AuthResponse register(RegisterRequest request) {
         log.info("Registering new user: {}", request.getUsername());
         
@@ -103,13 +100,8 @@ public class AuthService {
                 .build();
     }
     
-    /**
-     * Login a user.
-     *
-     * @param request the login request
-     * @return AuthResponse with tokens and user data
-     */
     @Transactional
+    @Override
     public AuthResponse login(LoginRequest request) {
         log.info("User attempting to login: {}", request.getUsernameOrEmail());
         
@@ -146,12 +138,7 @@ public class AuthService {
                 .build();
     }
     
-    /**
-     * Refresh access token using refresh token.
-     *
-     * @param refreshToken the refresh token
-     * @return AuthResponse with new tokens
-     */
+    @Override
     public AuthResponse refreshToken(String refreshToken) {
         log.info("Refreshing access token");
         
@@ -181,31 +168,18 @@ public class AuthService {
                 .build();
     }
     
-    /**
-     * Logout a user (client-side token removal).
-     *
-     * @param userId the user ID
-     */
+    @Override
     public void logout(String userId) {
         log.info("User logged out: {}", userId);
         SecurityContextHolder.clearContext();
     }
     
-    /**
-     * Validate a JWT token.
-     *
-     * @param token the JWT token
-     * @return true if valid, false otherwise
-     */
+    @Override
     public boolean validateToken(String token) {
         return jwtUtil.validateToken(token);
     }
     
-    /**
-     * Send password reset email.
-     *
-     * @param email the user email
-     */
+    @Override
     public void sendPasswordResetEmail(String email) {
         log.info("Sending password reset email to: {}", email);
         
@@ -218,13 +192,8 @@ public class AuthService {
         log.info("Password reset email would be sent to: {}", email);
     }
     
-    /**
-     * Reset password with token.
-     *
-     * @param token the reset token
-     * @param newPassword the new password
-     */
     @Transactional
+    @Override
     public void resetPassword(String token, String newPassword) {
         log.info("Resetting password with token");
         

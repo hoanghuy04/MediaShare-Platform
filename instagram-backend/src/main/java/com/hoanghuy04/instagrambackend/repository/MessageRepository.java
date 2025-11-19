@@ -8,15 +8,20 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
 /**
  * Repository interface for Message entity operations.
  * Provides CRUD operations and custom queries for message management.
  * 
  * @author Instagram Backend Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Repository
 public interface MessageRepository extends MongoRepository<Message, String> {
+    
+    // ==================== OLD METHODS (Backward Compatibility) ====================
     
     /**
      * Find messages between two users.
@@ -65,31 +70,55 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      */
     Page<Message> findBySender(User sender, Pageable pageable);
     
-    /**
-     * Count unread messages for a user.
-     *
-     * @param receiver the user to count unread messages for
-     * @return number of unread messages
-     */
-    long countByReceiverAndIsReadFalse(User receiver);
+    // ==================== NEW METHODS (Conversation-based) ====================
     
     /**
-     * Count unread messages from a specific sender to a receiver.
+     * Get messages in conversation (excluding deleted by user)
      *
-     * @param receiver the user who received the messages
-     * @param sender the user who sent the messages
-     * @return number of unread messages from this sender
-     */
-    long countByReceiverAndSenderAndIsReadFalse(User receiver, User sender);
-    
-    /**
-     * Find unread messages for a user.
-     *
-     * @param receiver the user to find unread messages for
-     * @param isRead read status
+     * @param conversationId the conversation ID
+     * @param userId the user ID to exclude deleted messages for
      * @param pageable pagination information
-     * @return Page of unread messages
+     * @return List of messages not deleted by the user
      */
-    Page<Message> findByReceiverAndIsRead(User receiver, boolean isRead, Pageable pageable);
+    List<Message> findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
+        String conversationId, 
+        String userId,
+        Pageable pageable
+    );
+    
+    /**
+     * Find messages deleted by all participants (for cleanup)
+     *
+     * @param conversationId the conversation ID
+     * @return List of fully deleted messages
+     */
+    @Query("{ 'conversation.$id': ?0, $expr: { $eq: [{ $size: '$deletedBy' }, { $size: '$conversation.participants' }] } }")
+    List<Message> findFullyDeletedMessages(String conversationId);
+    
+    /**
+     * Get latest message in conversation
+     *
+     * @param conversationId the conversation ID
+     * @return Optional containing the latest message
+     */
+    Optional<Message> findFirstByConversationIdOrderByCreatedAtDesc(String conversationId);
+    
+    /**
+     * Find messages between sender and receiver (OLD: Keep for compatibility)
+     *
+     * @param sender the sender user
+     * @param receiver the receiver user
+     * @return List of messages
+     */
+    List<Message> findBySenderAndReceiverOrderByCreatedAtDesc(User sender, User receiver);
+    
+    /**
+     * Find messages by list of IDs.
+     * Used for loading pending messages from message requests.
+     *
+     * @param ids list of message IDs
+     * @return List of messages matching the IDs
+     */
+    List<Message> findByIdIn(List<String> ids);
 }
 

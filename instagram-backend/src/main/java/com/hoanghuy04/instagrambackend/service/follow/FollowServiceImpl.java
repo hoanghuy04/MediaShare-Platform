@@ -1,10 +1,12 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.follow;
 
 import com.hoanghuy04.instagrambackend.entity.Follow;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,19 +22,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class FollowService {
+public class FollowServiceImpl implements FollowService {
     
     private final FollowRepository followRepository;
     private final UserService userService;
     private final UserRepository userRepository;
 
-    /**
-     * Follow a user.
-     *
-     * @param followerId the follower user ID
-     * @param followingId the user ID to follow
-     */
     @Transactional
+    @Override
     public void followUser(String followerId, String followingId) {
         log.info("User {} following user: {}", followerId, followingId);
         
@@ -66,13 +63,8 @@ public class FollowService {
         log.info("User followed successfully");
     }
     
-    /**
-     * Unfollow a user.
-     *
-     * @param followerId the follower user ID
-     * @param followingId the user ID to unfollow
-     */
     @Transactional
+    @Override
     public void unfollowUser(String followerId, String followingId) {
         log.info("User {} unfollowing user: {}", followerId, followingId);
         
@@ -91,14 +83,8 @@ public class FollowService {
         log.info("User unfollowed successfully");
     }
     
-    /**
-     * Check if a user is following another user.
-     *
-     * @param followerId the follower user ID
-     * @param followingId the user ID to check
-     * @return true if following, false otherwise
-     */
     @Transactional(readOnly = true)
+    @Override
     public boolean isFollowing(String followerId, String followingId) {
         log.debug("Checking if user {} is following user: {}", followerId, followingId);
         
@@ -108,13 +94,8 @@ public class FollowService {
         return followRepository.existsByFollowerAndFollowing(follower, following);
     }
     
-    /**
-     * Get follower count for a user.
-     *
-     * @param userId the user ID
-     * @return follower count
-     */
     @Transactional(readOnly = true)
+    @Override
     public long getFollowerCount(String userId) {
         log.debug("Getting follower count for user: {}", userId);
         
@@ -122,13 +103,8 @@ public class FollowService {
         return followRepository.countByFollowing(user);
     }
     
-    /**
-     * Get following count for a user.
-     *
-     * @param userId the user ID
-     * @return following count
-     */
     @Transactional(readOnly = true)
+    @Override
     public long getFollowingCount(String userId) {
         log.debug("Getting following count for user: {}", userId);
         

@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.comment;
 
 import com.hoanghuy04.instagrambackend.dto.request.CreateCommentRequest;
 import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
@@ -9,6 +9,9 @@ import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.CommentRepository;
+import com.hoanghuy04.instagrambackend.service.PostService;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,20 +31,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class CommentService {
+public class CommentServiceImpl implements CommentService {
     
     private final CommentRepository commentRepository;
     private final UserService userService;
     private final PostService postService;
     
-    /**
-     * Create a new comment on a post.
-     *
-     * @param request the comment creation request
-     * @param userId the user ID creating the comment
-     * @return CommentResponse
-     */
     @Transactional
+    @Override
     public CommentResponse createComment(CreateCommentRequest request, String userId) {
         log.info("Creating comment for post: {}", request.getPostId());
         
@@ -64,13 +61,8 @@ public class CommentService {
         return convertToCommentResponse(comment);
     }
     
-    /**
-     * Get comment by ID.
-     *
-     * @param commentId the comment ID
-     * @return CommentResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public CommentResponse getComment(String commentId) {
         log.debug("Getting comment by ID: {}", commentId);
         
@@ -80,14 +72,8 @@ public class CommentService {
         return convertToCommentResponse(comment);
     }
     
-    /**
-     * Get comments for a post.
-     *
-     * @param postId the post ID
-     * @param pageable pagination information
-     * @return PageResponse of CommentResponse
-     */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<CommentResponse> getPostComments(String postId, Pageable pageable) {
         log.debug("Getting comments for post: {}", postId);
         
@@ -97,15 +83,8 @@ public class CommentService {
         return PageResponse.of(page);
     }
     
-    /**
-     * Update a comment.
-     *
-     * @param commentId the comment ID
-     * @param text the new comment text
-     * @param userId the user ID updating the comment
-     * @return updated CommentResponse
-     */
     @Transactional
+    @Override
     public CommentResponse updateComment(String commentId, String text, String userId) {
         log.info("Updating comment: {}", commentId);
         
@@ -125,13 +104,8 @@ public class CommentService {
         return convertToCommentResponse(comment);
     }
     
-    /**
-     * Delete a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID deleting the comment
-     */
     @Transactional
+    @Override
     public void deleteComment(String commentId, String userId) {
         log.info("Deleting comment: {}", commentId);
         
@@ -147,15 +121,8 @@ public class CommentService {
         log.info("Comment deleted successfully: {}", commentId);
     }
     
-    /**
-     * Reply to a comment.
-     *
-     * @param commentId the comment ID to reply to
-     * @param request the comment request
-     * @param userId the user ID creating the reply
-     * @return CommentResponse
-     */
     @Transactional
+    @Override
     public CommentResponse replyToComment(String commentId, CreateCommentRequest request, String userId) {
         log.info("Creating reply to comment: {}", commentId);
         
@@ -173,13 +140,8 @@ public class CommentService {
         return reply;
     }
     
-    /**
-     * Like a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID liking the comment
-     */
     @Transactional
+    @Override
     public void likeComment(String commentId, String userId) {
         log.info("Liking comment: {} by user: {}", commentId, userId);
         
@@ -197,13 +159,8 @@ public class CommentService {
         }
     }
     
-    /**
-     * Unlike a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID unliking the comment
-     */
     @Transactional
+    @Override
     public void unlikeComment(String commentId, String userId) {
         log.info("Unliking comment: {} by user: {}", commentId, userId);
         
@@ -217,12 +174,6 @@ public class CommentService {
         }
     }
     
-    /**
-     * Convert Comment entity to CommentResponse DTO.
-     *
-     * @param comment the Comment entity
-     * @return CommentResponse DTO
-     */
     private CommentResponse convertToCommentResponse(Comment comment) {
         return CommentResponse.builder()
                 .id(comment.getId())
