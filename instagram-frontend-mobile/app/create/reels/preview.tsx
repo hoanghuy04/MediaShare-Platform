@@ -14,7 +14,7 @@ export default function ReelsPreviewPage() {
 
   const handleNext = () => {
     router.push({
-      pathname: '/(tabs)/create/reels/post',
+      pathname: '/create/reels/post',
       params: {
         mediaUri: params.mediaUri,
         mediaType: params.mediaType,

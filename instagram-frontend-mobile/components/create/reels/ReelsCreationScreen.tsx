@@ -139,7 +139,7 @@ export default function ReelsCreationScreen() {
       const asset = gallery.find(a => a.uri === uri);
       const mediaType = asset?.mediaType === 'video' ? 'video' : 'photo';
       router.push({
-        pathname: '/(tabs)/create/reels/preview',
+        pathname: '/create/reels/preview',
         params: { mediaUri: uri, mediaType },
       });
     },

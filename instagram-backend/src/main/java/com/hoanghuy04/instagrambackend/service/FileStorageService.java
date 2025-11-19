@@ -62,7 +62,7 @@ public class FileStorageService {
 
         // Validate file
         FileUtil.validateFileType(file.getOriginalFilename());
-        FileUtil.validateFileSize(file.getSize());
+        FileUtil.validateFileSize(file.getSize(), maxFileSize);
 
         // Save file to disk
         String filePath = FileUtil.saveFile(file, uploadDir);
@@ -144,7 +144,7 @@ public class FileStorageService {
      * @return true if valid, false otherwise
      */
     public boolean validateFileSize(long fileSize) {
-        return FileUtil.isValidFileSize(fileSize);
+        return FileUtil.isValidFileSize(fileSize, maxFileSize);
     }
 
     /**

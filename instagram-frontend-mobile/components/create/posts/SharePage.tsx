@@ -25,8 +25,8 @@ import apiConfig from '@/config/apiConfig';
 import { isVideoFormatSupported } from '@/utils/videoUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4; 
-const PREVIEW_HEIGHT = PREVIEW_WIDTH; 
+const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
+const PREVIEW_HEIGHT = PREVIEW_WIDTH;
 
 type GalleryAsset = {
   id: string;
@@ -63,7 +63,14 @@ type SharePageProps = {
   onPostCreated?: () => void; // Callback để refresh feed
 };
 
-export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedFlow = false, onPostCreated }: SharePageProps) {
+export function SharePage({
+  selectedMedia,
+  gallery,
+  onBack,
+  onShare,
+  hideTabbedFlow = false,
+  onPostCreated,
+}: SharePageProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [caption, setCaption] = useState('');
@@ -93,12 +100,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
 
     setIsSharing(true);
     try {
-      console.log('Starting share process...');
-      console.log('Selected assets:', selectedAssets);
-      console.log('Caption:', caption);
-      console.log('User:', user);
-
-      // Validate video formats before uploading
       const unsupportedVideos = selectedAssets.filter(asset => !validateVideoFormat(asset));
       if (unsupportedVideos.length > 0) {
         Alert.alert(
@@ -110,7 +111,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
 
       const hashtags = extractHashtags(caption);
       console.log('Extracted hashtags:', hashtags);
-      
+
       // Upload media files first
       console.log('Starting media upload...');
       const uploadedMedia = await Promise.all(
@@ -118,30 +119,30 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
           console.log(`Uploading asset ${index + 1}:`, asset);
           const formData = new FormData();
           const filename = asset.uri.split('/').pop() || 'upload';
-          
-              // Determine file type and extension
-              let fileExtension = filename.split('.').pop()?.toLowerCase() || '';
-              let mimeType = '';
-              
-              // Check if video format is supported
-              const isVideoSupported = asset.mediaType === 'video' && isVideoFormatSupported(asset.uri);
-              
-              if (asset.mediaType === 'video' && isVideoSupported) {
-                if (['mp4', 'mov', 'avi', 'mkv', 'm4v'].includes(fileExtension)) {
-                  mimeType = `video/${fileExtension}`;
-                } else {
-                  mimeType = 'video/mp4';
-                  fileExtension = 'mp4';
-                }
-              } else {
-                // Treat as image if video format is not supported
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
-                  mimeType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`;
-                } else {
-                  mimeType = 'image/jpeg';
-                  fileExtension = 'jpg';
-                }
-              }
+
+          // Determine file type and extension
+          let fileExtension = filename.split('.').pop()?.toLowerCase() || '';
+          let mimeType = '';
+
+          // Check if video format is supported
+          const isVideoSupported = asset.mediaType === 'video' && isVideoFormatSupported(asset.uri);
+
+          if (asset.mediaType === 'video' && isVideoSupported) {
+            if (['mp4', 'mov', 'avi', 'mkv', 'm4v'].includes(fileExtension)) {
+              mimeType = `video/${fileExtension}`;
+            } else {
+              mimeType = 'video/mp4';
+              fileExtension = 'mp4';
+            }
+          } else {
+            // Treat as image if video format is not supported
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+              mimeType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`;
+            } else {
+              mimeType = 'image/jpeg';
+              fileExtension = 'jpg';
+            }
+          }
 
           console.log(`Asset ${index + 1} - MIME type:`, mimeType, 'Extension:', fileExtension);
 
@@ -164,22 +165,22 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
           console.log(`Asset ${index + 1} uploaded successfully:`, uploadResponse);
           console.log(`Asset ${index + 1} upload response type:`, typeof uploadResponse);
           console.log(`Asset ${index + 1} upload response length:`, uploadResponse?.length);
-          
+
           // Backend returns full URL, no need to modify
           let mediaUrl = uploadResponse;
-          
+
           // If it's a relative path (shouldn't happen with current backend), make it absolute
           if (typeof mediaUrl === 'string' && !mediaUrl.startsWith('http')) {
             mediaUrl = `${apiConfig.apiUrl}${mediaUrl}`;
             console.log(`Asset ${index + 1} converted to absolute URL:`, mediaUrl);
           }
-          
+
           console.log(`Asset ${index + 1} final media URL:`, mediaUrl);
-          
-              return {
-                url: mediaUrl,
-                type: (asset.mediaType === 'video' && isVideoSupported) ? 'VIDEO' : 'IMAGE',
-              } as Media;
+
+          return {
+            url: mediaUrl,
+            type: asset.mediaType === 'video' && isVideoSupported ? 'VIDEO' : 'IMAGE',
+          } as Media;
         })
       );
 
@@ -196,7 +197,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
       console.log('Creating post with data:', postData);
       const newPost = await postAPI.createPost(postData);
       console.log('Post created successfully:', newPost);
-      
+
       // Show success message
       Alert.alert('Thành công', 'Bài viết đã được chia sẻ!', [
         {
@@ -206,24 +207,25 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             onPostCreated?.();
             // Navigate to feed after successful post creation
             router.push('/(tabs)/feed');
-          }
-        }
+          },
+        },
       ]);
-      
+
       // Call onShare callback to close the screen
       await onShare({
         mediaUris: selectedAssets.map(asset => asset.uri),
         mediaType: selectedAssets[0]?.mediaType || 'photo',
         caption,
         hashtags,
-        location: pickedLocation ? {
-          name: pickedLocation.name,
-          address: pickedLocation.address,
-          distance: pickedLocation.distance,
-        } : undefined,
+        location: pickedLocation
+          ? {
+              name: pickedLocation.name,
+              address: pickedLocation.address,
+              distance: pickedLocation.distance,
+            }
+          : undefined,
         aiTagEnabled,
       });
-      
     } catch (error: any) {
       console.error('Error sharing post:', error);
       console.error('Error response:', error.response?.data);
@@ -245,7 +247,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
   if (showLocationSearch) {
     return (
       <LocationSearchScreen
-        onSelectLocation={(loc) => {
+        onSelectLocation={loc => {
           setPickedLocation({
             name: loc.name,
             address: loc.address,
@@ -261,7 +263,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={28} color="#000" />
@@ -271,7 +273,6 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-       
         {selectedAssets.length > 0 && (
           <View style={styles.previewSection}>
             <View style={styles.previewContainer}>
@@ -366,10 +367,7 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.optionRow}
-            onPress={() => setShowLocationSearch(true)}
-          >
+          <TouchableOpacity style={styles.optionRow} onPress={() => setShowLocationSearch(true)}>
             <View style={styles.optionLeft}>
               <Ionicons name="location" size={24} color="#000" />
               <Text style={styles.optionText}>Thêm vị trí</Text>
@@ -401,7 +399,8 @@ export function SharePage({ selectedMedia, gallery, onBack, onShare, hideTabbedF
             <View style={styles.aiLabelSection}>
               <View style={styles.aiLabelText}>
                 <Text style={styles.aiLabelDescription}>
-                  Chúng tôi yêu cầu bạn gắn nhãn cho một số nội dung nhất định tạo bằng AI và cảm giác như thật. Tìm hiểu thêm
+                  Chúng tôi yêu cầu bạn gắn nhãn cho một số nội dung nhất định tạo bằng AI và cảm
+                  giác như thật. Tìm hiểu thêm
                 </Text>
               </View>
               <Switch

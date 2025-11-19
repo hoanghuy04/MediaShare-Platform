@@ -69,14 +69,14 @@ export const API_ENDPOINTS = {
   MARK_MESSAGE_READ: (messageId: string) => `/api/conversations/messages/${messageId}/read`,
   DELETE_MESSAGE: (messageId: string) => `/api/conversations/messages/${messageId}`,
   DELETE_CONVERSATION: (conversationId: string) => `/api/conversations/${conversationId}`,
-  
+
   // Group Chat
   CREATE_GROUP: '/api/conversations/group',
   UPDATE_GROUP: (id: string) => `/api/conversations/${id}`,
   ADD_MEMBERS: (id: string) => `/api/conversations/${id}/members`,
   REMOVE_MEMBER: (id: string, userId: string) => `/api/conversations/${id}/members/${userId}`,
   LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
-  
+
   // Message Requests
   MESSAGE_REQUESTS: '/api/message-requests',
   MESSAGE_REQUESTS_COUNT: '/api/message-requests/count',
@@ -94,7 +94,7 @@ export const API_ENDPOINTS = {
   // Upload
   UPLOAD: '/api/upload',
   UPLOAD_PROFILE_IMAGE: '/api/upload/profile',
-  UPLOAD_POST_MEDIA: '/api/upload/post',
+  UPLOAD_POST_MEDIA: '/api/upload/post-media',
   UPLOAD_POST_MEDIA_BATCH: '/api/upload/post/batch',
   DELETE_FILE: (fileId: string) => `/api/upload/${fileId}`,
 } as const;

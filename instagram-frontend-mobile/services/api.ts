@@ -168,14 +168,14 @@ export const postAPI = {
 
   likePost: async (postId: string): Promise<void> => {
     const response = await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId), null, {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
     });
     return response.data.data;
   },
 
   unlikePost: async (postId: string): Promise<void> => {
     const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId), {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
     });
     return response.data.data;
   },
@@ -257,14 +257,14 @@ export const commentAPI = {
 
   likeComment: async (commentId: string): Promise<void> => {
     const response = await axiosInstance.post(API_ENDPOINTS.LIKE_COMMENT(commentId), null, {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
     });
     return response.data.data;
   },
 
   unlikeComment: async (commentId: string): Promise<void> => {
     const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_COMMENT(commentId), {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
     });
     return response.data.data;
   },
@@ -309,7 +309,11 @@ export const messageAPI = {
   },
 
   // Send direct message (auto-creates conversation if needed)
-  sendDirectMessage: async (receiverId: string, content: string, mediaUrl?: string): Promise<Message> => {
+  sendDirectMessage: async (
+    receiverId: string,
+    content: string,
+    mediaUrl?: string
+  ): Promise<Message> => {
     const senderId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.post(
       API_ENDPOINTS.SEND_DIRECT_MESSAGE,
@@ -338,33 +342,31 @@ export const messageAPI = {
   // Mark message as read (marks all messages in conversation)
   markAsRead: async (messageId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.post(
-      API_ENDPOINTS.MARK_MESSAGE_READ(messageId),
-      null,
-      { params: { userId } }
-    );
+    await axiosInstance.post(API_ENDPOINTS.MARK_MESSAGE_READ(messageId), null, {
+      params: { userId },
+    });
   },
 
   // Delete message (soft delete)
   deleteMessage: async (messageId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.delete(
-      API_ENDPOINTS.DELETE_MESSAGE(messageId),
-      { params: { userId } }
-    );
+    await axiosInstance.delete(API_ENDPOINTS.DELETE_MESSAGE(messageId), { params: { userId } });
   },
 
   // Delete conversation (soft delete)
   deleteConversation: async (conversationId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.delete(
-      API_ENDPOINTS.DELETE_CONVERSATION(conversationId),
-      { params: { userId } }
-    );
+    await axiosInstance.delete(API_ENDPOINTS.DELETE_CONVERSATION(conversationId), {
+      params: { userId },
+    });
   },
 
   // Create group chat
-  createGroup: async (groupName: string, participantIds: string[], avatar?: string): Promise<Conversation> => {
+  createGroup: async (
+    groupName: string,
+    participantIds: string[],
+    avatar?: string
+  ): Promise<Conversation> => {
     const creatorId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.post(
       API_ENDPOINTS.CREATE_GROUP,
@@ -375,7 +377,11 @@ export const messageAPI = {
   },
 
   // Update group info
-  updateGroup: async (conversationId: string, name: string, avatar?: string): Promise<Conversation> => {
+  updateGroup: async (
+    conversationId: string,
+    name: string,
+    avatar?: string
+  ): Promise<Conversation> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.put(
       API_ENDPOINTS.UPDATE_GROUP(conversationId),
@@ -388,11 +394,9 @@ export const messageAPI = {
   // Leave group
   leaveGroup: async (conversationId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.post(
-      API_ENDPOINTS.LEAVE_GROUP(conversationId),
-      null,
-      { params: { userId } }
-    );
+    await axiosInstance.post(API_ENDPOINTS.LEAVE_GROUP(conversationId), null, {
+      params: { userId },
+    });
   },
 };
 
@@ -433,20 +437,16 @@ export const messageRequestAPI = {
 
   rejectRequest: async (requestId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.post(
-      API_ENDPOINTS.REJECT_MESSAGE_REQUEST(requestId),
-      null,
-      { params: { userId } }
-    );
+    await axiosInstance.post(API_ENDPOINTS.REJECT_MESSAGE_REQUEST(requestId), null, {
+      params: { userId },
+    });
   },
 
   ignoreRequest: async (requestId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.post(
-      API_ENDPOINTS.IGNORE_MESSAGE_REQUEST(requestId),
-      null,
-      { params: { userId } }
-    );
+    await axiosInstance.post(API_ENDPOINTS.IGNORE_MESSAGE_REQUEST(requestId), null, {
+      params: { userId },
+    });
   },
 };
 
@@ -475,25 +475,13 @@ export const notificationAPI = {
 
 // Upload API
 export const uploadAPI = {
-  uploadFile: async (
-    file: FormData,
-    type: 'profile' | 'post',
-    userId?: string
-  ): Promise<string> => {
-    let endpoint: string = API_ENDPOINTS.UPLOAD;
-    if (type === 'profile') endpoint = API_ENDPOINTS.UPLOAD_PROFILE_IMAGE;
-    if (type === 'post') endpoint = API_ENDPOINTS.UPLOAD_POST_MEDIA;
-
-    // Append userId to FormData if provided
-    if (userId) {
-      file.append('userId', userId);
-    }
-
-    const response = await axiosInstance.post(endpoint, file, {
+  uploadFile: async (file: FormData): Promise<string> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.UPLOAD_POST_MEDIA, file, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
+
     return response.data.data;
   },
 
