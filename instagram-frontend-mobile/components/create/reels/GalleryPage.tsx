@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ type GalleryAsset = {
   duration?: number;
 };
 
+type FilterType = 'recent' | 'photo' | 'video' | 'albums';
+
 type GalleryPageProps = {
   height: number;
   gallery: GalleryAsset[];
@@ -34,6 +36,8 @@ type GalleryPageProps = {
   onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollEndDrag: () => void;
   onOpenPreview: (uri: string) => void;
+  onOpenAlbumPicker?: () => void;
+  onClose: () => void;
 };
 
 export function GalleryPage({
@@ -45,10 +49,26 @@ export function GalleryPage({
   onScroll,
   onScrollEndDrag,
   onOpenPreview,
+  onOpenAlbumPicker,
+  onClose,
 }: GalleryPageProps) {
+  const [filterType, setFilterType] = useState<FilterType>('recent');
+  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
+
+  const filteredGallery = useMemo(() => {
+    switch (filterType) {
+      case 'photo':
+        return gallery.filter(asset => asset.mediaType === 'photo');
+      case 'video':
+        return gallery.filter(asset => asset.mediaType === 'video');
+      default:
+        return gallery;
+    }
+  }, [filterType, gallery]);
+
   const gridItems = [
     { type: 'camera' as const },
-    ...gallery.map(a => ({ type: 'asset' as const, item: a })),
+    ...filteredGallery.map(a => ({ type: 'asset' as const, item: a })),
   ];
 
   const rows: (typeof gridItems)[] = [];
@@ -56,10 +76,39 @@ export function GalleryPage({
     rows.push(gridItems.slice(i, i + 3));
   }
 
+  const handleFilterSelect = useCallback(
+    (nextFilter: FilterType) => {
+      setFilterMenuVisible(false);
+      if (nextFilter === 'albums') {
+        onOpenAlbumPicker?.();
+        return;
+      }
+      setFilterType(nextFilter);
+    },
+    [onOpenAlbumPicker]
+  );
+
+  const handleAssetPress = (asset: GalleryAsset) => {
+    onOpenPreview(asset.uri);
+  };
+
+  const getFilterLabel = () => {
+    switch (filterType) {
+      case 'photo':
+        return <Text style={styles.subHeaderText}>Ảnh</Text>;
+      case 'video':
+        return <Text style={styles.subHeaderText}>Video</Text>;
+      case 'albums':
+        return <Text style={styles.subHeaderText}>Tất cả album</Text>;
+      default:
+        return <Text style={styles.subHeaderText}>Mới đây</Text>;
+    }
+  };
+
   return (
     <View style={[styles.page, { height }]}>
       <View style={styles.galleryHeaderBar}>
-        <TouchableOpacity style={styles.closeBtn} onPress={onGoToCamera}>
+        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
 
@@ -70,30 +119,54 @@ export function GalleryPage({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.galleryActionRow}>
-        <View style={styles.galleryChip}>
-          <Ionicons name="logo-instagram" size={18} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.galleryChipText}>Edits</Text>
-        </View>
-
-        <View style={styles.galleryChip}>
-          <Ionicons name="scan-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.galleryChipText}>Bản nháp</Text>
-        </View>
-
-        <View style={styles.galleryChip}>
-          <Ionicons name="copy-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.galleryChipText}>Mẫu</Text>
-        </View>
-      </View>
-
       <View style={styles.gallerySubHeaderRow}>
-        <Text style={styles.subHeaderText}>Mới đây ▼</Text>
-
-        <TouchableOpacity style={styles.squareSelectBtn}>
-          <Ionicons name="checkbox-outline" size={20} color="#fff" />
+        <TouchableOpacity
+          style={styles.filterDropdown}
+          onPress={() => setFilterMenuVisible(prev => !prev)}
+        >
+          {getFilterLabel()}
+          <Ionicons
+            name={filterMenuVisible ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color="#fff"
+          />
         </TouchableOpacity>
       </View>
+
+      {filterMenuVisible && (
+        <View pointerEvents="box-none" style={styles.filterMenuOverlay}>
+          <View style={styles.filterMenu}>
+            <TouchableOpacity
+              style={styles.filterMenuItem}
+              onPress={() => handleFilterSelect('recent')}
+            >
+              <Ionicons name="time-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.filterMenuText}>Mới đây</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.filterMenuItem}
+              onPress={() => handleFilterSelect('photo')}
+            >
+              <Ionicons name="image-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.filterMenuText}>Ảnh</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.filterMenuItem}
+              onPress={() => handleFilterSelect('video')}
+            >
+              <Ionicons name="videocam-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.filterMenuText}>Video</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.filterMenuItem}
+              onPress={() => handleFilterSelect('albums')}
+            >
+              <Ionicons name="albums-outline" size={16} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.filterMenuText}>Tất cả ảnh</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {loadingGallery ? (
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
@@ -134,13 +207,14 @@ export function GalleryPage({
                     key={asset.id ?? `cell-${rowIdx}-${cellIdx}`}
                     style={[styles.tileBase, styles.assetWrapper]}
                     activeOpacity={0.8}
-                    onPress={() => onOpenPreview(asset.uri)}
+                    onPress={() => handleAssetPress(asset)}
                   >
                     <Image
                       source={{ uri: asset.uri }}
                       style={styles.assetThumb}
                       resizeMode="cover"
                     />
+
                     {asset.mediaType === 'video' && (
                       <View style={styles.durationBadge}>
                         <Ionicons
@@ -166,7 +240,7 @@ export function GalleryPage({
             </View>
           ))}
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 140 }} />
         </ScrollView>
       )}
     </View>
@@ -185,6 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     paddingTop: 16,
     paddingHorizontal: 12,
+    position: 'relative',
   },
 
   galleryHeaderBar: {
@@ -214,49 +289,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  galleryActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-    columnGap: 8,
-    rowGap: 8,
-  },
-  galleryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  galleryChipText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
   gallerySubHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     justifyContent: 'space-between',
   },
+  filterDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 6,
+  },
   subHeaderText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
   },
-  squareSelectBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  filterMenuOverlay: {
+    position: 'absolute',
+    top: 110,
+    left: 12,
+    right: 12,
+    zIndex: 10,
+  },
+  filterMenu: {
     backgroundColor: '#1a1a1a',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    width: '50%',
+  },
+  filterMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+  },
+  filterMenuText: {
+    color: '#fff',
+    fontSize: 16,
   },
 
   galleryGridScroll: {

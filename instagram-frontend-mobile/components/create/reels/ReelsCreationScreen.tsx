@@ -1,3 +1,4 @@
+// ReelsCreationScreen.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -6,6 +7,8 @@ import {
   ScrollView,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Alert,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -16,12 +19,12 @@ import {
   FlashMode,
 } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 
 import { GalleryPage } from './GalleryPage';
-
-import { Dimensions } from 'react-native';
-import { CameraPage } from '@/components/create/reels/CameraPage';
+import { CameraPage } from './CameraPage';
+import { PreviewEditOverlay } from './PreviewEditOverlay';
 
 const { height: FULL_HEIGHT, width: FULL_WIDTH } = Dimensions.get('screen');
 
@@ -39,10 +42,8 @@ export default function ReelsCreationScreen() {
   const cameraRef = useRef<CameraView | null>(null);
 
   const dragStartYRef = useRef<number>(0);
-
   const galleryDragStartYRef = useRef<number>(0);
   const galleryScrollYRef = useRef<number>(0);
-
   const isProgrammaticRef = useRef<boolean>(false);
 
   const [camPermission, requestCamPermission] = useCameraPermissions();
@@ -60,10 +61,11 @@ export default function ReelsCreationScreen() {
   const [loadingGallery, setLoadingGallery] = useState(true);
 
   const [lastOffsetY, setLastOffsetY] = useState(0);
-
   const [isOnCameraPage, setIsOnCameraPage] = useState(true);
-
   const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
+
+  const [isCameraReady, setIsCameraReady] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -93,10 +95,9 @@ export default function ReelsCreationScreen() {
           duration: a.duration,
         }));
 
-        const videoCount = mapped.filter(a => a.mediaType === 'video').length;
-
         setGallery(mapped);
       } catch (err) {
+        console.error('Load gallery error:', err);
       } finally {
         setLoadingGallery(false);
       }
@@ -105,29 +106,53 @@ export default function ReelsCreationScreen() {
 
   const handleRecordPress = useCallback(async () => {
     const cam = cameraRef.current;
-    if (!cam) return;
+
+    if (!cam) {
+      console.log('No camera ref yet');
+      return;
+    }
+
+    if (!isCameraReady) {
+      console.log('Camera not ready yet');
+      return;
+    }
 
     if (recordState === 'idle' || recordState === 'postrecord') {
       try {
+        console.log('Start recording...');
         setRecordState('recording');
 
-        const videoData = await cam.recordAsync({ maxDuration: 60 });
+        const video = await cam.recordAsync({
+          maxDuration: 60,
+        });
 
-        if (videoData?.uri) {
-          setLastClipUri(videoData.uri);
-          try {
-            await MediaLibrary.saveToLibraryAsync(videoData.uri);
-          } catch (saveErr) {}
+        console.log('recordAsync resolved: ', video);
+
+        if (video?.uri) {
+          setLastClipUri(video.uri);
+          setRecordState('postrecord');
+          setShowPreview(true);
+        } else {
+          setRecordState('idle');
         }
-
-        setRecordState('postrecord');
-      } catch (err) {
+      } catch (err: any) {
+        console.log('Recording error:', err);
+        const msg = String(err?.message || err);
+        if (!msg.includes('Recording was stopped before any data could be produced')) {
+          Alert.alert('Lỗi', 'Không quay được video. Vui lòng thử lại.');
+        }
         setRecordState('idle');
       }
     } else if (recordState === 'recording') {
-      cam.stopRecording();
+      try {
+        console.log('Stop recording...');
+        cam.stopRecording();
+      } catch (err) {
+        console.log('Stop recording error:', err);
+        setRecordState('idle');
+      }
     }
-  }, [recordState]);
+  }, [recordState, isCameraReady]);
 
   const handleUndo = useCallback(() => {
     setRecordState('idle');
@@ -135,11 +160,12 @@ export default function ReelsCreationScreen() {
   }, []);
 
   const openPreview = useCallback(
-    (uri: string) => {
+    (uri: string, forcedType?: 'photo' | 'video') => {
       const asset = gallery.find(a => a.uri === uri);
-      const mediaType = asset?.mediaType === 'video' ? 'video' : 'photo';
+      const mediaType = forcedType ?? (asset?.mediaType === 'video' ? 'video' : 'photo');
+
       router.push({
-        pathname: '/create/reels/preview',
+        pathname: '/create/reels/post',
         params: { mediaUri: uri, mediaType },
       });
     },
@@ -148,7 +174,7 @@ export default function ReelsCreationScreen() {
 
   const handleNext = useCallback(() => {
     if (lastClipUri) {
-      openPreview(lastClipUri);
+      openPreview(lastClipUri, 'video');
     }
   }, [lastClipUri, openPreview]);
 
@@ -163,7 +189,6 @@ export default function ReelsCreationScreen() {
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     setLastOffsetY(offsetY);
-
     setIsOnCameraPage(offsetY < FULL_HEIGHT / 2);
   };
 
@@ -172,35 +197,11 @@ export default function ReelsCreationScreen() {
     isProgrammaticRef.current = false;
   };
 
-  const trySnapCameraPage = useCallback(() => {
-    if (!parentScrollEnabled) return;
-    if (isProgrammaticRef.current) {
-      isProgrammaticRef.current = false;
-      return;
-    }
-    if (!scrollViewRef.current) return;
-
-    const startY = dragStartYRef.current;
-    const endY = lastOffsetY;
-    const delta = endY - startY;
-
-    const MIN_SWIPE = 2;
-
-    if (delta > MIN_SWIPE) {
-      goToGallery();
-    } else {
-      goToCamera();
-    }
-  }, [lastOffsetY, parentScrollEnabled]);
-
   const goToGallery = useCallback(() => {
     if (!scrollViewRef.current) return;
     isProgrammaticRef.current = true;
     setParentScrollEnabled(false);
-    scrollViewRef.current.scrollTo({
-      y: FULL_HEIGHT,
-      animated: true,
-    });
+    scrollViewRef.current.scrollTo({ y: FULL_HEIGHT, animated: true });
     setLastOffsetY(FULL_HEIGHT);
   }, []);
 
@@ -208,12 +209,27 @@ export default function ReelsCreationScreen() {
     if (!scrollViewRef.current) return;
     isProgrammaticRef.current = true;
     setParentScrollEnabled(true);
-    scrollViewRef.current.scrollTo({
-      y: 0,
-      animated: true,
-    });
+    scrollViewRef.current.scrollTo({ y: 0, animated: true });
     setLastOffsetY(0);
   }, []);
+
+  const trySnapCameraPage = useCallback(() => {
+    if (!parentScrollEnabled) return;
+    if (isProgrammaticRef.current) {
+      isProgrammaticRef.current = false;
+      return;
+    }
+    const startY = dragStartYRef.current;
+    const endY = lastOffsetY;
+    const delta = endY - startY;
+    const MIN_SWIPE = 2;
+
+    if (delta > MIN_SWIPE) {
+      goToGallery();
+    } else {
+      goToCamera();
+    }
+  }, [lastOffsetY, parentScrollEnabled, goToCamera, goToGallery]);
 
   const handleGalleryBeginDrag = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     galleryDragStartYRef.current = e.nativeEvent.contentOffset.y;
@@ -244,6 +260,42 @@ export default function ReelsCreationScreen() {
     }
   }, [goToCamera]);
 
+  const handleOpenAlbumPicker = useCallback(async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsEditing: false,
+        allowsMultipleSelection: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const mediaType = asset.type === 'video' ? 'video' : 'photo';
+        openPreview(asset.uri, mediaType);
+      }
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể mở thư viện ảnh');
+    }
+  }, [openPreview]);
+
+  const handleClose = useCallback(() => {
+    router.push('/(tabs)/feed');
+  }, [router]);
+
+  const handlePreviewBack = useCallback(() => {
+    setShowPreview(false);
+    setRecordState('idle');
+    setLastClipUri(null);
+  }, []);
+
+  const handlePreviewNext = useCallback(() => {
+    setShowPreview(false);
+    if (lastClipUri) {
+      openPreview(lastClipUri, 'video');
+    }
+  }, [lastClipUri, openPreview]);
+
   if (!camPermission || !micPermission) {
     return (
       <View style={styles.centerScreen}>
@@ -262,10 +314,20 @@ export default function ReelsCreationScreen() {
     );
   }
 
+  if (showPreview && lastClipUri) {
+    return (
+      <PreviewEditOverlay
+        uri={lastClipUri}
+        mediaType="video"
+        onClose={handlePreviewBack}
+        onNext={handlePreviewNext}
+      />
+    );
+  }
+
   return (
     <View style={styles.root}>
       <StatusBar hidden style="light" />
-
       <ScrollView
         ref={scrollViewRef}
         style={styles.scroll}
@@ -299,6 +361,12 @@ export default function ReelsCreationScreen() {
           onUndo={handleUndo}
           onNext={handleNext}
           onGoToGallery={goToGallery}
+          onClose={handleClose}
+          // NEW: khi camera ready
+          onCameraReady={() => {
+            console.log('Camera is ready');
+            setIsCameraReady(true);
+          }}
         />
 
         <GalleryPage
@@ -310,6 +378,8 @@ export default function ReelsCreationScreen() {
           onScroll={handleGalleryScroll}
           onScrollEndDrag={handleGalleryEndDrag}
           onOpenPreview={openPreview}
+          onOpenAlbumPicker={handleOpenAlbumPicker}
+          onClose={handleClose}
         />
       </ScrollView>
     </View>

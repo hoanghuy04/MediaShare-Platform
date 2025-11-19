@@ -100,6 +100,12 @@ export function SharePage({
 
     setIsSharing(true);
     try {
+      console.log('Starting share process...');
+      console.log('Selected assets:', selectedAssets);
+      console.log('Caption:', caption);
+      console.log('User:', user);
+
+      // Validate video formats before uploading
       const unsupportedVideos = selectedAssets.filter(asset => !validateVideoFormat(asset));
       if (unsupportedVideos.length > 0) {
         Alert.alert(

@@ -9,7 +9,6 @@ import {
   ScrollView,
   Dimensions,
   SafeAreaView,
-  Switch,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -116,7 +115,6 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
       } as any);
 
       const mediaUrl = await uploadAPI.uploadFile(formData, 'post', user.id);
-
       const hashtags = extractHashtags(caption);
 
       const postData = {
@@ -229,37 +227,6 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
             ) : (
               <Image source={{ uri: mediaUri }} style={styles.previewMedia} resizeMode="cover" />
             )}
-
-            <View style={styles.editTools}>
-              <View style={styles.toolBtn}>
-                <Ionicons name="musical-notes" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Text style={styles.toolBtnText}>Aa</Text>
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="happy-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="sparkles-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="images-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="mic-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="cut-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="ellipsis-horizontal" size={18} color="#fff" />
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.editCoverBtn}>
-              <Text style={styles.editCoverText}>Chỉnh sửa ảnh bìa</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -280,21 +247,6 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
           <TouchableOpacity style={styles.chip} onPress={handleHashtagPress}>
             <Text style={styles.chipIconText}>#</Text>
             <Text style={styles.chipText}>Hashtag</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip}>
-            <Ionicons
-              name="reorder-three-outline"
-              size={16}
-              color="#444"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.chipText}>Cuộc thăm dò ý kiến</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip}>
-            <Ionicons name="search-outline" size={16} color="#444" style={{ marginRight: 6 }} />
-            <Text style={styles.chipText}>Gợi ý</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.chip}>
@@ -352,25 +304,6 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
             <Ionicons name="chevron-forward" size={22} color="#999" />
           </TouchableOpacity>
         )}
-
-        <View style={[styles.rowPressable, { borderBottomWidth: 0 }]}>
-          <View style={[styles.rowLeft, { flex: 1 }]}>
-            <Ionicons name="copy-outline" size={24} color="#000" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowMainText}>Thêm nhãn AI</Text>
-              <Text style={styles.rowSubText}>
-                Chúng tôi yêu cầu bạn gắn nhãn cho một số nội dung nhất định tạo bằng AI.
-              </Text>
-            </View>
-          </View>
-
-          <Switch
-            value={aiTagEnabled}
-            onValueChange={setAiTagEnabled}
-            trackColor={{ false: '#d1d1d1', true: '#4264ff' }}
-            thumbColor={'#fff'}
-          />
-        </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
@@ -400,15 +333,6 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
             )}
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={styles.learnMoreTouch}
-          onPress={() => {
-            console.log('Tìm hiểu thêm về Reels');
-          }}
-        >
-          <Text style={styles.learnMoreText}>Tìm hiểu thêm về Reels.</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -459,45 +383,6 @@ const styles = StyleSheet.create({
   previewMedia: {
     width: '100%',
     height: '100%',
-  },
-
-  editTools: {
-    position: 'absolute',
-    top: 8,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-  },
-  toolBtn: {
-    minWidth: 28,
-    minHeight: 28,
-    borderRadius: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  editCoverBtn: {
-    position: 'absolute',
-    bottom: 12,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  editCoverText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
 
   captionSection: {
@@ -563,14 +448,8 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '400',
   },
-  rowSubText: {
-    fontSize: 14,
-    color: '#6b6b6b',
-    lineHeight: 20,
-    marginTop: 4,
-  },
 
-  // --- block vị trí đã chọn (màu xanh dương) ---
+  // vị trí đã chọn
   locationSelectedWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -653,14 +532,5 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
-  },
-  learnMoreTouch: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  learnMoreText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4264ff',
   },
 });

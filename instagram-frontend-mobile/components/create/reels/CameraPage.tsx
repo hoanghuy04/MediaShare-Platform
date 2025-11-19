@@ -4,8 +4,6 @@ import { CameraView, CameraType, FlashMode } from 'expo-camera';
 
 import { TopOverlay } from './TopOverlay';
 import { BottomOverlay } from './BottomOverlay';
-import { LeftToolbar } from './LeftToolbar';
-
 import type * as MediaLibrary from 'expo-media-library';
 
 type GalleryAsset = {
@@ -33,27 +31,33 @@ type CameraPageProps = {
   onUndo: () => void;
   onNext: () => void;
   onGoToGallery: () => void;
+  onClose: () => void;
+  onCameraReady: () => void;
 };
 
-export function CameraPage({
-  height,
-  width,
-  cameraRef,
-  cameraType,
-  flash,
-  zoomLevel,
-  recordState,
-  lastClipUri,
-  gallery,
-  isVisible,
-  onToggleFlash,
-  onAvatarPress,
-  onRecordPress,
-  onToggleCameraType,
-  onUndo,
-  onNext,
-  onGoToGallery,
-}: CameraPageProps) {
+export function CameraPage(props: CameraPageProps) {
+  const {
+    height,
+    width,
+    cameraRef,
+    cameraType,
+    flash,
+    zoomLevel,
+    recordState,
+    lastClipUri,
+    gallery,
+    isVisible,
+    onToggleFlash,
+    onAvatarPress,
+    onRecordPress,
+    onToggleCameraType,
+    onUndo,
+    onNext,
+    onGoToGallery,
+    onClose,
+    onCameraReady,
+  } = props;
+
   return (
     <View style={[styles.page, { height, width }]}>
       <CameraView
@@ -62,6 +66,9 @@ export function CameraPage({
         facing={cameraType}
         flash={flash}
         zoom={zoomLevel}
+        // NEW: quay video
+        mode="video"
+        onCameraReady={onCameraReady}
       />
 
       {isVisible && (
@@ -72,9 +79,8 @@ export function CameraPage({
             lastClipUri={lastClipUri}
             onToggleFlash={onToggleFlash}
             onAvatarPress={onAvatarPress}
+            onClose={onClose}
           />
-
-          <LeftToolbar visible={recordState !== 'recording'} />
 
           <BottomOverlay
             recordState={recordState}

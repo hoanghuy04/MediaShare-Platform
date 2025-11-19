@@ -48,26 +48,6 @@ export function TopOverlay({
         <TouchableOpacity onPress={onToggleFlash} style={styles.roundBubbleDark}>
           <Ionicons name={flash === 'on' ? 'flash' : 'flash-off'} size={20} color="#fff" />
         </TouchableOpacity>
-
-        <View style={styles.roundBubbleDark}>
-          <Text style={styles.topPillText}>1×</Text>
-        </View>
-
-        <View style={styles.roundBubbleDark}>
-          <Ionicons name="time-outline" size={20} color="#fff" />
-        </View>
-      </View>
-
-      <View style={styles.topRight}>
-        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={styles.avatarBubble}>
-          <View style={styles.avatarBadge}>
-            <Text style={styles.avatarBadgeText}>2</Text>
-          </View>
-          <Image
-            source={lastClipUri ? { uri: lastClipUri } : { uri: 'https://placekitten.com/200/200' }}
-            style={styles.avatarInner}
-          />
-        </TouchableOpacity>
       </View>
     </View>
   );

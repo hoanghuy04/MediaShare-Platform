@@ -35,23 +35,6 @@ export const PreviewEditOverlay: React.FC<PreviewEditOverlayProps> = ({
         <TouchableOpacity style={styles.topBubble} onPress={onClose}>
           <Ionicons name="close" size={28} color="#fff" />
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.soundInfo}>
-          <Image source={{ uri: uri }} style={styles.soundAvatar} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.soundTitle} numberOfLines={1}>
-              Khám phá âm thanh
-            </Text>
-            <Text style={styles.soundSubtitle} numberOfLines={1}>
-              Nhấn để lướt xem
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.topBubble}>
-          <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.mediaArea}>
@@ -71,26 +54,7 @@ export const PreviewEditOverlay: React.FC<PreviewEditOverlayProps> = ({
       </View>
 
       <View style={styles.bottomSheet}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.iconRow}
-        >
-          <ActionIcon name="musical-notes-outline" label=" " />
-          <ActionIcon name="text-outline" label=" " fallback="Aa" />
-          <ActionIcon name="happy-outline" label=" " />
-          <ActionIcon name="sparkles-outline" label=" " />
-          <ActionIcon name="copy-outline" label=" " />
-          <ActionIcon name="mic-outline" label=" " />
-          <ActionIcon name="videocam-outline" label=" " />
-          <ActionIcon name="add-outline" label=" " />
-        </ScrollView>
-
         <View style={styles.bottomRow}>
-          <TouchableOpacity style={styles.editBtn}>
-            <Text style={styles.editBtnText}>Chỉnh sửa video</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.nextBtn} onPress={onNext}>
             <Text style={styles.nextBtnText}>Tiếp</Text>
             <Ionicons name="chevron-forward" size={18} color="#fff" />
@@ -188,6 +152,7 @@ const styles = StyleSheet.create({
   bottomSheet: {
     backgroundColor: '#000',
     paddingBottom: 24,
+    paddingTop: 12,
   },
 
   iconRow: {
@@ -215,7 +180,7 @@ const styles = StyleSheet.create({
 
   bottomRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: 16,
   },
 
