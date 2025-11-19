@@ -1,22 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Image,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   TouchableOpacity,
   Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type * as MediaLibrary from 'expo-media-library';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_GAP = 2;
 const TILE_SIZE = (SCREEN_WIDTH - 24 - TILE_GAP * 2) / 3;
-
-import type * as MediaLibrary from 'expo-media-library';
 
 type GalleryAsset = {
   id: string;
@@ -32,12 +31,14 @@ type GalleryPageProps = {
   gallery: GalleryAsset[];
   loadingGallery: boolean;
   onGoToCamera: () => void;
-  onScrollBeginDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
-  onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
-  onScrollEndDrag: () => void;
   onOpenPreview: (uri: string) => void;
   onOpenAlbumPicker?: () => void;
   onClose: () => void;
+
+  // 👇 thêm lại 3 callback để parent (ReelsCreationScreen) bắt được gesture
+  onScrollBeginDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  onScrollEndDrag: () => void;
 };
 
 export function GalleryPage({
@@ -45,12 +46,12 @@ export function GalleryPage({
   gallery,
   loadingGallery,
   onGoToCamera,
-  onScrollBeginDrag,
-  onScroll,
-  onScrollEndDrag,
   onOpenPreview,
   onOpenAlbumPicker,
   onClose,
+  onScrollBeginDrag,
+  onScroll,
+  onScrollEndDrag,
 }: GalleryPageProps) {
   const [filterType, setFilterType] = useState<FilterType>('recent');
   const [filterMenuVisible, setFilterMenuVisible] = useState(false);
@@ -178,6 +179,8 @@ export function GalleryPage({
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           bounces={false}
+          nestedScrollEnabled
+          // 👇 forward các event cho ReelsCreationScreen xử lý kéo lên/kéo xuống
           onScrollBeginDrag={onScrollBeginDrag}
           onScroll={onScroll}
           onScrollEndDrag={onScrollEndDrag}

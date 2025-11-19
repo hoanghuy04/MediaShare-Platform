@@ -5,30 +5,29 @@ import { PreviewEditOverlay } from '../../../components/create/reels/PreviewEdit
 export default function ReelsPreviewPage() {
   const router = useRouter();
   const params = useLocalSearchParams<{
-    mediaUri?: string;
+    videoUri?: string;
     mediaType?: 'photo' | 'video';
   }>();
 
-  const mediaUri = typeof params.mediaUri === 'string' ? params.mediaUri : '';
-
+  const videoUri = typeof params.videoUri === 'string' ? params.videoUri : '';
   const rawType = params.mediaType;
   const mediaType: 'photo' | 'video' =
     rawType === 'video' || rawType === 'photo' ? rawType : 'video';
 
-  if (!mediaUri) {
+  if (!videoUri) {
     router.back();
     return null;
   }
 
   return (
     <PreviewEditOverlay
-      uri={mediaUri}
+      uri={videoUri}
       mediaType={mediaType}
       onClose={() => router.back()}
       onNext={() => {
         router.push({
           pathname: '/create/reels/post',
-          params: { mediaUri, mediaType },
+          params: { mediaUri: videoUri, mediaType },
         });
       }}
     />

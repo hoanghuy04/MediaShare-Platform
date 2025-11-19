@@ -10,28 +10,21 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import ReelsCreationScreen from './reels/ReelsCreationScreen';
 import PostCreationScreen from './posts/PostCreationScreen';
-
+import { ReelsCreationScreen } from './reels';
 
 const { width } = Dimensions.get('window');
 
 type TabType = 'post' | 'story' | 'reels';
 
 interface CreateTabbedFlowProps {
-  onPostCreated?: () => void; // Callback để refresh feed
+  onPostCreated?: () => void;
 }
 
 export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreated }) => {
   const [activeTab, setActiveTab] = useState<TabType>('post');
   const [postStep, setPostStep] = useState(1);
   const [tabsHidden, setTabsHidden] = useState(false);
-
-  // useFocusEffect(
-  //   React.useCallback(() => {
-  //     setActiveTab('post');
-  //   }, [])
-  // );
 
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
@@ -49,8 +42,14 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
 
   const renderContent = () => {
     switch (activeTab) {
-        case 'post':
-          return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} onPostCreated={onPostCreated} />;
+      case 'post':
+        return (
+          <PostCreationScreen
+            onClose={() => setActiveTab('story')}
+            onStepChange={handlePostStepChange}
+            onPostCreated={onPostCreated}
+          />
+        );
       case 'story':
         return (
           <View style={styles.placeholder}>
@@ -58,9 +57,14 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
           </View>
         );
       case 'reels':
-        return <ReelsCreationScreen onMultiSelectModeChange={setTabsHidden} />;
+        return <ReelsCreationScreen />;
       default:
-        return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} />;
+        return (
+          <PostCreationScreen
+            onClose={() => setActiveTab('story')}
+            onStepChange={handlePostStepChange}
+          />
+        );
     }
   };
 

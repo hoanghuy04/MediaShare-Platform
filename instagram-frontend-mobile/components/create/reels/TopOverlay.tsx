@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FlashMode } from 'expo-camera';
 
 type TopOverlayProps = {
-  recordState: 'idle' | 'recording' | 'postrecord';
-  flash: FlashMode;
-  lastClipUri: string | null;
+  recordState: 'idle' | 'recording';
+  torch: boolean;
   onToggleFlash: () => void;
   onAvatarPress: () => void;
   onClose?: () => void;
@@ -14,8 +12,7 @@ type TopOverlayProps = {
 
 export function TopOverlay({
   recordState,
-  flash,
-  lastClipUri,
+  torch,
   onToggleFlash,
   onAvatarPress,
   onClose,
@@ -27,10 +24,7 @@ export function TopOverlay({
           <View style={styles.avatarBadge}>
             <Text style={styles.avatarBadgeText}>2</Text>
           </View>
-          <Image
-            source={lastClipUri ? { uri: lastClipUri } : { uri: 'https://placekitten.com/200/200' }}
-            style={styles.avatarInner}
-          />
+          <Image source={{ uri: 'https://placekitten.com/200/200' }} style={styles.avatarInner} />
         </TouchableOpacity>
       </View>
     );
@@ -46,7 +40,7 @@ export function TopOverlay({
 
       <View style={styles.topCenterGroup}>
         <TouchableOpacity onPress={onToggleFlash} style={styles.roundBubbleDark}>
-          <Ionicons name={flash === 'on' ? 'flash' : 'flash-off'} size={20} color="#fff" />
+          <Ionicons name={torch ? 'flash' : 'flash-off'} size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
