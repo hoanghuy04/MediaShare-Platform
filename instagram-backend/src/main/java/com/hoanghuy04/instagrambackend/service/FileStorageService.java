@@ -5,6 +5,7 @@ import com.hoanghuy04.instagrambackend.enums.FileType;
 import com.hoanghuy04.instagrambackend.exception.FileUploadException;
 import com.hoanghuy04.instagrambackend.repository.MediaFileRepository;
 import com.hoanghuy04.instagrambackend.util.FileUtil;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +33,8 @@ public class FileStorageService {
 
     private final MediaFileRepository mediaFileRepository;
 
+    private final SecurityUtil securityUtil;
+
     @Value("${file.upload-dir}")
     private String uploadDir;
 
@@ -48,12 +51,12 @@ public class FileStorageService {
      * Upload a file.
      *
      * @param file the file to upload
-     * @param userId the user ID uploading the file
      * @param fileType the type of file being uploaded
      * @return the file path
      */
     @Transactional
-    public String uploadFile(MultipartFile file, String userId, FileType fileType) {
+    public String uploadFile(MultipartFile file, FileType fileType) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Uploading file for user: {}", userId);
 
         if (file.isEmpty()) {
@@ -93,12 +96,12 @@ public class FileStorageService {
      * Upload multiple files.
      *
      * @param files the list of files to upload
-     * @param userId the user ID uploading the files
      * @param fileType the type of files being uploaded
      * @return the list of file paths
      */
     @Transactional
-    public List<String> uploadMultipleFiles(List<MultipartFile> files, String userId, FileType fileType) {
+    public List<String> uploadMultipleFiles(List<MultipartFile> files, FileType fileType) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Uploading {} files for user: {}", files.size(), userId);
 
         if (files == null || files.isEmpty()) {
@@ -109,7 +112,7 @@ public class FileStorageService {
 
         for (MultipartFile file : files) {
             if (!file.isEmpty()) {
-                String filePath = uploadFile(file, userId, fileType);
+                String filePath = uploadFile(file, fileType);
                 filePaths.add(filePath);
             }
         }

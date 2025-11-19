@@ -29,7 +29,7 @@ public class FileUtil {
             "mp4", "mov", "avi", "wmv", "flv", "mkv"
     );
     
-    private static final long DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final long DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     
     private FileUtil() {
         throw new UnsupportedOperationException("Utility class cannot be instantiated");
