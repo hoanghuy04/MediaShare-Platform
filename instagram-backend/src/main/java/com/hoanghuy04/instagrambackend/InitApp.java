@@ -118,8 +118,8 @@ public class InitApp implements CommandLineRunner {
         List<User> users = new ArrayList<>();
         
         String[][] userData = {
-            {"john_doe", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
-            {"jane_smith", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
+            {"tnhxinhdep", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
+            {"tnh", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
             {"mike_wilson", "mike@example.com", "Mike", "Wilson", "Fitness coach 💪", "", "Miami, FL"},
             {"sarah_jones", "sarah@example.com", "Sarah", "Jones", "Food lover 🍕", "", "Chicago, IL"},
             {"alex_brown", "alex@example.com", "Alex", "Brown", "Tech enthusiast 💻", "", "Seattle, WA"},
@@ -141,7 +141,7 @@ public class InitApp implements CommandLineRunner {
             User user = User.builder()
                     .username(data[0])
                     .email(data[1])
-                    .password(passwordEncoder.encode("password123"))
+                    .password(passwordEncoder.encode("123"))
                     .profile(profile)
                     .roles(Set.of(UserRole.USER))
                     .isPrivate(Math.random() < 0.3) // 30% chance of private account

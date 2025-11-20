@@ -7,6 +7,7 @@ import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.enums.PostType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
@@ -138,6 +139,21 @@ public class PostService {
         followingIds.add(userId);
         Page<PostResponse> page = postRepository.findAll(pageable)
                 .map(this::convertToPostResponse);
+        return PageResponse.of(page);
+    }
+
+    /**
+     * Get feed posts for user (posts from followed users).
+     *
+     * @param pageable pagination information
+     * @return PageResponse of PostResponse
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
+
+        Page<PostResponse> page = postRepository.findByType(type, pageable)
+                .map(this::convertToPostResponse);
+
         return PageResponse.of(page);
     }
 

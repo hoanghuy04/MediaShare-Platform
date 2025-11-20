@@ -51,6 +51,7 @@ export const API_ENDPOINTS = {
   USER_POSTS: (userId: string) => `/api/posts/user/${userId}`,
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',
+  REELS: '/api/posts/reels',
 
   // Comments (khớp với backend: /comments/*)
   COMMENTS: (postId: string) => `/api/comments/post/${postId}`,

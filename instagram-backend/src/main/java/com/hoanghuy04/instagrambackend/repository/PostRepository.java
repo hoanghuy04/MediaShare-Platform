@@ -2,6 +2,7 @@ package com.hoanghuy04.instagrambackend.repository;
 
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.enums.PostType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -62,5 +63,7 @@ public interface PostRepository extends MongoRepository<Post, String> {
      * @return number of posts by the author
      */
     long countByAuthor(User author);
+
+    Page<Post> findByType(PostType postType, Pageable pageable);
 }
 

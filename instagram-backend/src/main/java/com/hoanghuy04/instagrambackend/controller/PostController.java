@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.request.CreatePostRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
+import com.hoanghuy04.instagrambackend.enums.PostType;
 import com.hoanghuy04.instagrambackend.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -115,7 +116,21 @@ public class PostController {
         PageResponse<PostResponse> response = postService.getFeedPosts(pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-    
+
+    /**
+     * Get user's feed.
+     *
+     * @param pageable pagination information
+     * @return ResponseEntity with PageResponse of PostResponse
+     */
+    @GetMapping("/reels")
+    public PageResponse<PostResponse> getReels(
+            Pageable pageable
+    ) {
+        return postService.getPostsByType(PostType.REEL, pageable);
+    }
+
+
     /**
      * Get explore posts.
      *

@@ -1,55 +1,20 @@
-import ReelList from '@/components/reels/ReelList';
+import { StyleSheet, View } from 'react-native';
 import React from 'react';
-import { View, Text, Dimensions, StyleSheet } from 'react-native';
+import ReelComponent from '../../components/reels/ReelComponent';
 
-const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
-
-export default function ReelScreen() {
+const Reels = () => {
   return (
     <View style={styles.container}>
-      <View style={styles.headerWrapper}>
-        <Text style={styles.headerTitle}>Reels</Text>
-        {/* <Feather name="camera" style={styles.headerIcon} /> */}
-      </View>
-
-      {/* DANH SÁCH VIDEO */}
-      <ReelList />
+      <ReelComponent />
     </View>
   );
-}
+};
+
+export default Reels;
 
 const styles = StyleSheet.create({
   container: {
-    width: windowWidth,
-    height: windowHeight,
+    flex: 1,
     backgroundColor: 'black',
-    position: 'relative',
-  },
-  headerWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 1,
-    padding: 10,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  headerIcon: {
-    fontSize: 25,
-    color: 'white',
-  },
-  createPostButton: {
-    marginLeft: 'auto',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#3897f0',
-    borderRadius: 20,
   },
 });

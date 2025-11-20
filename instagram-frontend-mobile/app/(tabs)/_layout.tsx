@@ -41,7 +41,20 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reels"
         options={{
-          tabBarIcon: ({ color, size }) => <Ionicons name="play" size={size} color={color} />,
+          tabBarStyle: {
+            backgroundColor: 'black',
+            borderTopWidth: 0,
+          },
+          tabBarActiveTintColor: 'white',
+          tabBarInactiveTintColor: '#888',
+
+          tabBarIcon: ({ focused, size }) => (
+            <Ionicons
+              name={focused ? 'play' : 'play-outline'}
+              size={size}
+              color={focused ? 'white' : '#888'}
+            />
+          ),
         }}
       />
       <Tabs.Screen

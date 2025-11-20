@@ -1,7 +1,8 @@
+import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
 import { PaginatedResponse, Post } from '../types';
-import { CreatePostRequest } from '../types/post.type';
+import { CreatePostRequest, PostResponse } from '../types/post.type';
 
 export const postService = {
   getFeed: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
@@ -9,6 +10,14 @@ export const postService = {
       params: { page, limit },
     });
     return response.data.data;
+  },
+
+  getReels: async (page = 0, limit = 20): Promise<PaginatedResponse<PostResponse>> => {
+    const response = await axiosInstance.get<PaginatedResponse<PostResponse>>(API_ENDPOINTS.REELS, {
+      params: { page, limit },
+    });
+    console.log('Reels response data:', response.data);
+    return response.data;
   },
 
   getExplorePosts: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
