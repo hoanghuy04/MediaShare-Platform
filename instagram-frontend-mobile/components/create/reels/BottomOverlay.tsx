@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, G } from 'react-native-svg';
 import type * as MediaLibrary from 'expo-media-library';
 
 type GalleryAsset = {
@@ -59,6 +59,7 @@ export function BottomOverlay({
   });
 
   const lastThumb = gallery[0];
+  const center = size / 2;
 
   return (
     <View style={styles.bottomRoot}>
@@ -74,17 +75,19 @@ export function BottomOverlay({
 
       <TouchableOpacity activeOpacity={0.7} onPress={onRecordPress} style={styles.recordWrapper}>
         <Svg width={size} height={size}>
-          <AnimatedCircle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="#ff3bcf"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            fill="transparent"
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={strokeDashoffset}
-          />
+          <G transform={`rotate(-90 ${center} ${center})`}>
+            <AnimatedCircle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#ff3bcf"
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              fill="transparent"
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+            />
+          </G>
         </Svg>
 
         <View style={styles.recordInner}>

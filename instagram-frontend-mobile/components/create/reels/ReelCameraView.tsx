@@ -63,7 +63,6 @@ export function ReelCameraView(props: CameraPageProps) {
   const [internalZoom, setInternalZoom] = useState(zoomLevel ?? 0);
   const baseZoomRef = useRef(internalZoom);
 
-  // Đồng bộ props zoomLevel vào state nội bộ
   useEffect(() => {
     setInternalZoom(zoomLevel ?? 0);
     baseZoomRef.current = zoomLevel ?? 0;
@@ -71,19 +70,15 @@ export function ReelCameraView(props: CameraPageProps) {
 
   const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
-  // Các hàm xử lý logic zoom (cần chạy trên JS thread)
   const handlePinchStart = () => {
     baseZoomRef.current = internalZoom;
   };
 
   const handlePinchUpdate = (scale: number) => {
-    // Tính toán zoom mới dựa trên scale của gesture
-    // Công thức: Zoom cũ + (tỉ lệ thay đổi * độ nhạy)
     const nextZoom = clampZoom(baseZoomRef.current + (scale - 1) * ZOOM_SENSITIVITY);
     setInternalZoom(nextZoom);
   };
 
-  // Định nghĩa Gesture Pinch mới
   const pinchGesture = useMemo(() => {
     const gesture = Gesture.Pinch()
       .onStart(() => {
@@ -95,17 +90,15 @@ export function ReelCameraView(props: CameraPageProps) {
         runOnJS(handlePinchUpdate)(e.scale);
       });
 
-    // Kết hợp với scroll view bên ngoài (nếu có) để tránh xung đột
     if (scrollSimultaneousRef) {
       gesture.simultaneousWithExternalGesture(scrollSimultaneousRef);
     }
 
     return gesture;
-  }, [internalZoom, scrollSimultaneousRef]); // Dependencies để cập nhật gesture khi cần
+  }, [internalZoom, scrollSimultaneousRef]);
 
   return (
     <View style={[styles.page, { height, width }]}>
-      {/* GestureDetector bao bọc View chứa Camera */}
       <GestureDetector gesture={pinchGesture}>
         <View style={StyleSheet.absoluteFill}>
           <CameraView

@@ -1,8 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  StatusBar,
+  Dimensions,
+} from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
 import PostCreationScreen from './posts/PostCreationScreen';
 import ReelsCreationScreen from '@/app/create/reels/index';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type TabType = 'post' | 'story' | 'reels';
 
@@ -15,6 +31,8 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
   const [postStep, setPostStep] = useState(1);
   const [tabsHidden, setTabsHidden] = useState(false);
 
+  const translateX = useSharedValue(0);
+
   const handleTabPress = (tab: TabType) => {
     setActiveTab(tab);
   };
@@ -24,37 +42,48 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
   };
 
   useEffect(() => {
+    let targetIndex = 0;
+    if (activeTab === 'story') targetIndex = 1;
+    if (activeTab === 'reels') targetIndex = 2;
+
+    translateX.value = withTiming(-targetIndex * SCREEN_WIDTH, {
+      duration: 300,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+
     if (activeTab !== 'reels' && tabsHidden) {
       setTabsHidden(false);
     }
   }, [activeTab, tabsHidden]);
 
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
   const renderContent = () => {
-    switch (activeTab) {
-      case 'post':
-        return (
+    return (
+      <Animated.View style={[styles.sliderContainer, animatedStyle]}>
+        <View style={styles.screenPage}>
           <PostCreationScreen
-            onClose={() => setActiveTab('story')}
+            onClose={() => handleTabPress('story')}
             onStepChange={handlePostStepChange}
             onPostCreated={onPostCreated}
           />
-        );
-      case 'story':
-        return (
+        </View>
+
+        <View style={styles.screenPage}>
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>Story Creation Coming Soon...</Text>
           </View>
-        );
-      case 'reels':
-        return <ReelsCreationScreen />;
-      default:
-        return (
-          <PostCreationScreen
-            onClose={() => setActiveTab('story')}
-            onStepChange={handlePostStepChange}
-          />
-        );
-    }
+        </View>
+
+        <View style={styles.screenPage}>
+          <ReelsCreationScreen isFocused={activeTab === 'reels'} />
+        </View>
+      </Animated.View>
+    );
   };
 
   const renderBottomTabs = () => {
@@ -97,9 +126,8 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
     <View style={styles.container}>
       <StatusBar hidden />
 
-      <View style={styles.contentContainer}>{renderContent()}</View>
+      <View style={styles.maskContainer}>{renderContent()}</View>
 
-      {/* Ẩn tabbed flow khi ở step 2 và 3 của posts */}
       {!shouldHideBottomTabs && renderBottomTabs()}
     </View>
   );
@@ -110,51 +138,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-
-  topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-
-    paddingTop: Platform.select({
-      ios: 50,
-      android: 20,
-      default: 20,
-    }),
-
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#000',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#1a1a1a',
-    zIndex: 20,
-  },
-  headerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  contentContainer: {
+  maskContainer: {
     flex: 1,
+    overflow: 'hidden',
     backgroundColor: '#000',
   },
-
+  sliderContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    width: SCREEN_WIDTH * 3,
+  },
+  screenPage: {
+    width: SCREEN_WIDTH,
+    height: '100%',
+    backgroundColor: '#000',
+  },
   placeholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000',
   },
-
   placeholderText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '500',
   },
-
   bottomSegmentedControl: {
     position: 'absolute',
     bottom: 0,
@@ -169,26 +178,23 @@ const styles = StyleSheet.create({
       android: 16,
       default: 16,
     }),
+    zIndex: 20,
   },
-
   bottomTab: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 12,
   },
-
   activeBottomTab: {
     borderBottomWidth: 2,
     borderBottomColor: 'white',
   },
-
   bottomTabText: {
     color: '#888',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
-
   activeBottomTabText: {
     color: 'white',
   },

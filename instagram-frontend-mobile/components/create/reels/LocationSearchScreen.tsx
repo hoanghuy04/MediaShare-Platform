@@ -152,9 +152,7 @@ export function LocationSearchScreen({ onClose, onSelectLocation }: LocationSear
               });
             }
           }
-        } catch (err) {
-          console.log('reverseGeocode error @', i, err);
-        }
+        } catch (err) {}
       }
 
       collected.sort((a, b) => {

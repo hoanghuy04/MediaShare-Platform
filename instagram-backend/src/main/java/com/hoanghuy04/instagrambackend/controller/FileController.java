@@ -32,6 +32,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/files")
 @Tag(name = "File Management", description = "File upload, download and management APIs")
 public class FileController {
 
@@ -99,7 +100,7 @@ public class FileController {
      * @param fileId the file ID to delete
      * @return ResponseEntity with success message
      */
-    @DeleteMapping("/upload/files/{fileId}")
+    @DeleteMapping("/upload/{fileId}")
     @Operation(summary = "Delete a file")
     @SecurityRequirement(name = "Bearer Authentication")
     public ResponseEntity<ApiResponse<Void>> deleteFile(@PathVariable String fileId) {
@@ -115,7 +116,7 @@ public class FileController {
      * @param filename the filename to serve
      * @return ResponseEntity with the file resource
      */
-    @GetMapping("/files/{filename:.+}")
+    @GetMapping("/{filename:.+}")
     @Operation(summary = "Download/serve a file")
     public ResponseEntity<Resource> serveFile(@PathVariable String filename) {
         try {

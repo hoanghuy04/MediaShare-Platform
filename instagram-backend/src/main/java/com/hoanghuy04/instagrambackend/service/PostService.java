@@ -274,20 +274,13 @@ public class PostService {
     private PostResponse convertToPostResponse(Post post) {
         UserResponse authorResponse = userService.convertToUserResponse(post.getAuthor());
 
-        // Get current user ID if authenticated
-        String currentUserId = null;
-        try {
-            currentUserId = securityUtil.getCurrentUserId();
-        } catch (Exception e) {
-            // User not authenticated, continue with null
-        }
+        String currentUserId = securityUtil.getCurrentUserId();
 
         boolean isLikedByCurrentUser = false;
         if (currentUserId != null && post.getLikes() != null) {
             isLikedByCurrentUser = post.getLikes().contains(currentUserId);
         }
 
-        // Get media files with URLs from fileStorage service
         List<MediaFileResponse> mediaWithUrls = fileService.getMediaFileResponses(post.getMediaFileIds());
 
         return PostResponse.builder()

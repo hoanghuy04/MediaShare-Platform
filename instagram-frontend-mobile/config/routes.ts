@@ -92,9 +92,9 @@ export const API_ENDPOINTS = {
   UNREAD_COUNT: '/api/notifications/unread-count',
 
   // Upload
-  UPLOAD: '/api/upload',
-  UPLOAD_PROFILE_IMAGE: '/api/upload/profile-image',
-  UPLOAD_POST_MEDIA: '/api/upload/post-media',
-  UPLOAD_POST_MEDIA_BATCH: '/api/upload/post-media/batch',
-  DELETE_FILE: (fileId: string) => `/api/upload/files/${fileId}`,
+  UPLOAD: '/api/files',
+  UPLOAD_PROFILE_IMAGE: '/api/files/upload/profile-image',
+  UPLOAD_POST_MEDIA: '/api/files/upload/post-media',
+  UPLOAD_POST_MEDIA_BATCH: '/api/files/upload/post-media/batch',
+  DELETE_FILE: (fileId: string) => `/api/files/upload/${fileId}`,
 } as const;
