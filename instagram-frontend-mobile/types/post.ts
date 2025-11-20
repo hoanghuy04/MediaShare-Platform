@@ -25,7 +25,8 @@ export interface Media {
 
 export interface CreatePostRequest {
   caption: string;
-  media: Media[];
+  mediaFileIds: string[];
+  type: 'FEED' | 'REEL' | 'STORY';
   tags?: string[];
   location?: string;
 }

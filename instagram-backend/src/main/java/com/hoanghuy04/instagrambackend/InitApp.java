@@ -1,7 +1,6 @@
 package com.hoanghuy04.instagrambackend;
 
 import com.hoanghuy04.instagrambackend.entity.*;
-import com.hoanghuy04.instagrambackend.enums.MediaType;
 import com.hoanghuy04.instagrambackend.enums.NotificationType;
 import com.hoanghuy04.instagrambackend.enums.UserRole;
 import com.hoanghuy04.instagrambackend.repository.*;
@@ -176,72 +175,71 @@ public class InitApp implements CommandLineRunner {
             int postCount = 5; // 5 posts per user
             
             for (int i = 0; i < postCount; i++) {
-                Post post = createSamplePost(user);
-                posts.add(post);
+//                Post post = createSamplePost(user);
+//                posts.add(post);
             }
         }
         
-        postRepository.saveAll(posts);
+//        postRepository.saveAll(posts);
         log.info("Created {} sample posts", posts.size());
     }
     
     /**
      * Create a sample post for a user
      */
-    private Post createSamplePost(User author) {
-        String[] captions = {
-            "Beautiful sunset today! 🌅",
-            "Coffee and coding ☕️💻",
-            "Weekend vibes 🎉",
-            "New adventure begins! 🚀",
-            "Throwback to amazing memories 📸",
-            "Working hard, playing harder 💪",
-            "Food coma achieved 🍕",
-            "Art in progress 🎨",
-            "Music is life 🎵",
-            "Travel dreams ✈️"
-        };
-        
-        String[] locations = {
-            "New York, NY", "Los Angeles, CA", "Miami, FL", "Chicago, IL", 
-            "Seattle, WA", "Portland, OR", "Austin, TX", "San Francisco, CA"
-        };
-        
-        String[] tags = {
-            "#photography", "#lifestyle", "#travel", "#food", "#art", 
-            "#music", "#fitness", "#nature", "#city", "#friends"
-        };
-        
-        // Create media for the post
-        List<Media> media = new ArrayList<>();
-        int mediaCount = (int) (Math.random() * 3) + 1; // 1-3 media items per post
-        
-        for (int i = 0; i < mediaCount; i++) {
-            Media mediaItem = Media.builder()
-                    .url("https://picsum.photos/800/600?random=" + System.currentTimeMillis() + i)
-                    .type(Math.random() < 0.8 ? MediaType.IMAGE : MediaType.VIDEO)
-                    .uploadedAt(LocalDateTime.now().minusHours((long) (Math.random() * 168))) // Within last week
-                    .build();
-            media.add(mediaItem);
-        }
-        
-        // Create random tags
-        List<String> postTags = new ArrayList<>();
-        int tagCount = (int) (Math.random() * 5) + 1; // 1-5 tags per post
-        Collections.shuffle(Arrays.asList(tags));
-        for (int i = 0; i < Math.min(tagCount, tags.length); i++) {
-            postTags.add(tags[i]);
-        }
-        
-        return Post.builder()
-                .author(author)
-                .caption(captions[(int) (Math.random() * captions.length)])
-                .media(media)
-                .tags(postTags)
-                .location(locations[(int) (Math.random() * locations.length)])
-                .createdAt(LocalDateTime.now().minusHours((long) (Math.random() * 168)))
-                .build();
-    }
+//    private Post createSamplePost(User author) {
+//        String[] captions = {
+//            "Beautiful sunset today! 🌅",
+//            "Coffee and coding ☕️💻",
+//            "Weekend vibes 🎉",
+//            "New adventure begins! 🚀",
+//            "Throwback to amazing memories 📸",
+//            "Working hard, playing harder 💪",
+//            "Food coma achieved 🍕",
+//            "Art in progress 🎨",
+//            "Music is life 🎵",
+//            "Travel dreams ✈️"
+//        };
+//
+//        String[] locations = {
+//            "New York, NY", "Los Angeles, CA", "Miami, FL", "Chicago, IL",
+//            "Seattle, WA", "Portland, OR", "Austin, TX", "San Francisco, CA"
+//        };
+//
+//        String[] tags = {
+//            "#photography", "#lifestyle", "#travel", "#food", "#art",
+//            "#music", "#fitness", "#nature", "#city", "#friends"
+//        };
+//
+//        // Create media for the post
+//        List<Media> media = new ArrayList<>();
+//        int mediaCount = (int) (Math.random() * 3) + 1; // 1-3 media items per post
+//
+//        for (int i = 0; i < mediaCount; i++) {
+//            Media mediaItem = Media.builder()
+//                    .type(Math.random() < 0.8 ? MediaType.IMAGE : MediaType.VIDEO)
+//                    .uploadedAt(LocalDateTime.now().minusHours((long) (Math.random() * 168))) // Within last week
+//                    .build();
+//            media.add(mediaItem);
+//        }
+//
+//        // Create random tags
+//        List<String> postTags = new ArrayList<>();
+//        int tagCount = (int) (Math.random() * 5) + 1; // 1-5 tags per post
+//        Collections.shuffle(Arrays.asList(tags));
+//        for (int i = 0; i < Math.min(tagCount, tags.length); i++) {
+//            postTags.add(tags[i]);
+//        }
+//
+//        return Post.builder()
+//                .author(author)
+//                .caption(captions[(int) (Math.random() * captions.length)])
+//                .media(media)
+//                .tags(postTags)
+//                .location(locations[(int) (Math.random() * locations.length)])
+//                .createdAt(LocalDateTime.now().minusHours((long) (Math.random() * 168)))
+//                .build();
+//    }
     
     /**
      * Initialize sample comments

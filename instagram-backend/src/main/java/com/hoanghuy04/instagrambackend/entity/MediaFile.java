@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.entity;
 
-import com.hoanghuy04.instagrambackend.enums.FileType;
+import com.hoanghuy04.instagrambackend.enums.MediaCategory;
+import com.hoanghuy04.instagrambackend.enums.MediaUsage;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,44 +26,29 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Document(collection = "media_files")
 public class MediaFile {
-    
-    /**
-     * Unique identifier for the media file
-     */
+
     @Id
     private String id;
-    
-    /**
-     * ID of the user who uploaded this file
-     */
+
     @Indexed
     private String userId;
-    
-    /**
-     * Original filename
-     */
+
     private String fileName;
-    
-    /**
-     * File path where the file is stored
-     */
     private String filePath;
-    
-    /**
-     * File size in bytes
-     */
     private Long fileSize;
-    
-    /**
-     * Type of file (PROFILE_IMAGE, POST_MEDIA, COVER_IMAGE)
-     */
-    private FileType fileType;
-    
-    /**
-     * Timestamp when the file was uploaded
-     */
+
+    // IMAGE / VIDEO
+    private MediaCategory category;
+
+    // PROFILE / POST / STORY / REEL / COVER
+    private MediaUsage usage;
+
+    // VD: "image/jpeg", "image/png", "video/mp4"
+    private String contentType;
+
     @CreatedDate
     @Indexed
     private LocalDateTime uploadedAt;
 }
+
 

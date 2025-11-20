@@ -77,7 +77,10 @@ export default function ReelPostScreen() {
   };
 
   const handleShare = async () => {
-    if (isUploading) return;
+    if (isUploading) {
+      console.log('⚠️ Upload already in progress, skipping...');
+      return;
+    }
 
     if (!user || !user.id) {
       Alert.alert('Lỗi', 'Vui lòng đăng nhập để chia sẻ Reel.');
@@ -85,6 +88,7 @@ export default function ReelPostScreen() {
     }
 
     try {
+      console.log('🚀 Starting upload process...');
       setIsUploading(true);
 
       const formData = new FormData();
@@ -117,22 +121,24 @@ export default function ReelPostScreen() {
         type: mimeType,
       } as any);
 
-      const mediaUrl = await uploadAPI.uploadFile(formData);
+      // Upload file và nhận file ID (không phải URL)
+      console.log('📤 Uploading file...');
+      const fileId = await uploadAPI.uploadFile(formData, 'REEL');
+      console.log('✅ File uploaded, ID:', fileId);
+
       const hashtags = extractHashtags(caption);
 
       const postData = {
         caption: caption.trim(),
-        media: [
-          {
-            url: mediaUrl,
-            type: 'REEL',
-          },
-        ],
+        mediaFileIds: [fileId],
+        type: 'REEL' as const,
         tags: hashtags,
         location: pickedLocation?.name,
       };
 
+      console.log('📝 Creating post with data:', postData);
       await postAPI.createPost(postData);
+      console.log('✅ Post created successfully!');
 
       Alert.alert('Thành công! 🎉', 'Reel của bạn đã được chia sẻ', [
         {
@@ -143,13 +149,14 @@ export default function ReelPostScreen() {
         },
       ]);
     } catch (error: any) {
-      console.error(error);
+      console.error('❌ Upload error:', error);
       Alert.alert(
         'Lỗi',
         error?.response?.data?.message || 'Không thể chia sẻ Reel. Vui lòng thử lại.',
         [{ text: 'OK' }]
       );
     } finally {
+      console.log('🏁 Upload process finished');
       setIsUploading(false);
     }
   };
@@ -319,6 +326,7 @@ export default function ReelPostScreen() {
             style={[styles.shareBtn, isUploading && styles.btnDisabled]}
             onPress={handleShare}
             disabled={isUploading}
+            activeOpacity={0.7}
           >
             {isUploading ? (
               <>
