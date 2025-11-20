@@ -427,9 +427,33 @@ export default function ConversationScreen() {
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.actionButton}><Ionicons name="call-outline" size={20} color={chatPalette.headerText} /></TouchableOpacity>
             <TouchableOpacity style={styles.actionButton}><Ionicons name="videocam-outline" size={20} color={chatPalette.headerText} /></TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => setGroupInfoVisible(true)}>
-              <Ionicons name="information-circle-outline" size={22} color={chatPalette.headerText} />
-            </TouchableOpacity>
+            <TouchableOpacity
+  style={styles.actionButton}
+  onPress={() => {
+    const isGroup = conversationDetails?.type === 'GROUP';
+    if (isGroup) {
+      // Nhóm: mở settings theo conversation
+      router.push({
+        pathname: '/messages/conversation-settings',
+        params: {
+          conversationId: actualConversationId || routeConversationId || '',
+        },
+      });
+    } else {
+      // Direct / Pending: mở settings theo user
+      router.push({
+        pathname: '/messages/conversation-settings',
+        params: {
+          userId: otherUser?.id || peerUserId || '',
+        },
+      });
+    }
+  }}
+  onLongPress={() => setGroupInfoVisible(true)} // tuỳ chọn: giữ long-press để mở sheet cũ
+>
+  <Ionicons name="information-circle-outline" size={22} color={chatPalette.headerText} />
+</TouchableOpacity>
+
           </View>
         </View>
       </SafeAreaView>

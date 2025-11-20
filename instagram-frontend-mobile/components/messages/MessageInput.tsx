@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+// components/messages/MessageInput.tsx
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   TextInput,
@@ -7,11 +8,24 @@ import {
   Text,
   Platform,
   Alert,
+  Modal,
+  Keyboard,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
+import {
+  COLORS,
+  SIZES,
+  EMOJI,
+  EMOJI_CATEGORIES_ORDER,
+  EMOJI_DEFAULTS,
+  EMOJI_RECENTS_MAX,
+} from '../../utils/constants';
 
-interface MessageInputProps {
+type EmojiCategory = (typeof EMOJI_CATEGORIES_ORDER)[number];
+
+export interface MessageInputProps {
   onSend: (message: string) => void;
   onTyping?: () => void;
   onStopTyping?: () => void;
@@ -19,11 +33,112 @@ interface MessageInputProps {
   themeColor?: string;
 }
 
+/* --------------------------------- */
+/* Emoji Panel (lightweight, Fabric-safe) */
+/* --------------------------------- */
+const EmojiPanel: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  onPick: (emoji: string) => void;
+}> = ({ visible, onClose, onPick }) => {
+  const [active, setActive] = useState<EmojiCategory>('smileys');
+  const [recents, setRecents] = useState<string[]>([]);
+  const { theme } = useTheme();
 
-const TOOLBAR_H = 44;        // chiều cao chuẩn cho tất cả
-const BTN = 40;              // kích thước nút tròn
-const RADIUS = 20;
+  const categories: EmojiCategory[] = useMemo(
+    () => (recents.length ? (['smileys'] as EmojiCategory[]).concat(EMOJI_CATEGORIES_ORDER.slice(1)) : EMOJI_CATEGORIES_ORDER),
+    [recents.length]
+  );
 
+  const list = useMemo(() => {
+    if (active === 'smileys' && recents.length) return recents; // ưu tiên hiển thị recents khi có
+    return EMOJI[active] || [];
+  }, [active, recents]);
+
+  const handlePick = (e: string) => {
+    // cập nhật recents (in-memory)
+    setRecents(prev => {
+      const next = [e, ...prev.filter(x => x !== e)].slice(0, EMOJI_RECENTS_MAX);
+      return next;
+    });
+    onPick(e);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.emojiOverlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[styles.emojiPanel, { backgroundColor: theme.colors.surface }]}>
+          {/* Header */}
+          <View style={styles.emojiHeader}>
+            <Text style={[styles.emojiTitle, { color: theme.colors.text }]} allowFontScaling={false}>
+              Chọn emoji
+            </Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={SIZES.iconSm} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Category Tabs */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catRow}
+          >
+            {categories.map(cat => {
+              const selected = cat === active;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setActive(cat)}
+                  style={[
+                    styles.catPill,
+                    {
+                      backgroundColor: selected ? theme.colors.primary : theme.colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.catText,
+                      { color: selected ? COLORS.light.background : theme.colors.text },
+                    ]}
+                    allowFontScaling={false}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Grid */}
+          <ScrollView contentContainerStyle={styles.emojiGrid}>
+            {list.map((emoji) => (
+              <TouchableOpacity
+                key={`${active}-${emoji}`}
+                style={styles.emojiBtn}
+                activeOpacity={0.7}
+                onPress={() => handlePick(emoji)}
+              >
+                <Text
+                  style={{ fontSize: EMOJI_DEFAULTS.emojiSize, textAlign: 'center' }}
+                  allowFontScaling={EMOJI_DEFAULTS.allowFontScaling}
+                >
+                  {emoji}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+/* --------------------------------- */
+/* MessageInput */
+/* --------------------------------- */
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
   onTyping,
@@ -35,55 +150,54 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [showEmoji, setShowEmoji] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // demo recorder timer
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (isRecording) {
-      timer = setInterval(() => {
-        setRecordSeconds(prev => prev + 1);
-      }, 1000);
+      timer = setInterval(() => setRecordSeconds((p) => p + 1), 1000);
     } else {
       setRecordSeconds(0);
     }
-
-    return () => {
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
+    return () => timer && clearInterval(timer);
   }, [isRecording]);
 
-  const handleSend = () => {
-    if (message.trim()) {
-      onSend(message.trim());
-      setMessage('');
-      handleStopTyping();
-    }
-  };
+  // cleanup typing debounce
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
 
-  const handleTextChange = (text: string) => {
-    setMessage(text);
-    if (text.trim()) {
-      onTyping?.();
-    } else {
-      onStopTyping?.();
-    }
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    typingTimeoutRef.current = setTimeout(() => {
-      handleStopTyping();
-    }, 1200);
-  };
-
-  const handleStopTyping = () => {
+  const stopTyping = useCallback(() => {
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
     onStopTyping?.();
+  }, [onStopTyping]);
+
+  const scheduleStopTyping = useCallback(() => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(stopTyping, 1200);
+  }, [stopTyping]);
+
+  const handleTextChange = (text: string) => {
+    setMessage(text);
+    if (text.trim()) onTyping?.();
+    else onStopTyping?.();
+    scheduleStopTyping();
+  };
+
+  const handleSend = () => {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    onSend(trimmed);
+    setMessage('');
+    stopTyping();
+    setShowEmoji(false);
   };
 
   const handleAttachmentPress = () => {
@@ -92,11 +206,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const ActionSheet = require('react-native').ActionSheetIOS;
       ActionSheet.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: options.length - 1,
-          title: 'Chia sẻ',
-        },
+        { options, cancelButtonIndex: options.length - 1, title: 'Chia sẻ' },
         () => {}
       );
     } else {
@@ -104,17 +214,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
-  const toggleRecording = () => {
-    setIsRecording(prev => !prev);
+  const toggleRecording = () => setIsRecording((p) => !p);
+
+  const openEmoji = () => {
+    Keyboard.dismiss();
+    setShowEmoji(true);
   };
 
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, []);
+  const onPickEmoji = (e: string) => {
+    // nối vào cursor cuối (đơn giản)
+    const next = `${message}${e}`;
+    setMessage(next);
+    onTyping?.();
+    scheduleStopTyping();
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -123,8 +236,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onPress={handleAttachmentPress}
         activeOpacity={0.8}
       >
-        <Ionicons name="add" size={24} color={theme.colors.text} />
+        <Ionicons name="add" size={SIZES.iconMd} color={theme.colors.text} />
       </TouchableOpacity>
+
       <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}>
         <TextInput
           value={message}
@@ -133,30 +247,32 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           placeholderTextColor={theme.colors.textSecondary}
           style={[styles.input, { color: theme.colors.text }]}
           multiline
+          allowFontScaling={false}
         />
         <View style={styles.inputActions}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="happy-outline" size={22} color={theme.colors.textSecondary} />
+          <TouchableOpacity style={styles.iconButton} onPress={openEmoji}>
+            <Ionicons name="happy-outline" size={SIZES.iconSm} color={theme.colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={toggleRecording}>
             <Ionicons
               name={isRecording ? 'stop-circle' : 'mic-outline'}
-              size={22}
+              size={SIZES.iconSm}
               color={isRecording ? theme.colors.danger : theme.colors.textSecondary}
             />
           </TouchableOpacity>
         </View>
       </View>
+
       <TouchableOpacity
         onPress={handleSend}
         disabled={!message.trim()}
         style={[
-          styles.sendButton,
-          {
-            backgroundColor: message.trim()
-              ? themeColor || theme.chat.bubbleOut
-              : theme.colors.border,
-          },
+            styles.sendButton,
+            {
+              backgroundColor: message.trim()
+                ? themeColor || theme.chat.bubbleOut
+                : theme.colors.border,
+            },
         ]}
       >
         <Ionicons
@@ -165,23 +281,39 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           color={message.trim() ? theme.chat.bubbleText : theme.colors.textSecondary}
         />
       </TouchableOpacity>
+
       {isRecording && (
         <View style={styles.recordingBadge}>
-          <Ionicons name='pulse' size={12} color="#fff" />
-          <Text style={styles.recordingText}>{recordSeconds}s</Text>
+          <Ionicons name="pulse" size={12} color="#fff" />
+          <Text style={styles.recordingText} allowFontScaling={false}>
+            {recordSeconds}s
+          </Text>
         </View>
       )}
+
+      {/* Emoji modal */}
+      <EmojiPanel
+        visible={showEmoji}
+        onClose={() => setShowEmoji(false)}
+        onPick={onPickEmoji}
+      />
     </View>
   );
 };
+
+/* --------------------------------- */
+/* Styles */
+/* --------------------------------- */
+const GRID_BTN_SIZE = 40;
 
 const styles = StyleSheet.create({
   wrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 12,
-    gap: 8,
+    padding: SIZES.md,
+    gap: SIZES.sm,
   },
+
   attachButton: {
     width: 38,
     height: 38,
@@ -189,28 +321,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   inputContainer: {
     flex: 1,
-    borderRadius: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: SIZES.radiusLg,
+    paddingHorizontal: SIZES.sm + 6,
+    paddingVertical: SIZES.sm - 2,
     flexDirection: 'row',
     alignItems: 'center',
   },
+
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: SIZES.fontMd,
     maxHeight: 120,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
+
   inputActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 6,
+    marginLeft: SIZES.xs + 2,
   },
+
   iconButton: {
     padding: 4,
     marginLeft: 4,
   },
+
   sendButton: {
     width: 42,
     height: 42,
@@ -218,6 +357,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   recordingBadge: {
     position: 'absolute',
     top: -18,
@@ -229,10 +369,66 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
-  recordingText: {
-    color: '#fff',
-    fontSize: 12,
-    marginLeft: 4,
+
+  recordingText: { color: '#fff', fontSize: 12, marginLeft: 4 },
+
+  /* Emoji modal */
+  emojiOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+
+  emojiPanel: {
+    maxHeight: EMOJI_DEFAULTS.panelMaxHeight,
+    borderTopLeftRadius: SIZES.radiusLg,
+    borderTopRightRadius: SIZES.radiusLg,
+    overflow: 'hidden',
+  },
+
+  emojiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SIZES.sm + 4,
+    paddingVertical: SIZES.sm,
+  },
+
+  emojiTitle: {
+    fontSize: SIZES.fontSm + 2,
+    fontWeight: '700',
+  },
+
+  catRow: {
+    paddingHorizontal: SIZES.sm + 4,
+    paddingBottom: SIZES.sm,
+    gap: SIZES.xs,
+  },
+
+  catPill: {
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 6,
+    borderRadius: SIZES.radiusFull,
+    marginRight: SIZES.xs,
+  },
+
+  catText: {
+    fontSize: SIZES.fontSm,
+    fontWeight: '600',
+  },
+
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: SIZES.md,
+    paddingBottom: SIZES.md,
+  },
+
+  emojiBtn: {
+    width: GRID_BTN_SIZE,
+    height: GRID_BTN_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: 4,
+    borderRadius: SIZES.radiusMd,
   },
 });
-
