@@ -1,7 +1,6 @@
 package com.hoanghuy04.instagrambackend.repository;
 
 import com.hoanghuy04.instagrambackend.entity.MediaFile;
-import com.hoanghuy04.instagrambackend.enums.FileType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -35,7 +34,7 @@ public interface MediaFileRepository extends MongoRepository<MediaFile, String> 
      * @param fileType the type of files to find
      * @return List of media files matching the criteria
      */
-    List<MediaFile> findByUserIdAndFileType(String userId, FileType fileType);
+//    List<MediaFile> findByUserIdAndFileType(String userId, FileType fileType);
     
     /**
      * Find a media file by file path.

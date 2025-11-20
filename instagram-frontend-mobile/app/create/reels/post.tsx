@@ -8,18 +8,17 @@ import {
   Image,
   ScrollView,
   Dimensions,
-  SafeAreaView,
-  Switch,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
-import { LocationSearchScreen } from './LocationSearchScreen';
-import { uploadAPI, postAPI } from '@/services/api';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useUpload } from '@/context/UploadContext';
 import { useAuth } from '@/context/AuthContext';
-import { extractHashtags } from '@/utils/hashtag';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LocationSearchScreen } from '@/components/create/reels/LocationSearchScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
@@ -31,36 +30,41 @@ type PickedLocation = {
   distance?: string;
 } | null;
 
-export type ReelPostData = {
-  mediaUri: string;
-  mediaType: 'photo' | 'video';
-  caption: string;
-  hashtags: string[];
-  location?: {
-    name: string;
-    address?: string;
-    distance?: string;
-  };
-  aiTagEnabled: boolean;
-};
-
-type ReelPostScreenProps = {
-  mediaUri: string;
-  mediaType: 'photo' | 'video';
-  onBack: () => void;
-  onShare: (data: ReelPostData) => void;
-};
-
-export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPostScreenProps) {
+export default function ReelPostScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
   const { user } = useAuth();
+
+  const { startUpload } = useUpload();
+
+  const rawUri = params.mediaUri as string;
+  const mediaUri = rawUri ? decodeURIComponent(rawUri) : '';
+  const mediaType = (params.mediaType as 'photo' | 'video') || 'video';
+
   const [caption, setCaption] = useState('');
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
-  const [aiTagEnabled, setAiTagEnabled] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+
+  const isSubmittingRef = useRef(false);
 
   const scrollRef = useRef<ScrollView | null>(null);
   const captionInputRef = useRef<TextInput | null>(null);
+
+  const player = useVideoPlayer(mediaType === 'video' && mediaUri ? mediaUri : null, player => {
+    if (mediaType === 'video') {
+      player.loop = true;
+      player.play();
+      player.muted = true;
+    }
+  });
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/create/reels');
+    }
+  };
 
   const handleHashtagPress = () => {
     setCaption(prev => {
@@ -74,90 +78,27 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
     }, 50);
   };
 
-  const handleShare = async () => {
-    if (isUploading) return;
+  const handleShare = () => {
+    if (isSubmittingRef.current) return;
 
     if (!user || !user.id) {
       Alert.alert('Lỗi', 'Vui lòng đăng nhập để chia sẻ Reel.');
       return;
     }
 
-    try {
-      setIsUploading(true);
+    isSubmittingRef.current = true;
 
-      const formData = new FormData();
-      const filename = mediaUri.split('/').pop() || 'upload';
+    router.replace('/(tabs)/feed');
 
-      let fileExtension = filename.split('.').pop()?.toLowerCase() || '';
-      let mimeType = '';
-
-      if (mediaType === 'video') {
-        if (['mp4', 'mov', 'avi', 'mkv', 'm4v'].includes(fileExtension)) {
-          mimeType = `video/${fileExtension}`;
-        } else {
-          mimeType = 'video/mp4';
-          fileExtension = 'mp4';
-        }
-      } else {
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
-          mimeType = `image/${fileExtension}`;
-        } else {
-          mimeType = 'image/jpeg';
-          fileExtension = 'jpg';
-        }
-      }
-
-      const newFilename = `upload_${Date.now()}.${fileExtension}`;
-
-      formData.append('file', {
-        uri: mediaUri,
-        name: newFilename,
-        type: mimeType,
-      } as any);
-
-      const mediaUrl = await uploadAPI.uploadFile(formData, 'post', user.id);
-
-      const hashtags = extractHashtags(caption);
-
-      const postData = {
-        caption: caption.trim(),
-        media: [
-          {
-            url: mediaUrl,
-            type: mediaType === 'video' ? ('VIDEO' as const) : ('IMAGE' as const),
-          },
-        ],
-        tags: hashtags,
+    setTimeout(() => {
+      startUpload({
+        mediaUri: mediaUri,
+        mediaType: mediaType,
+        caption: caption,
         location: pickedLocation?.name,
-      };
-
-      const newPost = await postAPI.createPost(postData);
-
-      Alert.alert('Thành công! 🎉', 'Reel của bạn đã được chia sẻ', [
-        {
-          text: 'OK',
-          onPress: () => {
-            const reelData: ReelPostData = {
-              mediaUri,
-              mediaType,
-              caption: caption.trim(),
-              hashtags,
-              location: pickedLocation || undefined,
-              aiTagEnabled,
-            };
-            onShare(reelData);
-          },
-        },
-      ]);
-    } catch (error: any) {
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || 'Không thể chia sẻ Reel. Vui lòng thử lại.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setIsUploading(false);
-    }
+        userId: user.id,
+      });
+    }, 100);
   };
 
   const handleSelectLocation = (loc: { name: string; address: string; distance: string }) => {
@@ -194,12 +135,20 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
     return pieces.join(' · ');
   };
 
+  if (!mediaUri) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.headerBtn}>
+        <TouchableOpacity onPress={handleBack} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={28} color="#000" />
         </TouchableOpacity>
 
@@ -218,48 +167,15 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
         <View style={styles.previewSection}>
           <View style={styles.previewContainer}>
             {mediaType === 'video' ? (
-              <Video
-                source={{ uri: mediaUri }}
+              <VideoView
                 style={styles.previewMedia}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                isMuted
+                player={player}
+                contentFit="cover"
+                nativeControls={false}
               />
             ) : (
               <Image source={{ uri: mediaUri }} style={styles.previewMedia} resizeMode="cover" />
             )}
-
-            <View style={styles.editTools}>
-              <View style={styles.toolBtn}>
-                <Ionicons name="musical-notes" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Text style={styles.toolBtnText}>Aa</Text>
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="happy-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="sparkles-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="images-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="mic-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="cut-outline" size={18} color="#fff" />
-              </View>
-              <View style={styles.toolBtn}>
-                <Ionicons name="ellipsis-horizontal" size={18} color="#fff" />
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.editCoverBtn}>
-              <Text style={styles.editCoverText}>Chỉnh sửa ảnh bìa</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -280,26 +196,6 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
           <TouchableOpacity style={styles.chip} onPress={handleHashtagPress}>
             <Text style={styles.chipIconText}>#</Text>
             <Text style={styles.chipText}>Hashtag</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip}>
-            <Ionicons
-              name="reorder-three-outline"
-              size={16}
-              color="#444"
-              style={{ marginRight: 6 }}
-            />
-            <Text style={styles.chipText}>Cuộc thăm dò ý kiến</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip}>
-            <Ionicons name="search-outline" size={16} color="#444" style={{ marginRight: 6 }} />
-            <Text style={styles.chipText}>Gợi ý</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.chip}>
-            <Ionicons name="pencil-outline" size={16} color="#444" style={{ marginRight: 6 }} />
-            <Text style={styles.chipText}>Viết lại</Text>
           </TouchableOpacity>
         </View>
 
@@ -352,63 +248,18 @@ export function ReelPostScreen({ mediaUri, mediaType, onBack, onShare }: ReelPos
             <Ionicons name="chevron-forward" size={22} color="#999" />
           </TouchableOpacity>
         )}
-
-        <View style={[styles.rowPressable, { borderBottomWidth: 0 }]}>
-          <View style={[styles.rowLeft, { flex: 1 }]}>
-            <Ionicons name="copy-outline" size={24} color="#000" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowMainText}>Thêm nhãn AI</Text>
-              <Text style={styles.rowSubText}>
-                Chúng tôi yêu cầu bạn gắn nhãn cho một số nội dung nhất định tạo bằng AI.
-              </Text>
-            </View>
-          </View>
-
-          <Switch
-            value={aiTagEnabled}
-            onValueChange={setAiTagEnabled}
-            trackColor={{ false: '#d1d1d1', true: '#4264ff' }}
-            thumbColor={'#fff'}
-          />
-        </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
         <View style={styles.bottomRow}>
-          <TouchableOpacity
-            style={[styles.saveDraftBtn, isUploading && styles.btnDisabled]}
-            disabled={isUploading}
-            onPress={() => {
-              console.log('Lưu bản nháp');
-            }}
-          >
+          <TouchableOpacity style={styles.saveDraftBtn} onPress={() => console.log('Lưu bản nháp')}>
             <Text style={styles.saveDraftText}>Lưu bản nháp</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.shareBtn, isUploading && styles.btnDisabled]}
-            onPress={handleShare}
-            disabled={isUploading}
-          >
-            {isUploading ? (
-              <>
-                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.shareBtnText}>Đang tải...</Text>
-              </>
-            ) : (
-              <Text style={styles.shareBtnText}>Chia sẻ</Text>
-            )}
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.7}>
+            <Text style={styles.shareBtnText}>Chia sẻ</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={styles.learnMoreTouch}
-          onPress={() => {
-            console.log('Tìm hiểu thêm về Reels');
-          }}
-        >
-          <Text style={styles.learnMoreText}>Tìm hiểu thêm về Reels.</Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -419,7 +270,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -439,11 +289,9 @@ const styles = StyleSheet.create({
     color: '#000',
     textAlign: 'center',
   },
-
   content: {
     flex: 1,
   },
-
   previewSection: {
     alignItems: 'center',
     paddingVertical: 16,
@@ -460,46 +308,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-
-  editTools: {
-    position: 'absolute',
-    top: 8,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-  },
-  toolBtn: {
-    minWidth: 28,
-    minHeight: 28,
-    borderRadius: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toolBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  editCoverBtn: {
-    position: 'absolute',
-    bottom: 12,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  editCoverText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   captionSection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
@@ -513,7 +321,6 @@ const styles = StyleSheet.create({
     minHeight: 60,
     textAlignVertical: 'top',
   },
-
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -543,7 +350,6 @@ const styles = StyleSheet.create({
     color: '#444',
     fontWeight: '500',
   },
-
   rowPressable: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -563,14 +369,6 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '400',
   },
-  rowSubText: {
-    fontSize: 14,
-    color: '#6b6b6b',
-    lineHeight: 20,
-    marginTop: 4,
-  },
-
-  // --- block vị trí đã chọn (màu xanh dương) ---
   locationSelectedWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -607,7 +405,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
-
   bottomBar: {
     position: 'absolute',
     left: 0,
@@ -653,14 +450,5 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
-  },
-  learnMoreTouch: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  learnMoreText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4264ff',
   },
 });

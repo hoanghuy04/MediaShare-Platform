@@ -1,7 +1,8 @@
 package com.hoanghuy04.instagrambackend.dto.request;
 
-import com.hoanghuy04.instagrambackend.entity.Media;
+import com.hoanghuy04.instagrambackend.enums.PostType;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,9 +27,12 @@ public class CreatePostRequest {
     @Size(max = 2200, message = "Caption must not exceed 2200 characters")
     private String caption;
     
-    @NotEmpty(message = "At least one media item is required")
+    @NotNull(message = "Post type is required")
+    private PostType type;
+    
+    @NotEmpty(message = "At least one media file ID is required")
     @Builder.Default
-    private List<Media> media = new ArrayList<>();
+    private List<String> mediaFileIds = new ArrayList<>();
     
     @Builder.Default
     private List<String> tags = new ArrayList<>();

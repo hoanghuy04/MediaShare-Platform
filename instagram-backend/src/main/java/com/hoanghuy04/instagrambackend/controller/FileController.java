@@ -1,5 +1,11 @@
 package com.hoanghuy04.instagrambackend.controller;
 
+import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
+import com.hoanghuy04.instagrambackend.enums.MediaUsage;
+import com.hoanghuy04.instagrambackend.service.FileService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,25 +16,99 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 /**
- * REST controller for serving static files.
- * Handles file serving from uploads directory.
+ * REST controller for file operations.
+ * Handles file uploads, serving, and deletions.
  *
  * @author Instagram Backend Team
  * @version 1.0.0
  */
 @Slf4j
 @RestController
-@RequestMapping("/files")
 @RequiredArgsConstructor
+@RequestMapping("/files")
+@Tag(name = "File Management", description = "File upload, download and management APIs")
 public class FileController {
+
+    private final FileService fileService;
 
     @Value("${file.upload-dir}")
     private String uploadDir;
+
+    /**
+     * Upload profile image.
+     *
+     * @param file the file to upload
+     * @return ResponseEntity with MediaFile ID
+     */
+    @PostMapping("/upload/profile-image")
+    @Operation(summary = "Upload profile image")
+    @SecurityRequirement(name = "Bearer Authentication")
+    public ResponseEntity<ApiResponse<String>> uploadProfileImage(
+            @RequestParam("file") MultipartFile file) {
+        String fileId = fileService.uploadFile(file, MediaUsage.PROFILE);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("File uploaded successfully", fileId));
+    }
+    
+    /**
+     * Upload post media.
+     *
+     * @param file the file to upload
+     * @param usage the media usage (POST, REEL, STORY)
+     * @return ResponseEntity with MediaFile ID
+     */
+    @PostMapping("/upload/post-media")
+    @Operation(summary = "Upload post media")
+    @SecurityRequirement(name = "Bearer Authentication")
+    public ResponseEntity<ApiResponse<String>> uploadPostMedia(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "usage", defaultValue = "POST") MediaUsage usage) {
+        String fileId = fileService.uploadFile(file, usage);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("File uploaded successfully", fileId));
+    }
+    
+    /**
+     * Upload multiple post media files (batch upload).
+     *
+     * @param files the list of files to upload
+     * @param usage the media usage
+     * @return ResponseEntity with list of MediaFile IDs
+     */
+    @PostMapping("/upload/post-media/batch")
+    @Operation(summary = "Upload multiple post media files")
+    @SecurityRequirement(name = "Bearer Authentication")
+    public ResponseEntity<ApiResponse<List<String>>> uploadMultiplePostMedia(
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(value = "usage", defaultValue = "POST") MediaUsage usage) {
+
+        List<String> fileIds = fileService.uploadMultipleFiles(files, usage);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Files uploaded successfully", fileIds));
+    }
+    
+    /**
+     * Delete a file.
+     *
+     * @param fileId the file ID to delete
+     * @return ResponseEntity with success message
+     */
+    @DeleteMapping("/upload/{fileId}")
+    @Operation(summary = "Delete a file")
+    @SecurityRequirement(name = "Bearer Authentication")
+    public ResponseEntity<ApiResponse<Void>> deleteFile(@PathVariable String fileId) {
+        log.info("Delete file request received for file: {}", fileId);
+        
+        fileService.deleteFile(fileId);
+        return ResponseEntity.ok(ApiResponse.success("File deleted successfully", null));
+    }
 
     /**
      * Serve a file from the uploads directory.
@@ -37,6 +117,7 @@ public class FileController {
      * @return ResponseEntity with the file resource
      */
     @GetMapping("/{filename:.+}")
+    @Operation(summary = "Download/serve a file")
     public ResponseEntity<Resource> serveFile(@PathVariable String filename) {
         try {
             Path filePath = Paths.get(uploadDir, filename).normalize();
