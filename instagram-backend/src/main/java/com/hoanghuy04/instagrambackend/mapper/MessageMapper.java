@@ -43,7 +43,6 @@ public abstract class MessageMapper {
      * @return UserSummaryDTO
      */
     @Mapping(target = "avatar", expression = "java(getAvatar(user))")
-    @Mapping(target = "isVerified", source = "verified")
     public abstract UserSummaryDTO toUserSummaryDTO(User user);
     
     /**
@@ -55,8 +54,6 @@ public abstract class MessageMapper {
      * @return MessageDTO
      */
     @Mapping(target = "conversationId", expression = "java(getConversationId(message))")
-    @Mapping(target = "sender", ignore = true)
-    @Mapping(target = "replyTo", ignore = true)
     @Mapping(target = "isDeleted", expression = "java(message.getDeletedBy().contains(currentUserId))")
     @Mapping(target = "readBy", expression = "java(new java.util.ArrayList<>(message.getReadBy()))")
     public abstract MessageDTO toMessageDTO(Message message, @Context String currentUserId);
@@ -71,141 +68,6 @@ public abstract class MessageMapper {
      */
     public abstract ConversationDTO toConversationDTO(Conversation conversation, @Context String currentUserId);
 
-    /**
-     * Enrich MessageDTO with sender and reply-to message.
-     * Handles nested mappings and null safety.
-     *
-     * @param dto the target MessageDTO
-     * @param message the source Message entity
-     * @param currentUserId the current user ID for context
-     */
-    @AfterMapping
-    protected void enrichMessage(@MappingTarget MessageDTO dto, Message message, @Context String currentUserId) {
-        if (message == null) {
-            return;
-        }
-        
-        // Map sender
-        boolean senderMapped = false;
-        if (message.getSender() != null) {
-            try {
-                dto.setSender(toUserSummaryDTO(message.getSender()));
-                senderMapped = true;
-            } catch (Exception e) {
-                log.warn("Failed to load sender from message {}: {}", message.getId(), e.getMessage());
-            }
-        }
-        
-        // Fallback: If sender not mapped (either null or mapping failed), fetch from repository
-        if (!senderMapped) {
-            if (currentUserId == null || currentUserId.isBlank()) {
-                log.error("Cannot fetch sender for message {}: currentUserId is null or blank", message.getId());
-                return;
-            }
-            
-            log.warn("Sender not populated/mapped for message {}, fetching from repository using currentUserId: {}", 
-                message.getId(), currentUserId);
-            try {
-                User sender = userRepository.findById(currentUserId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Sender not found: " + currentUserId));
-                dto.setSender(toUserSummaryDTO(sender));
-                log.info("Successfully fetched and mapped sender {} for message {}", sender.getId(), message.getId());
-            } catch (ResourceNotFoundException e) {
-                log.error("Sender not found in repository for message {} using currentUserId {}: {}", 
-                    message.getId(), currentUserId, e.getMessage());
-            } catch (Exception e) {
-                log.error("Failed to fetch sender for message {} using currentUserId {}: {}", 
-                    message.getId(), currentUserId, e.getMessage(), e);
-            }
-        }
-        
-        // Final check: ensure sender is set
-        if (dto.getSender() == null) {
-            log.error("CRITICAL: Sender is still null in DTO for message {} after all fallback attempts", message.getId());
-        }
-        
-        // Map reply-to message (nested)
-        if (message.getReplyToMessageId() != null) {
-            try {
-                Message replyToMessage = messageRepository.findById(message.getReplyToMessageId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Reply-to message not found"));
-                
-                // Create lightweight DTO for reply-to message
-                MessageDTO replyTo = MessageDTO.builder()
-                    .id(replyToMessage.getId())
-                    .content(replyToMessage.getContent())
-                    .createdAt(replyToMessage.getCreatedAt())
-                    .build();
-                
-                // Map sender of reply-to message
-                if (replyToMessage.getSender() != null) {
-                    replyTo.setSender(UserSummaryDTO.builder()
-                        .id(replyToMessage.getSender().getId())
-                        .username(replyToMessage.getSender().getUsername())
-                        .build());
-                }
-                
-                dto.setReplyTo(replyTo);
-            } catch (Exception e) {
-                log.warn("Failed to load reply-to message {}: {}", message.getReplyToMessageId(), e.getMessage());
-            }
-        }
-    }
-    
-    /**
-     * Enrich ConversationDTO with participants and last message.
-     * Handles complex nested mappings and null safety.
-     *
-     * @param dto the target ConversationDTO
-     * @param conversation the source Conversation entity
-     * @param currentUserId the current user ID for context
-     */
-    @AfterMapping
-    protected void enrichConversation(@MappingTarget ConversationDTO dto, Conversation conversation, @Context String currentUserId) {
-        if (conversation == null) {
-            return;
-        }
-        
-        // Map participants - convert ConversationMember to ConversationMemberDTO
-        List<ConversationMemberDTO> participants = new java.util.ArrayList<>();
-        if (conversation.getParticipants() != null && !conversation.getParticipants().isEmpty()) {
-            participants = conversation.getParticipants().stream()
-                .map(member -> ConversationMemberDTO.builder()
-                    .userId(member.getUserId())
-                    .username(member.getUsername())
-                    .avatar(member.getAvatar())
-                    .isVerified(member.isVerified())
-                    .joinedAt(member.getJoinedAt())
-                    .leftAt(member.getLeftAt())
-                    .role(member.getRole())
-                    .build())
-                .collect(Collectors.toList());
-        }
-        
-        dto.setParticipants(participants);
-        
-        // Map last message
-        if (conversation.getLastMessage() != null) {
-            try {
-                LastMessageInfo lastMessageInfo = conversation.getLastMessage();
-                User sender = userRepository.findById(lastMessageInfo.getSenderId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Sender not found"));
-                
-                LastMessageDTO lastMessageDTO = LastMessageDTO.builder()
-                    .messageId(lastMessageInfo.getMessageId())
-                    .content(lastMessageInfo.getContent())
-                    .senderId(lastMessageInfo.getSenderId())
-                    .senderUsername(sender.getUsername())
-                    .timestamp(lastMessageInfo.getTimestamp())
-                    .build();
-                
-                dto.setLastMessage(lastMessageDTO);
-            } catch (Exception e) {
-                log.warn("Failed to load last message sender: {}", e.getMessage());
-            }
-        }
-    }
-    
     /**
      * Helper method to extract avatar URL from User.
      * Null-safe extraction of avatar from user profile.

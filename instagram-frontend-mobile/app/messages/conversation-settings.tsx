@@ -16,7 +16,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/common/Avatar';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { userAPI } from '../../services/api';
+import { messageAPI, userAPI } from '../../services/api';
 import { UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
 
@@ -24,12 +24,20 @@ export default function ConversationSettingsScreen() {
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
   const router = useRouter();
-  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
+  const params = useLocalSearchParams<{ userId?: string; conversationId?: string }>();
+  const normalizeParam = (value?: string | string[]): string | undefined =>
+    Array.isArray(value) ? value[0] : value;
+  const routeUserId = normalizeParam(params.userId);
+  const routeConversationId = normalizeParam(params.conversationId);
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const handleViewProfile = () => {
-    router.push(`/users/${conversationId}`);
+    if (otherUser?.id) {
+      router.push(`/users/${otherUser.id}`);
+    } else {
+      showAlert('Error', 'Không xác định được người dùng');
+    }
   };
 
   const handleBack = () => {
@@ -38,15 +46,29 @@ export default function ConversationSettingsScreen() {
 
   useEffect(() => {
     loadUserProfile();
-  }, [conversationId]);
+  }, [routeUserId, routeConversationId]);
 
   const loadUserProfile = async () => {
     try {
-      if (!conversationId) return;
-      
       setIsLoading(true);
-      const userProfile = await userAPI.getUserProfile(conversationId);
-      setOtherUser(userProfile);
+
+      if (routeUserId) {
+        const profile = await userAPI.getUserProfile(routeUserId);
+        setOtherUser(profile);
+        return;
+      }
+
+      if (routeConversationId) {
+        const conversation = await messageAPI.getConversation(routeConversationId);
+        const other = conversation.participants?.find(p => p.userId !== currentUser?.id)
+                   || conversation.participants?.[0];
+        if (!other?.userId) throw new Error('Không tìm thấy participant còn lại');
+        const profile = await userAPI.getUserProfile(other.userId);
+        setOtherUser(profile);
+        return;
+      }
+
+      throw new Error('Thiếu userId/conversationId');
     } catch (error: any) {
       console.error('Error loading user profile:', error);
       showAlert('Error', 'Không thể tải thông tin người dùng');
@@ -197,6 +219,13 @@ export default function ConversationSettingsScreen() {
       {/* Create Group Chat */}
       <TouchableOpacity 
         style={styles.settingItem}
+        onPress={() => {
+          // Navigate to create-group with current otherUser.id if available
+          router.push({
+            pathname: '/messages/create-group',
+            params: otherUser?.id ? { userId: otherUser.id } : {},
+          });
+        }}
       >
         <View style={styles.settingIcon}>
           <Ionicons name="people-outline" size={24} color={theme.colors.text} />

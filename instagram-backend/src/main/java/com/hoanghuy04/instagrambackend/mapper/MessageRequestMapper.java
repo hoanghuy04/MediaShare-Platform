@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.mapper;
 
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
@@ -33,8 +34,6 @@ public abstract class MessageRequestMapper {
      * @param request the MessageRequest entity
      * @return MessageRequestDTO
      */
-    @Mapping(target = "sender", ignore = true)
-    @Mapping(target = "receiver", ignore = true)
     public abstract MessageRequestDTO toMessageRequestDTO(MessageRequest request);
     
     /**
@@ -74,6 +73,35 @@ public abstract class MessageRequestMapper {
         }
         
         // lastMessageContent and lastMessageTimestamp are already mapped by MapStruct
+    }
+    
+    /**
+     * Convert MessageRequest to InboxItemDTO.
+     * Used for pending inbox items display.
+     *
+     * @param req the MessageRequest entity
+     * @param viewerId the user ID viewing the inbox (for context)
+     * @return InboxItemDTO with type MESSAGE_REQUEST
+     */
+    public InboxItemDTO toInboxItem(MessageRequest req, String viewerId) {
+        if (req == null) {
+            return null;
+        }
+        
+        // Convert to MessageRequestDTO and enrich
+        MessageRequestDTO reqDTO = toMessageRequestDTO(req);
+        enrichMessageRequest(reqDTO, req);
+        
+        // Determine timestamp: use lastMessageTimestamp if available, fallback to createdAt
+        java.time.LocalDateTime timestamp = req.getLastMessageTimestamp() != null 
+            ? req.getLastMessageTimestamp() 
+            : req.getCreatedAt();
+        
+        return InboxItemDTO.builder()
+            .type(InboxItemDTO.InboxItemType.MESSAGE_REQUEST)
+            .messageRequest(reqDTO)
+            .timestamp(timestamp)
+            .build();
     }
 }
 

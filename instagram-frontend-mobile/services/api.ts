@@ -17,6 +17,7 @@ import {
   InboxItem,
   Notification,
   PaginatedResponse,
+  UserSummary,
 } from '../types';
 import apiConfig from '../config/apiConfig';
 
@@ -116,6 +117,52 @@ export const userAPI = {
       params: { page, limit },
     });
     return response.data.data;
+  },
+
+  getMutualFollows: async (
+    userId: string,
+    query = '',
+    page = 0,
+    size = 20
+  ): Promise<UserSummary[]> => {
+    const mapToSummary = (user: UserProfile): UserSummary => ({
+      id: user.id,
+      username: user.username,
+      avatar: user.profile?.avatar,
+      isVerified: !!user.isVerified,
+    });
+
+    try {
+      const response = await axiosInstance.get(API_ENDPOINTS.MUTUAL_FOLLOWS(userId), {
+        params: { query, page, size },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
+      const [followers, following] = await Promise.all([
+        userAPI.getFollowers(userId, 0, 100),
+        userAPI.getFollowing(userId, 0, 100),
+      ]);
+
+      const followerIds = new Set(followers.map(u => u.id));
+      let mutuals = following.filter(u => followerIds.has(u.id));
+
+      if (query.trim()) {
+        const lowerQuery = query.toLowerCase();
+        mutuals = mutuals.filter(user => {
+          const username = user.username?.toLowerCase() || '';
+          const firstName = user.profile?.firstName?.toLowerCase() || '';
+          const lastName = user.profile?.lastName?.toLowerCase() || '';
+          return (
+            username.includes(lowerQuery) ||
+            firstName.includes(lowerQuery) ||
+            lastName.includes(lowerQuery)
+          );
+        });
+      }
+
+      return mutuals.map(mapToSummary);
+    }
   },
 
   getUserStats: async (userId: string): Promise<any> => {
@@ -281,7 +328,7 @@ export const messageAPI = {
   getInbox: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
     // userId will be automatically added by axios interceptor
     const response = await axiosInstance.get(API_ENDPOINTS.INBOX, {
-      params: { page, limit },
+      params: { page, size: limit }, // Backend uses 'size' not 'limit'
     });
     return response.data.data; // Backend returns ApiResponse<PageResponse<InboxItemDTO>>
   },
@@ -364,11 +411,11 @@ export const messageAPI = {
   },
 
   // Create group chat
-  createGroup: async (groupName: string, participantIds: string[], avatar?: string): Promise<Conversation> => {
+  createGroup: async (groupName: string, participantIds: string[], avatar?: string | null): Promise<Conversation> => {
     const creatorId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.post(
       API_ENDPOINTS.CREATE_GROUP,
-      { groupName, participantIds, avatar },
+      { groupName, participantIds, avatar: avatar ?? null },
       { params: { creatorId } }
     );
     return response.data.data;
@@ -385,13 +432,22 @@ export const messageAPI = {
     return response.data.data;
   },
 
+  // Add members to group
+  addGroupMembers: async (conversationId: string, addedBy: string, userIds: string[]): Promise<void> => {
+    await axiosInstance.post(
+      API_ENDPOINTS.ADD_MEMBERS(conversationId),
+      { userIds },
+      { params: { addedBy } }
+    );
+  },
+
   // Leave group
-  leaveGroup: async (conversationId: string): Promise<void> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+  leaveGroup: async (conversationId: string, userId?: string): Promise<void> => {
+    const requesterId = userId ?? axiosInstance.defaults.headers.common['X-User-ID'];
     await axiosInstance.post(
       API_ENDPOINTS.LEAVE_GROUP(conversationId),
       null,
-      { params: { userId } }
+      { params: { userId: requesterId } }
     );
   },
 };
@@ -414,6 +470,14 @@ export const messageRequestAPI = {
     return response.data.data;
   },
 
+  getPendingInboxItems: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_INBOX, {
+      params: { userId, page, size: limit }, // Backend uses 'size' not 'limit'
+    });
+    return response.data.data;
+  },
+
   getPendingMessages: async (senderId: string, receiverId: string): Promise<Message[]> => {
     const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_PENDING_MESSAGES, {
       params: { senderId, receiverId },
@@ -421,32 +485,15 @@ export const messageRequestAPI = {
     return response.data.data;
   },
 
-  acceptRequest: async (requestId: string): Promise<Conversation> => {
+  getPendingMessagesByRequestId: async (requestId: string): Promise<Message[]> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    const response = await axiosInstance.post(
-      API_ENDPOINTS.ACCEPT_MESSAGE_REQUEST(requestId),
-      null,
-      { params: { userId } }
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.MESSAGE_REQUESTS_PENDING_MESSAGES_BY_ID(requestId),
+      {
+        params: { userId },
+      }
     );
     return response.data.data;
-  },
-
-  rejectRequest: async (requestId: string): Promise<void> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.post(
-      API_ENDPOINTS.REJECT_MESSAGE_REQUEST(requestId),
-      null,
-      { params: { userId } }
-    );
-  },
-
-  ignoreRequest: async (requestId: string): Promise<void> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    await axiosInstance.post(
-      API_ENDPOINTS.IGNORE_MESSAGE_REQUEST(requestId),
-      null,
-      { params: { userId } }
-    );
   },
 };
 

@@ -357,16 +357,24 @@ export default function MessagesScreen() {
       return (
         <TouchableOpacity
           style={styles.messageItem}
-          onPress={() =>
+          onPress={() => {
+            // In MessagesScreen, currentUser is sender, receiver is other
+            const currentUserId = currentUser?.id;
+            if (!currentUserId || !messageRequest.sender?.id || !messageRequest.receiver?.id) {
+              return;
+            }
             router.push({
               pathname: '/messages/[conversationId]',
               params: {
                 conversationId: messageRequest.receiver.id,
                 isNewConversation: 'true',
                 requestId: messageRequest.id,
+                direction: 'sent', // currentUser is sender
+                senderId: messageRequest.sender.id, // BE-safe
+                receiverId: messageRequest.receiver.id, // BE-safe
               },
-            })
-          }
+            });
+          }}
         >
           <Avatar uri={receiverAvatar} name={receiverName} size={50} />
           <View style={styles.messageContent}>

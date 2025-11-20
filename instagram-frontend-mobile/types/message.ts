@@ -35,6 +35,7 @@ export interface Conversation {
   name?: string; // Group name
   avatar?: string; // Group avatar
   participants: ConversationMember[]; // Changed from UserSummary[] to ConversationMember[]
+  admins?: string[];
   lastMessage?: LastMessage;
   createdAt: string;
   // Note: unreadCount removed - calculate on frontend from messages
@@ -44,7 +45,7 @@ export interface Conversation {
 export interface Message {
   id: string;
   conversationId?: string;
-  sender: UserSummary;
+  sender?: UserSummary;
   content: string;
   mediaUrl?: string;
   readBy: string[]; // Changed from isRead: boolean

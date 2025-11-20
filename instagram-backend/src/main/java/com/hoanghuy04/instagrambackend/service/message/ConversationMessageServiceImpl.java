@@ -125,9 +125,71 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         );
 
         if (incomingRequest.isPresent()) {
-            log.info("Auto-accepting pending request {} when {} replies to {}", incomingRequest.get().getId(), senderId, receiverId);
-            Conversation conversation = messageRequestService.acceptRequest(incomingRequest.get().getId(), senderId);
-            return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
+            MessageRequest request = incomingRequest.get();
+            log.info("Auto-accepting pending request {} when {} replies to {}", request.getId(), senderId, receiverId);
+            
+            // Update request status
+            request.setStatus(RequestStatus.ACCEPTED);
+            request.setRespondedAt(LocalDateTime.now());
+            
+            // Create or get existing conversation
+            Conversation conversation = conversationService
+                .getExistingDirectConversation(senderId, receiverId)
+                .orElseGet(() -> conversationService.createDirectConversation(senderId, receiverId));
+            
+            // Migrate all pending messages (sender↔receiver, conversation == null) into conversation
+            // Query both directions: sender→receiver and receiver→sender
+            List<Message> pendingMessages1 = messageRepository.findBySenderAndReceiverOrderByCreatedAtDesc(sender, receiver);
+            List<Message> pendingMessages2 = messageRepository.findBySenderAndReceiverOrderByCreatedAtDesc(receiver, sender);
+            
+            // Combine and filter messages with conversation == null
+            List<Message> allPendingMessages = new ArrayList<>();
+            allPendingMessages.addAll(pendingMessages1);
+            allPendingMessages.addAll(pendingMessages2);
+            
+            List<Message> messagesToMigrate = allPendingMessages.stream()
+                .filter(msg -> msg.getConversation() == null)
+                .collect(Collectors.toList());
+            
+            Message lastMigratedMessage = null;
+            for (Message msg : messagesToMigrate) {
+                msg.setConversation(conversation);
+                messageRepository.save(msg);
+                lastMigratedMessage = msg;
+                log.debug("Migrated message {} to conversation {}", msg.getId(), conversation.getId());
+            }
+            
+            if (!messagesToMigrate.isEmpty()) {
+                log.info("Migrated {} pending messages to conversation {}", messagesToMigrate.size(), conversation.getId());
+            }
+            
+            // Link pending messages from request.pendingMessageIds (if any)
+            if (request.getPendingMessageIds() != null && !request.getPendingMessageIds().isEmpty()) {
+                List<Message> requestMessages = messageRepository.findByIdIn(request.getPendingMessageIds());
+                for (Message msg : requestMessages) {
+                    if (msg.getConversation() == null) {
+                        msg.setConversation(conversation);
+                        messageRepository.save(msg);
+                        lastMigratedMessage = msg;
+                    }
+                }
+            }
+            
+            // Update conversation.lastMessage after migration (or after sending new reply)
+            // We'll update it after sending the reply message below
+            
+            // Clear request.pendingMessageIds and save request
+            request.setPendingMessageIds(new ArrayList<>());
+            messageRequestRepository.save(request);
+            
+            // Send the reply message to conversation
+            Message replyMessage = sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
+            
+            // Update conversation.lastMessage (the reply message is now the last)
+            conversationService.updateLastMessage(conversation.getId(), replyMessage);
+            
+            log.info("Auto-accepted request {} and migrated messages to conversation {}", request.getId(), conversation.getId());
+            return replyMessage;
         }
 
         Message message = Message.builder()
@@ -380,7 +442,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         for (MessageRequest req : sentRequests) {
             MessageRequestDTO reqDTO = messageRequestMapper.toMessageRequestDTO(req);
             // Manually enrich sender and receiver (MapStruct doesn't auto-call @AfterMapping)
-            messageRequestMapper.enrichMessageRequest(reqDTO, req);
+//            messageRequestMapper.enrichMessageRequest(reqDTO, req);
             
             InboxItemDTO item = InboxItemDTO.builder()
                 .type(InboxItemDTO.InboxItemType.MESSAGE_REQUEST)

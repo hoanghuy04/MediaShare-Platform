@@ -1,88 +1,132 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Message } from '@types';
-import { useTheme } from '@hooks/useTheme';
-import { formatTime } from '@utils/formatters';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { Message } from '../../types/message';
+import { useTheme } from '../../hooks/useTheme';
 
 interface ChatMessageProps {
   message: Message;
   isOwn: boolean;
-  showStatus?: boolean;
+  isClusterStart?: boolean;
+  isClusterEnd?: boolean;
+  showAvatar?: boolean;
+  avatarUrl?: string;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isOwn, showStatus = true }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  message,
+  isOwn,
+  isClusterStart = true,
+  isClusterEnd = true,
+  showAvatar = false,
+  avatarUrl,
+}) => {
   const { theme } = useTheme();
 
-  const getStatusIcon = () => {
-    if (!isOwn || !showStatus) return null;
-    
-    if (message.isRead) {
-      return <Ionicons name="checkmark-done" size={12} color="rgba(255,255,255,0.7)" />;
-    } else {
-      return <Ionicons name="checkmark" size={12} color="rgba(255,255,255,0.7)" />;
-    }
-  };
+  const containerStyle = [
+    styles.row,
+    isClusterStart ? styles.clusterGap : styles.clusterTight,
+  ];
+
+  const bubbleStyle = [
+    styles.bubble,
+    isOwn ? styles.bubbleOwn : styles.bubbleOther,
+    !isClusterStart && (isOwn ? styles.bubbleOwnNotStart : styles.bubbleOtherNotStart),
+    !isClusterEnd && (isOwn ? styles.bubbleOwnNotEnd : styles.bubbleOtherNotEnd),
+  ];
 
   return (
-    <View style={[styles.container, isOwn ? styles.ownMessage : styles.otherMessage]}>
+    <View style={containerStyle}>
       <View
         style={[
-          styles.bubble,
-          {
-            backgroundColor: isOwn ? theme.colors.primary : theme.colors.surface,
-          },
+          styles.bubbleWrapper,
+          isOwn ? styles.wrapperOwn : styles.wrapperOther,
         ]}
       >
-        <Text style={[styles.content, { color: isOwn ? '#fff' : theme.colors.text }]}>
-          {message.content}
-        </Text>
-        <View style={styles.footer}>
-          <Text
-            style={[
-              styles.timestamp,
-              { color: isOwn ? 'rgba(255,255,255,0.7)' : theme.colors.textSecondary },
-            ]}
-          >
-            {formatTime(message.createdAt)}
+        <View style={bubbleStyle}>
+          <Text style={[styles.content, isOwn ? styles.textRight : styles.textLeft]}>
+            {message.content}
           </Text>
-          {getStatusIcon()}
         </View>
+        {showAvatar && !isOwn && (
+          <Image
+            source={avatarUrl ? { uri: avatarUrl } : undefined}
+            style={styles.avatarTail}
+          />
+        )}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 4,
-    paddingHorizontal: 16,
+  row: {
+    width: '100%',
+    paddingLeft: 36
   },
-  ownMessage: {
-    alignItems: 'flex-end',
+  clusterGap: {
+    marginTop: 10,
   },
-  otherMessage: {
-    alignItems: 'flex-start',
+  clusterTight: {
+    marginTop: 3,
+  },
+  bubbleWrapper: {
+    position: 'relative',
+    maxWidth: '78%',
+  },
+  wrapperOwn: {
+    alignSelf: 'flex-end',
+  },
+  wrapperOther: {
+    alignSelf: 'flex-start',
   },
   bubble: {
-    maxWidth: '75%',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  bubbleOwn: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#4F6AF5',
+    borderTopRightRadius: 16,
+  },
+  bubbleOther: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F4F5F8',
+    borderTopLeftRadius: 16,
+  },
+  bubbleOwnNotStart: {
+    borderTopRightRadius: 8,
+    borderTopLeftRadius: 8,
+  },
+  bubbleOtherNotStart: {
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  bubbleOwnNotEnd: {
+    borderBottomRightRadius: 8,
+    borderBottomLeftRadius: 8,
+  },
+  bubbleOtherNotEnd: {
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
   content: {
     fontSize: 16,
     lineHeight: 20,
   },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 4,
+  textLeft: {
+    color: '#111827',
   },
-  timestamp: {
-    fontSize: 10,
-    marginRight: 4,
+  textRight: {
+    color: '#fff',
+  },
+  avatarTail: {
+    position: 'absolute',
+    left: -36,
+    bottom: 0,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
   },
 });
 

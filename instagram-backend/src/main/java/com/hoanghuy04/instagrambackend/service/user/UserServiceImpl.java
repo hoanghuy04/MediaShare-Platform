@@ -4,6 +4,8 @@ import com.hoanghuy04.instagrambackend.dto.request.UpdateUserRequest;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
+import com.hoanghuy04.instagrambackend.entity.Follow;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.UserProfile;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -17,7 +19,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -195,6 +199,80 @@ public class UserServiceImpl implements UserService {
                 .isActive(user.isActive())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
+                .build();
+    }
+    
+    @Transactional(readOnly = true)
+    @Override
+    public List<UserSummaryDTO> getMutualFollows(String userId, String query, int page, int size) {
+        log.debug("Getting mutual follows for user {} with query: {}", userId, query);
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // Lấy danh sách following và followers
+        List<Follow> following = followRepository.findByFollowerId(userId);
+        List<Follow> followers = followRepository.findByFollowingId(userId);
+        
+        // Tạo Set để giao cắt
+        Set<String> followingIds = following.stream()
+                .map(f -> f.getFollowing().getId())
+                .collect(Collectors.toSet());
+        
+        Set<String> followerIds = followers.stream()
+                .map(f -> f.getFollower().getId())
+                .collect(Collectors.toSet());
+        
+        // Giao cắt: mutual = vừa là following vừa là follower
+        Set<String> mutualIds = followingIds.stream()
+                .filter(followerIds::contains)
+                .collect(Collectors.toSet());
+        
+        if (mutualIds.isEmpty()) {
+            log.debug("No mutual follows found for user {}", userId);
+            return new ArrayList<>();
+        }
+        
+        // Load users
+        List<User> mutualUsers = new ArrayList<>();
+        userRepository.findAllById(mutualIds).forEach(mutualUsers::add);
+        
+        // Filter theo query nếu có
+        if (query != null && !query.trim().isEmpty()) {
+            String lowerQuery = query.toLowerCase();
+            mutualUsers = mutualUsers.stream()
+                    .filter(u -> {
+                        String username = u.getUsername() != null ? u.getUsername().toLowerCase() : "";
+                        String firstName = u.getProfile() != null && u.getProfile().getFirstName() != null
+                                ? u.getProfile().getFirstName().toLowerCase() : "";
+                        String lastName = u.getProfile() != null && u.getProfile().getLastName() != null
+                                ? u.getProfile().getLastName().toLowerCase() : "";
+                        return username.contains(lowerQuery) ||
+                               firstName.contains(lowerQuery) ||
+                               lastName.contains(lowerQuery);
+                    })
+                    .collect(Collectors.toList());
+        }
+        
+        // Pagination (manual)
+        int start = page * size;
+        int end = Math.min(start + size, mutualUsers.size());
+        List<User> paginatedUsers = start < mutualUsers.size()
+                ? mutualUsers.subList(start, end)
+                : new ArrayList<>();
+        
+        // Map to DTOs
+        return paginatedUsers.stream()
+                .map(this::toUserSummary)
+                .collect(Collectors.toList());
+    }
+
+    private UserSummaryDTO toUserSummary(User user) {
+        return UserSummaryDTO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .avatar(user.getProfile() != null ? user.getProfile().getAvatar() : null)
+                .isVerified(user.isVerified())
                 .build();
     }
 }

@@ -1,9 +1,11 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,33 +42,15 @@ public interface MessageRequestService {
     List<MessageRequestDTO> getPendingRequests(String userId);
 
     /**
-     * Accept a message request.
-     * This will create a conversation and move pending messages to it.
+     * Get pending inbox items (received requests only) for a user.
+     * Used for the "Pending Messages" tab - shows requests that others sent to the user.
      *
-     * @param requestId the request ID
-     * @param userId the user who accepts the request
-     * @return Conversation entity
+     * @param userId the user ID (receiver)
+     * @param pageable pagination information
+     * @return PageResponse of InboxItemDTO
      */
-    @Transactional
-    Conversation acceptRequest(String requestId, String userId);
-
-    /**
-     * Reject a message request.
-     *
-     * @param requestId the request ID
-     * @param userId the user who rejects the request
-     */
-    @Transactional
-    void rejectRequest(String requestId, String userId);
-
-    /**
-     * Ignore a message request.
-     *
-     * @param requestId the request ID
-     * @param userId the user who ignores the request
-     */
-    @Transactional
-    void ignoreRequest(String requestId, String userId);
+    @Transactional(readOnly = true)
+    PageResponse<InboxItemDTO> getPendingInboxItems(String userId, Pageable pageable);
 
     /**
      * Get count of pending message requests for a user.
@@ -115,4 +99,16 @@ public interface MessageRequestService {
      */
     @Transactional(readOnly = true)
     List<com.hoanghuy04.instagrambackend.dto.response.MessageDTO> getPendingMessages(String senderId, String receiverId);
+    
+    /**
+     * Get all pending messages for a message request by request ID.
+     * BE automatically reads senderId/receiverId from the MessageRequest.
+     * This is more stable than passing senderId/receiverId separately.
+     *
+     * @param requestId the message request ID
+     * @param viewerId the user ID viewing the messages (for context)
+     * @return List of pending messages as DTOs
+     */
+    @Transactional(readOnly = true)
+    List<com.hoanghuy04.instagrambackend.dto.response.MessageDTO> getPendingMessagesByRequestId(String requestId, String viewerId);
 }

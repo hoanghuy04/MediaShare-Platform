@@ -51,7 +51,7 @@ public class InitApp implements CommandLineRunner {
             initializeUsers();
             initializePosts();
             initializeComments();
-//            initializeFollows();
+            initializeFollows();
             initializeNotifications();
             
             log.info("Application initialization completed successfully");

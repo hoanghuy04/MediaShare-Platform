@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -10,6 +10,9 @@ import {
   Image,
   StatusBar,
   SafeAreaView,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,20 +25,29 @@ import { TypingIndicator } from '../../components/messages/TypingIndicator';
 import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { messageAPI, userAPI, messageRequestAPI } from '../../services/api';
-import { Message, UserProfile } from '../../types';
+import { Conversation, Message, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
+import { MutualUserPicker, MutualUserOption } from '../../components/messages/MutualUserPicker';
+import { MiniOverlapAvatars } from '../../components/messages/MiniOverlapAvatars';
+import { GroupInfoSheet } from '../../components/messages/GroupInfoSheet';
 
 export default function ConversationScreen() {
   const params = useLocalSearchParams<{
     conversationId?: string | string[];
     isNewConversation?: string | string[];
     requestId?: string | string[];
+    direction?: string | string[];
+    senderId?: string | string[];
+    receiverId?: string | string[];
   }>();
   const normalizeParam = (value?: string | string[]): string | undefined =>
     Array.isArray(value) ? value[0] : value;
   const routeConversationId = normalizeParam(params.conversationId) || '';
   const routePendingFlag = normalizeParam(params.isNewConversation);
   const routeRequestId = normalizeParam(params.requestId);
+  const direction = normalizeParam(params.direction); // 'sent' | 'received' | undefined
+  const routeSenderId = normalizeParam(params.senderId);
+  const routeReceiverId = normalizeParam(params.receiverId);
   const wantsPendingRoute = routePendingFlag === 'true';
   const router = useRouter();
   const { theme } = useTheme();
@@ -63,6 +75,38 @@ export default function ConversationScreen() {
   );
   const [isNewConversation, setIsNewConversation] = useState(wantsPendingRoute);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [conversationDetails, setConversationDetails] = useState<Conversation | null>(null);
+  const [isGroupInfoVisible, setGroupInfoVisible] = useState(false);
+  const [isAddMembersVisible, setAddMembersVisible] = useState(false);
+  const [pendingMembers, setPendingMembers] = useState<Record<string, MutualUserOption>>({});
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+
+  const isGroupConversation = conversationDetails?.type === 'GROUP';
+  const participantMap = useMemo(() => {
+    const map = new Map<string, Conversation['participants'][number]>();
+    conversationDetails?.participants?.forEach(participant => {
+      map.set(participant.userId, participant);
+    });
+    return map;
+  }, [conversationDetails]);
+
+  const typingDisplayNames = useMemo(
+    () =>
+      typingUsers
+        .map(userId => participantMap.get(userId)?.username)
+        .filter((name): name is string => Boolean(name)),
+    [participantMap, typingUsers]
+  );
+
+  const recentMedia = useMemo(
+    () => messages.filter(message => !!message.mediaUrl).slice(-6).reverse(),
+    [messages]
+  );
+
+  const existingMemberIds = useMemo(
+    () => conversationDetails?.participants?.map(member => member.userId) ?? [],
+    [conversationDetails]
+  );
   const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
   const [developmentTitle, setDevelopmentTitle] = useState('');
   const [developmentMessage, setDevelopmentMessage] = useState('');
@@ -97,6 +141,14 @@ export default function ConversationScreen() {
     [user]
   );
 
+  const sortMessagesAscending = useCallback(
+    (list: Message[]) =>
+      [...list].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      ),
+    []
+  );
+
   const loadPendingThread = useCallback(
     async (targetUserId: string) => {
       if (!targetUserId || !user?.id) {
@@ -109,17 +161,42 @@ export default function ConversationScreen() {
         setIsNewConversation(true);
         setActualConversationId(null);
         setPeerUserId(targetUserId);
+        setConversationDetails(null);
 
         if (!otherUser || otherUser.id !== targetUserId) {
           const profile = await userAPI.getUserProfile(targetUserId);
           setOtherUser(profile);
         }
 
-        const pendingMessages = await messageRequestAPI.getPendingMessages(user.id, targetUserId);
+        // ---- XÁC ĐỊNH CHIỀU AN TOÀN ----
+        // Ưu tiên dùng endpoint theo requestId nếu có (ổn định hơn)
+        let pendingMessages: Message[];
+        
+        if (routeRequestId) {
+          // Use endpoint by requestId (more stable)
+          pendingMessages = await messageRequestAPI.getPendingMessagesByRequestId(routeRequestId);
+        } else {
+          // Fallback: calculate senderId/receiverId
+          let senderId = routeSenderId;
+          let receiverId = routeReceiverId;
+
+          if (!senderId || !receiverId) {
+            if (direction === 'received') {
+              // Bạn là receiver (mở từ tab Pending)
+              senderId = targetUserId;   // other
+              receiverId = user.id;      // currentUser
+            } else {
+              // Mặc định/sent (mở từ inbox/pending do bạn gửi)
+              senderId = user.id;        // currentUser
+              receiverId = targetUserId; // other
+            }
+          }
+
+          pendingMessages = await messageRequestAPI.getPendingMessages(senderId!, receiverId!);
+        }
         const orderedMessages = [...pendingMessages]
-          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
           .map(ensureMessageSender);
-        setMessages(orderedMessages);
+        setMessages(sortMessagesAscending(orderedMessages));
       } catch (error) {
         console.error('Error loading pending messages:', error);
         setMessages([]);
@@ -127,7 +204,16 @@ export default function ConversationScreen() {
         setIsLoading(false);
       }
     },
-    [ensureMessageSender, otherUser, user]
+    [
+      routeRequestId,
+      direction,
+      routeSenderId,
+      routeReceiverId,
+      ensureMessageSender,
+      otherUser,
+      sortMessagesAscending,
+      user,
+    ]
   );
 
   const loadExistingThread = useCallback(
@@ -143,7 +229,9 @@ export default function ConversationScreen() {
         setActualConversationId(conversation.id);
         setIsNewConversation(false);
 
-        if (conversation.participants && conversation.participants.length > 0) {
+        setConversationDetails(conversation);
+
+        if (conversation.type === 'DIRECT' && conversation.participants && conversation.participants.length > 0) {
           const otherParticipant =
             conversation.participants.find(p => p.userId !== user?.id) ||
             conversation.participants[0];
@@ -164,11 +252,14 @@ export default function ConversationScreen() {
                   }
             );
           }
+        } else {
+          setPeerUserId(null);
+          setOtherUser(null);
         }
 
         const response = await messageAPI.getMessages(conversation.id);
-        const orderedMessages = [...(response.content || [])].reverse().map(ensureMessageSender);
-        setMessages(orderedMessages);
+        const orderedMessages = [...(response.content || [])].map(ensureMessageSender);
+        setMessages(sortMessagesAscending(orderedMessages));
 
         if (response.content && response.content.length > 0) {
           const unreadMessages = response.content.filter(
@@ -200,6 +291,7 @@ export default function ConversationScreen() {
       loadPendingThread,
       messageAPI,
       sendReadReceipt,
+      sortMessagesAscending,
       user,
     ]
   );
@@ -260,10 +352,11 @@ export default function ConversationScreen() {
         if (exists) return prev;
 
         if (message.senderId === user?.id) {
-          return prev.map(msg => (msg.id.startsWith('temp-') ? newMessage : msg));
+          const replaced = prev.map(msg => (msg.id.startsWith('temp-') ? newMessage : msg));
+          return sortMessagesAscending(replaced);
         }
 
-        return [...prev, newMessage];
+        return sortMessagesAscending([...prev, newMessage]);
       });
 
       if (isNewConversation && message.conversationId) {
@@ -363,7 +456,7 @@ export default function ConversationScreen() {
 
       // Add optimistic message immediately
       console.log('Adding optimistic message:', optimisticMessage);
-      setMessages(prev => [...prev, optimisticMessage]);
+      setMessages(prev => sortMessagesAscending([...prev, optimisticMessage]));
 
       // If this is a new conversation (no existing conversation), send via direct message endpoint
       // This will create a message request (if users are not connected)
@@ -385,8 +478,10 @@ export default function ConversationScreen() {
 
           // Replace optimistic message with real message
           setMessages(prev =>
-            prev.map(msg =>
-              msg.id === optimisticMessage.id ? ensureMessageSender(newMessage) : msg
+            sortMessagesAscending(
+              prev.map(msg =>
+                msg.id === optimisticMessage.id ? ensureMessageSender(newMessage) : msg
+              )
             )
           );
 
@@ -437,8 +532,10 @@ export default function ConversationScreen() {
 
             // Replace optimistic message with real message
             setMessages(prev =>
-              prev.map(msg =>
-                msg.id === optimisticMessage.id ? ensureMessageSender(newMessage) : msg
+              sortMessagesAscending(
+                prev.map(msg =>
+                  msg.id === optimisticMessage.id ? ensureMessageSender(newMessage) : msg
+                )
               )
             );
           } catch (apiError) {
@@ -453,16 +550,62 @@ export default function ConversationScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    // Safety check: ensure sender exists
+  const CLUSTER_MS = 2 * 60 * 1000;
+
+  const getClusterFlags = useCallback(
+    (index: number) => {
+      const current = messages[index];
+      const prev = messages[index - 1];
+      const next = messages[index + 1];
+
+      const sameAsPrev =
+        !!prev &&
+        prev.sender?.id === current?.sender?.id &&
+        new Date(current.createdAt).getTime() - new Date(prev.createdAt).getTime() <= CLUSTER_MS;
+
+      const sameAsNext =
+        !!next &&
+        next.sender?.id === current?.sender?.id &&
+        new Date(next.createdAt).getTime() - new Date(current.createdAt).getTime() <= CLUSTER_MS;
+
+      return {
+        isClusterStart: !sameAsPrev,
+        isClusterEnd: !sameAsNext,
+      };
+    },
+    [messages]
+  );
+
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     if (!item.sender) {
-      console.warn('Message missing sender:', item);
-      return null;
+      return (
+        <View style={styles.systemMessageContainer}>
+          <Text style={[styles.systemMessageText, { color: theme.colors.textSecondary }]}>
+            {item.content}
+          </Text>
+        </View>
+      );
     }
-    return <ChatMessage message={item} isOwn={item.sender.id === user?.id} />;
+
+    const isOwn = item.sender.id === user?.id;
+    const { isClusterStart, isClusterEnd } = getClusterFlags(index);
+    const showAvatar = !isOwn && isClusterEnd;
+
+    return (
+      <View>
+        <ChatMessage
+          message={item}
+          isOwn={isOwn}
+          isClusterStart={isClusterStart}
+          isClusterEnd={isClusterEnd}
+          showAvatar={showAvatar}
+          avatarUrl={item.sender.avatar}
+        />
+      </View>
+    );
   };
 
-  const renderHeader = () => (
+  const renderGroupHeader = () => (
     <SafeAreaView style={[styles.header, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
       <View style={styles.headerContent}>
@@ -470,64 +613,119 @@ export default function ConversationScreen() {
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.userInfo}
-          onPress={() =>
-            router.push(
-              `/messages/conversation-settings?conversationId=${
-                actualConversationId || routeConversationId
-              }`
-            )
-          }
-        >
-          <Image
-            source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/40' }}
-            style={styles.avatar}
-          />
-          <View style={styles.userDetails}>
-            <Text style={[styles.userName, { color: theme.colors.text }]}>
-              {otherUser?.profile?.firstName || otherUser?.username || 'User'}
+        <TouchableOpacity style={styles.groupInfoTrigger} onPress={() => setGroupInfoVisible(true)}>
+          <Text style={[styles.groupTitle, { color: theme.colors.text }]}>
+            {conversationDetails?.name || 'Nhóm chat'}
+          </Text>
+          <View style={styles.groupMeta}>
+            {/* <MiniOverlapAvatars
+              members={(conversationDetails?.participants || []).map(participant => ({
+                id: participant.userId,
+                avatar: participant.avatar,
+                username: participant.username,
+              }))}
+            /> */}
+            <Text style={[styles.groupMetaText, { color: theme.colors.textSecondary }]}>
+              {(conversationDetails?.participants?.length || 0)} thành viên
             </Text>
-            <Text style={[styles.userHandle, { color: theme.colors.textSecondary }]}>
-              @{otherUser?.username || 'user'}
-            </Text>
-            {isNewConversation && (
-              <View style={styles.pendingChip}>
-                <Text style={styles.pendingChipText}>Pending</Text>
-              </View>
-            )}
           </View>
         </TouchableOpacity>
 
-        {!isNewConversation && (
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() =>
-                showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')
-              }
-            >
-              <Ionicons name="person-add" size={20} color={theme.colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}
-            >
-              <Ionicons name="call" size={20} color={theme.colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() =>
-                showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')
-              }
-            >
-              <Ionicons name="videocam" size={20} color={theme.colors.text} />
-            </TouchableOpacity>
-          </View>
-        )}
+        <View style={styles.groupActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => showDevelopmentNotice('Tìm kiếm', 'Tính năng tìm kiếm trong nhóm đang phát triển.')}
+          >
+            <Ionicons name="search-outline" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => showDevelopmentNotice('Gọi nhóm', 'Tính năng cuộc gọi nhóm đang phát triển.')}
+          >
+            <Ionicons name="call-outline" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setGroupInfoVisible(true)}>
+            <Ionicons name="information-circle-outline" size={22} color={theme.colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
+
+  const renderHeader = () => {
+    if (isGroupConversation && conversationDetails) {
+      return renderGroupHeader();
+    }
+
+    return (
+      <SafeAreaView style={[styles.header, { backgroundColor: theme.colors.background }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.userInfo}
+            onPress={() =>
+              router.push({
+                pathname: '/messages/conversation-settings',
+                params: {
+                  userId: otherUser?.id || peerUserId || '',
+                  conversationId: actualConversationId || routeConversationId || '',
+                },
+              })
+            }
+          >
+            <Image
+              source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/40' }}
+              style={styles.avatar}
+            />
+            <View style={styles.userDetails}>
+              <Text style={[styles.userName, { color: theme.colors.text }]}>
+                {otherUser?.profile?.firstName || otherUser?.username || 'User'}
+              </Text>
+              <Text style={[styles.userHandle, { color: theme.colors.textSecondary }]}>
+                @{otherUser?.username || 'user'}
+              </Text>
+              {isNewConversation && (
+                <View style={styles.pendingChip}>
+                  <Text style={styles.pendingChipText}>Pending</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {!isNewConversation && (
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() =>
+                  showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')
+                }
+              >
+                <Ionicons name="person-add" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}
+              >
+                <Ionicons name="call" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() =>
+                  showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')
+                }
+              >
+                <Ionicons name="videocam" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  };
 
   const renderContactInfo = () => (
     <View style={styles.contactInfo}>
@@ -563,6 +761,126 @@ export default function ConversationScreen() {
     </View>
   );
 
+  const renderMediaStrip = () => (
+    <View style={styles.mediaStripContainer}>
+      <Text style={[styles.mediaStripTitle, { color: theme.colors.text }]}>Ảnh/Video gần đây</Text>
+      <ScrollView
+        style={styles.mediaStrip}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingRight: 16 }}
+      >
+        {recentMedia.map(media => (
+          <TouchableOpacity
+            key={media.id}
+            style={styles.mediaPreview}
+            onPress={() =>
+              showDevelopmentNotice('Trình xem media', 'Tính năng xem media đang phát triển.')
+            }
+          >
+            <Image source={{ uri: media.mediaUrl || undefined }} style={styles.mediaImage} />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const handleOpenAddMembers = () => {
+    setPendingMembers({});
+    setAddMembersVisible(true);
+    setGroupInfoVisible(false);
+  };
+
+  const handleConfirmAddMembers = async () => {
+    if (!actualConversationId || !user?.id) return;
+    const userIds = Object.keys(pendingMembers);
+    if (userIds.length === 0) {
+      showAlert('Thông báo', 'Vui lòng chọn ít nhất một thành viên');
+      return;
+    }
+    try {
+      setIsAddingMembers(true);
+      const start = Date.now();
+      await messageAPI.addGroupMembers(actualConversationId, user.id, userIds);
+      console.log('[telemetry] group_add_members', {
+        count: userIds.length,
+        durationMs: Date.now() - start,
+      });
+      showAlert('Thành công', 'Đã thêm thành viên mới');
+      setAddMembersVisible(false);
+      setPendingMembers({});
+      await loadExistingThread(actualConversationId);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Không thể thêm thành viên';
+      showAlert('Lỗi', message);
+    } finally {
+      setIsAddingMembers(false);
+    }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!actualConversationId || !user?.id) return;
+    try {
+      await messageAPI.leaveGroup(actualConversationId, user.id);
+      console.log('[telemetry] group_leave', { conversationId: actualConversationId });
+      showAlert('Thông báo', 'Bạn đã rời nhóm');
+      router.replace('/messages');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Không thể rời nhóm';
+      showAlert('Lỗi', message);
+    }
+  };
+
+  const renderAddMembersModal = () => (
+    <Modal
+      visible={isAddMembersVisible}
+      animationType="slide"
+      onRequestClose={() => setAddMembersVisible(false)}
+    >
+      <SafeAreaView style={[styles.addMembersModal, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.addMembersHeader}>
+          <TouchableOpacity onPress={() => setAddMembersVisible(false)}>
+            <Ionicons name="close" size={22} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.addMembersTitle, { color: theme.colors.text }]}>Thêm thành viên</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <MutualUserPicker
+          currentUserId={user?.id || ''}
+          selectedUsers={pendingMembers}
+          onSelectedChange={setPendingMembers}
+          excludeUserIds={existingMemberIds}
+          emptyMessage="Chỉ hiện những người theo dõi nhau"
+        />
+        <View style={styles.addMembersActions}>
+          <TouchableOpacity
+            style={[styles.addMembersSecondaryBtn, { borderColor: theme.colors.border || '#e0e0e0' }]}
+            onPress={() => setAddMembersVisible(false)}
+          >
+            <Text style={[styles.addMembersSecondaryText, { color: theme.colors.text }]}>Huỷ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.addMembersPrimaryBtn,
+              {
+                backgroundColor: theme.colors.primary,
+                opacity: Object.keys(pendingMembers).length === 0 || isAddingMembers ? 0.4 : 1,
+              },
+            ]}
+            onPress={handleConfirmAddMembers}
+            disabled={Object.keys(pendingMembers).length === 0 || isAddingMembers}
+          >
+            {isAddingMembers ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text style={styles.addMembersPrimaryText}>Thêm</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+
   const renderDateSeparator = () => (
     <View style={styles.dateSeparator}>
       <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
@@ -593,7 +911,9 @@ export default function ConversationScreen() {
 
       {isNewConversation && renderPendingBanner()}
 
-      {messages.length === 0 && otherUser && renderContactInfo()}
+      {messages.length === 0 && otherUser && !isGroupConversation && renderContactInfo()}
+
+      {recentMedia.length > 0 && renderMediaStrip()}
 
       {messages.length > 0 && renderDateSeparator()}
 
@@ -614,8 +934,8 @@ export default function ConversationScreen() {
           ) : null
         }
         ListFooterComponent={
-          canUseRealtime && typingUsers.length > 0 ? (
-            <TypingIndicator isVisible multipleUsers={typingUsers} />
+          canUseRealtime && typingDisplayNames.length > 0 ? (
+            <TypingIndicator isVisible multipleUsers={typingDisplayNames} />
           ) : null
         }
       />
@@ -625,6 +945,15 @@ export default function ConversationScreen() {
         onStopTyping={typingChannelId ? () => sendStopTyping(typingChannelId) : undefined}
         placeholder={isNewConversation ? 'Tin nhắn sẽ được gửi dưới dạng yêu cầu' : 'Nhắn tin...'}
       />
+      <GroupInfoSheet
+        visible={isGroupInfoVisible}
+        conversation={conversationDetails || undefined}
+        currentUserId={user?.id || ''}
+        onClose={() => setGroupInfoVisible(false)}
+        onAddMembers={handleOpenAddMembers}
+        onLeaveGroup={handleLeaveGroup}
+      />
+      {renderAddMembersModal()}
     </KeyboardAvoidingView>
   );
 }
@@ -756,8 +1085,111 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginHorizontal: 16,
   },
-  messagesList: {
-    paddingVertical: 16,
-    flexGrow: 1,
+    messagesList: {
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      flexGrow: 1,
+    },
+  groupInfoTrigger: {
+    flex: 1,
+    paddingHorizontal: 12,
+  },
+  groupTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  groupMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  groupMetaText: {
+    fontSize: 12,
+  },
+  groupActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  systemMessageContainer: {
+    alignItems: 'center',
+    marginVertical: 6,
+    paddingHorizontal: 16,
+  },
+  systemMessageText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  mediaStripContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  mediaStripTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  mediaStrip: {
+    flexGrow: 0,
+  },
+  mediaPreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  addMembersModal: {
+    flex: 1,
+  },
+  addMembersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  addMembersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addMembersActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  addMembersPrimaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  addMembersPrimaryText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  addMembersSecondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  addMembersSecondaryText: {
+    fontWeight: '600',
+    fontSize: 15,
   },
 });

@@ -1,7 +1,9 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
@@ -14,6 +16,7 @@ import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -104,86 +107,67 @@ public class MessageRequestServiceImpl implements MessageRequestService {
             .collect(Collectors.toList());
     }
     
-    @Transactional
+    @Transactional(readOnly = true)
     @Override
-    public Conversation acceptRequest(String requestId, String userId) {
-        log.info("Accepting message request {} by user {}", requestId, userId);
+    public PageResponse<InboxItemDTO> getPendingInboxItems(String userId, Pageable pageable) {
+        log.debug("Getting pending inbox items for user: {} with page {} and size {}", 
+            userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        MessageRequest request = getRequestById(requestId);
+        // Query received requests (others sent to this user)
+        List<MessageRequest> requests = messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
+            userId, 
+            RequestStatus.PENDING
+        );
         
-        // Verify user is the receiver
-        if (!request.getReceiverId().equals(userId)) {
-            throw new BadRequestException("You can only accept your own requests");
-        }
-
-        if (request.getStatus() == RequestStatus.ACCEPTED) {
-            log.info("Request {} already accepted earlier. Returning existing conversation", requestId);
-            return conversationService.getExistingDirectConversation(request.getSenderId(), request.getReceiverId())
-                .orElseThrow(() -> new BadRequestException("Conversation missing for an already accepted request"));
-        }
-
-        if (request.getStatus() != RequestStatus.PENDING) {
-            throw new BadRequestException("Request is no longer pending");
-        }
+        // Convert to InboxItemDTO
+        List<InboxItemDTO> allInboxItems = requests.stream()
+            .map(req -> messageRequestMapper.toInboxItem(req, userId))
+            .collect(Collectors.toList());
         
-        // Update request status
-        request.setStatus(RequestStatus.ACCEPTED);
-        request.setRespondedAt(LocalDateTime.now());
-
-        Conversation conversation = conversationService
-            .getExistingDirectConversation(request.getSenderId(), request.getReceiverId())
-            .orElseGet(() -> conversationService.createDirectConversation(userId, request.getSenderId()));
-
-        Message lastLinkedMessage = linkPendingMessages(conversation, request.getPendingMessageIds());
-        if (lastLinkedMessage != null) {
-            conversationService.updateLastMessage(conversation.getId(), lastLinkedMessage);
-        }
-
-        request.setPendingMessageIds(new ArrayList<>());
-        messageRequestRepository.save(request);
+        // Sort by timestamp (lastMessageTimestamp or createdAt) - most recent first
+        // Note: Repository already sorts by createdAt DESC, but we need to sort by lastMessageTimestamp
+        allInboxItems.sort((a, b) -> {
+            LocalDateTime timeA = a.getTimestamp();
+            LocalDateTime timeB = b.getTimestamp();
+            if (timeA == null && timeB == null) return 0;
+            if (timeA == null) return 1;
+            if (timeB == null) return -1;
+            return timeB.compareTo(timeA); // Descending order (most recent first)
+        });
         
-        log.info("Request accepted successfully, conversation: {}", conversation.getId());
-        return conversation;
-    }
-    
-    @Transactional
-    @Override
-    public void rejectRequest(String requestId, String userId) {
-        log.info("Rejecting message request {} by user {}", requestId, userId);
+        // Apply pagination
+        int totalElements = allInboxItems.size();
+        int pageNumber = pageable.getPageNumber();
+        int pageSize = pageable.getPageSize();
+        int startIndex = pageNumber * pageSize;
+        int endIndex = Math.min(startIndex + pageSize, totalElements);
         
-        MessageRequest request = getRequestById(requestId);
+        List<InboxItemDTO> pageContent = (startIndex < totalElements) 
+            ? allInboxItems.subList(startIndex, endIndex) 
+            : new ArrayList<>();
         
-        // Verify user is the receiver
-        if (!request.getReceiver().getId().equals(userId)) {
-            throw new BadRequestException("You can only reject your own requests");
-        }
+        int totalPages = (int) Math.ceil((double) totalElements / pageSize);
+        boolean hasNext = pageNumber < (totalPages - 1);
+        boolean hasPrevious = pageNumber > 0;
+        boolean isFirst = pageNumber == 0;
+        boolean isLast = pageNumber >= (totalPages - 1);
+        boolean isEmpty = pageContent.isEmpty();
         
-        // Update request status
-        request.setStatus(RequestStatus.REJECTED);
-        request.setRespondedAt(LocalDateTime.now());
-        messageRequestRepository.save(request);
+        log.debug("Found {} total pending inbox items for user {}. Returning page {} with {} items", 
+            totalElements, userId, pageNumber, pageContent.size());
         
-        log.info("Request rejected successfully");
-    }
-    
-    @Transactional
-    @Override
-    public void ignoreRequest(String requestId, String userId) {
-        log.info("Ignoring message request {} by user {}", requestId, userId);
-        
-        MessageRequest request = getRequestById(requestId);
-        
-        // Verify user is the receiver
-        if (!request.getReceiver().getId().equals(userId)) {
-            throw new BadRequestException("You can only ignore your own requests");
-        }
-        
-        // Update request status
-        request.setStatus(RequestStatus.IGNORED);
-        request.setRespondedAt(LocalDateTime.now());
-        messageRequestRepository.save(request);
-        
-        log.info("Request ignored successfully");
+        return PageResponse.<InboxItemDTO>builder()
+            .content(pageContent)
+            .pageNumber(pageNumber)
+            .pageSize(pageSize)
+            .totalElements(totalElements)
+            .totalPages(totalPages)
+            .hasNext(hasNext)
+            .hasPrevious(hasPrevious)
+            .first(isFirst)
+            .last(isLast)
+            .empty(isEmpty)
+            .build();
     }
     
     @Transactional(readOnly = true)
@@ -274,6 +258,22 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         log.info("Successfully mapped {} pending messages to DTOs", messageDTOs.size());
         
         return messageDTOs;
+    }
+    
+    @Transactional(readOnly = true)
+    @Override
+    public List<MessageDTO> getPendingMessagesByRequestId(String requestId, String viewerId) {
+        log.info("Getting pending messages for request {} by viewer {}", requestId, viewerId);
+        
+        MessageRequest request = getRequestById(requestId);
+        
+        // Verify viewer is either sender or receiver
+        if (!request.getSenderId().equals(viewerId) && !request.getReceiverId().equals(viewerId)) {
+            throw new BadRequestException("You can only view pending messages for your own requests");
+        }
+        
+        // Use senderId and receiverId from the request
+        return getPendingMessages(request.getSenderId(), request.getReceiverId());
     }
 
     private String resolvePreviewContent(Message message) {
