@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.entity;
 
+import com.hoanghuy04.instagrambackend.enums.PostType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,8 +39,10 @@ public class Post {
 
     private String caption;
 
+    private PostType type;
+
     @Builder.Default
-    private List<Media> media = new ArrayList<>();
+    private List<String> mediaFileIds = new ArrayList<>();
 
     @Builder.Default
     private List<String> likes = new ArrayList<>();

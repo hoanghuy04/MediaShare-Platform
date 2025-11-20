@@ -167,16 +167,12 @@ export const postAPI = {
   },
 
   likePost: async (postId: string): Promise<void> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId), null, {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
-    });
+    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId));
     return response.data.data;
   },
 
   unlikePost: async (postId: string): Promise<void> => {
-    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId), {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
-    });
+    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId));
     return response.data.data;
   },
 
@@ -475,22 +471,36 @@ export const notificationAPI = {
 
 // Upload API
 export const uploadAPI = {
-  uploadFile: async (file: FormData): Promise<string> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.UPLOAD_POST_MEDIA, file, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+  uploadFile: async (
+    file: FormData,
+    usage: 'PROFILE' | 'POST' | 'REEL' | 'STORY' = 'POST'
+  ): Promise<string> => {
+    const response = await axiosInstance.post(
+      `${API_ENDPOINTS.UPLOAD_POST_MEDIA}?usage=${usage}`,
+      file,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
 
     return response.data.data;
   },
 
-  uploadMultipleFiles: async (files: FormData): Promise<string[]> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.UPLOAD_POST_MEDIA_BATCH, files, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+  uploadMultipleFiles: async (
+    files: FormData,
+    usage: 'PROFILE' | 'POST' | 'REEL' | 'STORY' = 'POST'
+  ): Promise<string[]> => {
+    const response = await axiosInstance.post(
+      `${API_ENDPOINTS.UPLOAD_POST_MEDIA_BATCH}?usage=${usage}`,
+      files,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
     return response.data.data;
   },
 

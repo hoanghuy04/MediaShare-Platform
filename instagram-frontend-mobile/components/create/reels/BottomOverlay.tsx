@@ -1,295 +1,174 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
+import type * as MediaLibrary from 'expo-media-library';
 
 type GalleryAsset = {
   id: string;
   uri: string;
-  mediaType: any;
+  mediaType: MediaLibrary.MediaTypeValue;
   duration?: number;
 };
 
 type BottomOverlayProps = {
-  recordState: 'idle' | 'recording' | 'postrecord';
+  recordState: 'idle' | 'recording';
   gallery: GalleryAsset[];
-  lastClipUri: string | null;
   onRecordPress: () => void;
   onToggleCameraType: () => void;
-  onUndo: () => void;
-  onNext: () => void;
   onGoToGallery: () => void;
 };
+
+const MAX_DURATION_SEC = 15;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export function BottomOverlay({
   recordState,
   gallery,
-  lastClipUri,
   onRecordPress,
   onToggleCameraType,
-  onUndo,
-  onNext,
   onGoToGallery,
 }: BottomOverlayProps) {
-  const insets = useSafeAreaInsets();
+  const progress = useRef(new Animated.Value(0)).current;
 
-  if (recordState === 'idle') {
-    return (
-      <View style={[styles.bottomSectionIdle, { bottom: 100 + insets.bottom }]}>
-        <TouchableOpacity style={styles.galleryPreviewBtn} onPress={onGoToGallery}>
-          {gallery[0] ? (
-            <Image source={{ uri: gallery[0].uri }} style={styles.galleryPreviewThumb} />
-          ) : (
-            <View style={styles.galleryPreviewThumbEmpty}>
-              <Ionicons name="images-outline" size={20} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
+  useEffect(() => {
+    if (recordState === 'recording') {
+      progress.setValue(0);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: MAX_DURATION_SEC * 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      progress.stopAnimation(() => {
+        progress.setValue(0);
+      });
+    }
+  }, [recordState, progress]);
 
-        <TouchableOpacity
-          onPress={onRecordPress}
-          activeOpacity={0.7}
-          style={styles.idleRecordOuter}
-        >
-          <View style={styles.idleRecordInner} />
-        </TouchableOpacity>
+  const size = 120;
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
 
-        <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
-          <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const strokeDashoffset = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circumference, 0],
+  });
 
-  if (recordState === 'recording') {
-    return (
-      <View style={[styles.bottomSectionRecording, { bottom: 100 + insets.bottom }]}>
-        <TouchableOpacity onPress={onRecordPress} activeOpacity={0.8}>
-          <View style={styles.recordingBubble}>
-            <View style={styles.stopSquare} />
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.bottomRightFloating}>
-          <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
-            <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const lastThumb = gallery[0];
 
   return (
-    <>
-      <View style={[styles.bottomSectionPost, { bottom: 100 + insets.bottom }]}>
-        <TouchableOpacity style={styles.undoPill} onPress={onUndo}>
-          <Text style={styles.undoText}>Hoàn tác</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={onRecordPress}>
-          <View style={styles.postRecordOuter}>
-            <View style={styles.postRecordInner} />
+    <View style={styles.bottomRoot}>
+      <TouchableOpacity style={styles.leftBtn} onPress={onGoToGallery}>
+        {lastThumb ? (
+          <Image source={{ uri: lastThumb.uri }} style={styles.thumb} />
+        ) : (
+          <View style={styles.thumbPlaceholder}>
+            <Ionicons name="images-outline" size={22} color="#fff" />
           </View>
-        </TouchableOpacity>
+        )}
+      </TouchableOpacity>
 
-        <TouchableOpacity style={styles.nextPill} onPress={onNext}>
-          <Text style={styles.nextText}>Tiếp</Text>
-          <Ionicons name="chevron-forward" size={18} color="#000" />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity activeOpacity={0.7} onPress={onRecordPress} style={styles.recordWrapper}>
+        <Svg width={size} height={size}>
+          <AnimatedCircle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#ff3bcf"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            fill="transparent"
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={strokeDashoffset}
+          />
+        </Svg>
 
-      <View style={[styles.bottomLeftFloating, { bottom: 28 + insets.bottom }]}>
-        <TouchableOpacity style={styles.galleryPreviewSmall} onPress={onGoToGallery}>
-          {lastClipUri || gallery[0] ? (
-            <Image
-              source={{ uri: lastClipUri ?? gallery[0]?.uri }}
-              style={styles.galleryPreviewSmallImg}
-            />
+        <View style={styles.recordInner}>
+          {recordState === 'recording' ? (
+            <View style={styles.stopSquare} />
           ) : (
-            <View style={styles.galleryPreviewSmallImgEmpty}>
-              <Ionicons name="images-outline" size={20} color="#fff" />
-            </View>
+            <View style={styles.startCircle} />
           )}
-        </TouchableOpacity>
-      </View>
+        </View>
+      </TouchableOpacity>
 
-      <View style={[styles.bottomRightFloating, { bottom: insets.bottom }]}>
-        <TouchableOpacity style={styles.flipBtnBubble} onPress={onToggleCameraType}>
-          <Ionicons name="camera-reverse-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </>
+      <TouchableOpacity style={styles.rightBtn} onPress={onToggleCameraType}>
+        <Ionicons name="camera-reverse-outline" size={30} color="#fff" />
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bottomSectionIdle: {
+  bottomRoot: {
     position: 'absolute',
+    bottom: 40,
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    zIndex: 20,
+    paddingHorizontal: 30,
+    marginBottom: 50,
   },
 
-  galleryPreviewBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  leftBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
     overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  galleryPreviewThumb: {
-    width: '100%',
-    height: '100%',
-  },
-  galleryPreviewThumbEmpty: {
-    width: '100%',
-    height: '100%',
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  idleRecordOuter: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 4,
-    borderColor: '#fff',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  thumb: {
+    width: '100%',
+    height: '100%',
   },
-  idleRecordInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#fff',
-  },
-
-  flipBtnBubble: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  thumbPlaceholder: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // RECORDING
-  bottomSectionRecording: {
+  recordWrapper: {
+    width: 150,
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordInner: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 30,
-  },
-
-  recordingBubble: {
     width: 90,
     height: 90,
     borderRadius: 45,
-    borderWidth: 4,
-    borderColor: '#aaa',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  startCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 36,
+    backgroundColor: '#ffffff',
   },
   stopSquare: {
-    width: 32,
-    height: 32,
-    borderRadius: 4,
-    backgroundColor: '#fff',
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
   },
 
-  bottomRightFloating: {
-    position: 'absolute',
-    right: 16,
-  },
-
-  bottomSectionPost: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    zIndex: 40,
-  },
-
-  undoPill: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  undoText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-
-  postRecordOuter: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 4,
-    borderColor: '#fff',
+  rightBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  postRecordInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#1a1a1a',
-  },
-
-  nextPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  nextText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-
-  bottomLeftFloating: {
-    position: 'absolute',
-    left: 16,
-    zIndex: 45,
-  },
-  galleryPreviewSmall: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  galleryPreviewSmallImg: {
-    width: '100%',
-    height: '100%',
-  },
-  galleryPreviewSmallImgEmpty: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },

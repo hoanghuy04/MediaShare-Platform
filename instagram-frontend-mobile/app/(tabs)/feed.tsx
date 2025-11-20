@@ -29,6 +29,15 @@ export default function FeedScreen() {
   });
 
   useEffect(() => {
+    if (posts.length > 0) {
+      console.log('Total posts:', posts.length);
+      posts.forEach((post, index) => {
+        console.log(`Post ${index + 1}:`, post);
+      });
+    }
+  }, [posts]);
+
+  useEffect(() => {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       refresh();
@@ -107,10 +116,7 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <FeedHeader
-        onActivityPress={handleActivityPress}
-        hasNotifications={false}
-      />
+      <FeedHeader onActivityPress={handleActivityPress} hasNotifications={false} />
       <FeedList
         ref={flatListRef}
         posts={posts}

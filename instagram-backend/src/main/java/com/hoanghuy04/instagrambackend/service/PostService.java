@@ -1,28 +1,25 @@
 package com.hoanghuy04.instagrambackend.service;
 
 import com.hoanghuy04.instagrambackend.dto.request.CreatePostRequest;
+import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
-import com.hoanghuy04.instagrambackend.entity.Media;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
-import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,28 +39,24 @@ public class PostService {
     private final PostRepository postRepository;
     private final UserService userService;
     private final FollowRepository followRepository;
-    private final FileStorageService fileStorageService;
+    private final FileService fileService;
+    private final SecurityUtil securityUtil;
 
     /**
      * Create a new post.
      *
      * @param request the post creation request
-     * @param userId the user ID creating the post
      * @return PostResponse
      */
     @Transactional
-    public PostResponse createPost(CreatePostRequest request, String userId) {
-        log.info("Creating post for user: {}", userId);
-
-        User author = userService.getUserEntityById(userId);
-
-        // Convert media file paths to URLs
-        List<Media> mediaWithUrls = convertMediaPathsToUrls(request.getMedia());
+    public PostResponse createPost(CreatePostRequest request) {
+        User author = securityUtil.getCurrentUser();
 
         Post post = Post.builder()
                 .author(author)
                 .caption(request.getCaption())
-                .media(mediaWithUrls)
+                .type(request.getType())
+                .mediaFileIds(request.getMediaFileIds())
                 .tags(request.getTags())
                 .location(request.getLocation())
                 .likes(new ArrayList<>())
@@ -73,46 +66,37 @@ public class PostService {
         post = postRepository.save(post);
         log.info("Post created successfully: {}", post.getId());
 
-        return convertToPostResponse(post, userId);
+        return convertToPostResponse(post);
     }
 
     /**
      * Get post by ID.
      *
      * @param postId the post ID
-     * @param currentUserId the current user ID (optional)
      * @return PostResponse
      */
     @Transactional(readOnly = true)
-    public PostResponse getPost(String postId, String currentUserId) {
+    public PostResponse getPost(String postId) {
         log.debug("Getting post by ID: {}", postId);
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
 
-        return convertToPostResponse(post, currentUserId);
+        return convertToPostResponse(post);
     }
 
     /**
      * Get all posts with pagination.
      *
      * @param pageable pagination information
-     * @param currentUserId the current user ID (optional)
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public PageResponse<PostResponse> getAllPosts(Pageable pageable, String currentUserId) {
+    public PageResponse<PostResponse> getAllPosts(Pageable pageable) {
         log.debug("Getting all posts");
 
-        // Sort by createdAt DESC (newest first)
-        Pageable sortedPageable = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
-
-        Page<PostResponse> page = postRepository.findAll(sortedPageable)
-                .map(post -> convertToPostResponse(post, currentUserId));
+        Page<PostResponse> page = postRepository.findAll(pageable)
+                .map(this::convertToPostResponse);
 
         return PageResponse.of(page);
     }
@@ -122,21 +106,14 @@ public class PostService {
      *
      * @param userId the user ID
      * @param pageable pagination information
-     * @param currentUserId the current user ID (optional)
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable, String currentUserId) {
+    public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable) {
         log.debug("Getting posts for user: {}", userId);
 
-        Pageable sortedPageable = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
-
-        Page<PostResponse> page = postRepository.findByAuthorId(userId, sortedPageable)
-                .map(post -> convertToPostResponse(post, currentUserId));
+        Page<PostResponse> page = postRepository.findByAuthorId(userId, pageable)
+                .map(this::convertToPostResponse);
 
         return PageResponse.of(page);
     }
@@ -144,57 +121,23 @@ public class PostService {
     /**
      * Get feed posts for user (posts from followed users).
      *
-     * @param userId the user ID
      * @param pageable pagination information
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public PageResponse<PostResponse> getFeedPosts(String userId, Pageable pageable) {
+    public PageResponse<PostResponse> getFeedPosts(Pageable pageable) {
+        String userId = securityUtil.getCurrentUserId();
         log.debug("Getting feed posts for user: {}", userId);
 
         User user = userService.getUserEntityById(userId);
 
-//        List<String> followingIds = followRepository.findByFollower(user).stream()
-//                .map(follow -> follow.getFollowing().getId())
-//                .collect(Collectors.toList());
-//
-//        followingIds.add(userId);
-//
-//        Page<PostResponse> page = postRepository.findByAuthorIdIn(followingIds, pageable)
-//                .map(post -> convertToPostResponse(post, userId));
         //get All posts and prioritize posts from followed users
         List<String> followingIds = followRepository.findByFollower(user).stream()
                 .map(follow -> follow.getFollowing().getId())
                 .collect(Collectors.toList());
         followingIds.add(userId);
-        
-        Pageable sortedPageable = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
-        
-        Page<PostResponse> page = postRepository.findAll(sortedPageable)
-                .map(post -> {
-                    PostResponse postResponse = convertToPostResponse(post, userId);
-                    if (followingIds.contains(post.getAuthor().getId())) {
-                        // Boost posts from followed users
-                        postResponse = PostResponse.builder()
-                                .id(postResponse.getId())
-                                .author(postResponse.getAuthor())
-                                .caption(postResponse.getCaption())
-                                .media(postResponse.getMedia())
-                                .likesCount(postResponse.getLikesCount())
-                                .commentsCount(postResponse.getCommentsCount())
-                                .tags(postResponse.getTags())
-                                .location(postResponse.getLocation())
-                                .isLikedByCurrentUser(postResponse.isLikedByCurrentUser())
-                                .createdAt(postResponse.getCreatedAt())
-                                .updatedAt(postResponse.getUpdatedAt())
-                                .build();
-                    }
-                    return postResponse;
-                });
+        Page<PostResponse> page = postRepository.findAll(pageable)
+                .map(this::convertToPostResponse);
         return PageResponse.of(page);
     }
 
@@ -202,22 +145,14 @@ public class PostService {
      * Get explore posts (random/popular posts).
      *
      * @param pageable pagination information
-     * @param currentUserId the current user ID (optional)
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
-    public PageResponse<PostResponse> getExplore(Pageable pageable, String currentUserId) {
+    public PageResponse<PostResponse> getExplore(Pageable pageable) {
         log.debug("Getting explore posts");
 
-        // Sort by createdAt DESC (newest first)
-        Pageable sortedPageable = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
-
-        Page<PostResponse> page = postRepository.findAll(sortedPageable)
-                .map(post -> convertToPostResponse(post, currentUserId));
+        Page<PostResponse> page = postRepository.findAll(pageable)
+                .map(this::convertToPostResponse);
 
         return PageResponse.of(page);
     }
@@ -227,11 +162,11 @@ public class PostService {
      *
      * @param postId the post ID
      * @param request the update request
-     * @param userId the user ID updating the post
      * @return updated PostResponse
      */
     @Transactional
-    public PostResponse updatePost(String postId, CreatePostRequest request, String userId) {
+    public PostResponse updatePost(String postId, CreatePostRequest request) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Updating post: {}", postId);
 
         Post post = postRepository.findById(postId)
@@ -242,28 +177,26 @@ public class PostService {
             throw new UnauthorizedException("You are not authorized to update this post");
         }
 
-        // Convert media file paths to URLs
-        List<Media> mediaWithUrls = convertMediaPathsToUrls(request.getMedia());
-
         post.setCaption(request.getCaption());
-        post.setMedia(mediaWithUrls);
+        post.setType(request.getType());
+        post.setMediaFileIds(request.getMediaFileIds());
         post.setTags(request.getTags());
         post.setLocation(request.getLocation());
 
         post = postRepository.save(post);
         log.info("Post updated successfully: {}", postId);
 
-        return convertToPostResponse(post, userId);
+        return convertToPostResponse(post);
     }
 
     /**
      * Delete a post.
      *
      * @param postId the post ID
-     * @param userId the user ID deleting the post
      */
     @Transactional
-    public void deletePost(String postId, String userId) {
+    public void deletePost(String postId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Deleting post: {}", postId);
 
         Post post = postRepository.findById(postId)
@@ -294,10 +227,10 @@ public class PostService {
      * Like a post.
      *
      * @param postId the post ID
-     * @param userId the user ID liking the post
      */
     @Transactional
-    public void likePost(String postId, String userId) {
+    public void likePost(String postId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Liking post: {} by user: {}", postId, userId);
 
         Post post = getPostEntityById(postId);
@@ -317,10 +250,10 @@ public class PostService {
      * Unlike a post.
      *
      * @param postId the post ID
-     * @param userId the user ID unliking the post
      */
     @Transactional
-    public void unlikePost(String postId, String userId) {
+    public void unlikePost(String postId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Unliking post: {} by user: {}", postId, userId);
 
         Post post = getPostEntityById(postId);
@@ -333,25 +266,36 @@ public class PostService {
     }
 
     /**
-     * Convert Post entity to PostResponse DTO.
+     * Convert Post entity to PostResponse DTO with media URLs.
      *
      * @param post the Post entity
-     * @param currentUserId the current user ID (optional)
-     * @return PostResponse DTO
+     * @return PostResponse
      */
-    private PostResponse convertToPostResponse(Post post, String currentUserId) {
+    private PostResponse convertToPostResponse(Post post) {
         UserResponse authorResponse = userService.convertToUserResponse(post.getAuthor());
+
+        // Get current user ID if authenticated
+        String currentUserId = null;
+        try {
+            currentUserId = securityUtil.getCurrentUserId();
+        } catch (Exception e) {
+            // User not authenticated, continue with null
+        }
 
         boolean isLikedByCurrentUser = false;
         if (currentUserId != null && post.getLikes() != null) {
             isLikedByCurrentUser = post.getLikes().contains(currentUserId);
         }
 
+        // Get media files with URLs from fileStorage service
+        List<MediaFileResponse> mediaWithUrls = fileService.getMediaFileResponses(post.getMediaFileIds());
+
         return PostResponse.builder()
                 .id(post.getId())
                 .author(authorResponse)
                 .caption(post.getCaption())
-                .media(post.getMedia())
+                .type(post.getType())
+                .media(mediaWithUrls)
                 .likesCount(post.getLikes() != null ? post.getLikes().size() : 0)
                 .commentsCount(post.getComments() != null ? post.getComments().size() : 0)
                 .tags(post.getTags())
@@ -359,51 +303,6 @@ public class PostService {
                 .isLikedByCurrentUser(isLikedByCurrentUser)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
-                .build();
-    }
-
-    /**
-     * Convert media file paths to URLs.
-     *
-     * @param mediaList the list of media objects
-     * @return list of media objects with URLs
-     */
-    private List<Media> convertMediaPathsToUrls(List<Media> mediaList) {
-        if (mediaList == null || mediaList.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        return mediaList.stream()
-                .map(this::convertMediaPathToUrl)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Convert a single media file path to URL.
-     *
-     * @param media the media object
-     * @return media object with URL
-     */
-    private Media convertMediaPathToUrl(Media media) {
-        if (media == null || media.getUrl() == null) {
-            return media;
-        }
-
-        String url = media.getUrl();
-
-        // If URL is already a full URL (starts with http), return as is
-        if (url.startsWith("http")) {
-            return media;
-        }
-
-        // If URL is a relative path, convert to full URL
-        String filename = Paths.get(url).getFileName().toString();
-        String fullUrl = fileStorageService.getFileUrl(filename);
-
-        return Media.builder()
-                .url(fullUrl)
-                .type(media.getType())
-                .uploadedAt(media.getUploadedAt())
                 .build();
     }
 }

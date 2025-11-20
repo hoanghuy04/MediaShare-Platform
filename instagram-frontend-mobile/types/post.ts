@@ -12,20 +12,21 @@ export interface Post {
   tags?: string[];
   location?: string;
   isLikedByCurrentUser?: boolean;
-  isSaved?: boolean; // Frontend-only property
+  isSaved?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Media {
   url: string;
-  type: 'IMAGE' | 'VIDEO' | 'image' | 'video';
+  type: 'IMAGE' | 'VIDEO' | 'image' | 'video' | 'REEL';
   uploadedAt?: string;
 }
 
 export interface CreatePostRequest {
   caption: string;
-  media: Media[];
+  mediaFileIds: string[];
+  type: 'FEED' | 'REEL' | 'STORY';
   tags?: string[];
   location?: string;
 }
@@ -41,7 +42,7 @@ export interface Comment {
   text: string;
   likesCount: number;
   repliesCount?: number;
-  isLiked?: boolean; // Frontend-only property
+  isLiked?: boolean;
   createdAt: string;
   updatedAt: string;
 }

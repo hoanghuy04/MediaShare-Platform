@@ -1,16 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-  StatusBar,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 
-import ReelsCreationScreen from './reels/ReelsCreationScreen';
+import ReelsCreationScreen from '@/app/create/reels/index';
 import PostCreationScreen from './posts/PostCreationScreen';
 
 const { width } = Dimensions.get('window');
@@ -18,7 +9,7 @@ const { width } = Dimensions.get('window');
 type TabType = 'post' | 'story' | 'reels';
 
 interface CreateTabbedFlowProps {
-  onPostCreated?: () => void; // Callback để refresh feed
+  onPostCreated?: () => void;
 }
 
 export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreated }) => {
@@ -51,7 +42,6 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
           </View>
         );
       case 'reels':
-        
         return <ReelsCreationScreen />;
       default:
         return <PostCreationScreen onClose={() => setActiveTab('story')} onStepChange={handlePostStepChange} />;

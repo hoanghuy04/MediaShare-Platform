@@ -18,7 +18,6 @@ export default function PickMediaScreen() {
   const [gallery, setGallery] = useState<GalleryAsset[]>([]);
   const [loadingGallery, setLoadingGallery] = useState(true);
 
-  // Mock gallery (kept from previous implementation)
   useEffect(() => {
     const mock: GalleryAsset[] = [
       { id: '1', uri: 'https://picsum.photos/400/400?random=1', mediaType: 'photo' },
