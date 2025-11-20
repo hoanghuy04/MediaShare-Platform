@@ -119,6 +119,20 @@ export const userAPI = {
     return response.data.data;
   },
 
+  getFollowingSummary: async (
+    userId: string,
+    params?: { query?: string; page?: number; size?: number }
+  ): Promise<UserSummary[]> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWING_SUMMARY(userId), {
+      params: {
+        query: params?.query ?? '',
+        page: params?.page ?? 0,
+        size: params?.size ?? 20,
+      },
+    });
+    return response.data.data;
+  },
+
   getMutualFollows: async (
     userId: string,
     query = '',

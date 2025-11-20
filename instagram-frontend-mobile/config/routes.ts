@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   UNFOLLOW: (id: string) => `/api/users/${id}/follow`, // DELETE method
   FOLLOWERS: (id: string) => `/api/users/${id}/followers`,
   FOLLOWING: (id: string) => `/api/users/${id}/following`,
+  FOLLOWING_SUMMARY: (id: string) => `/api/users/${id}/following-summary`,
   MUTUAL_FOLLOWS: (id: string) => `/api/users/${id}/mutual-follows`,
   USER_STATS: (id: string) => `/api/users/${id}/stats`,
   IS_FOLLOWING: (id: string) => `/api/users/${id}/is-following`,

@@ -2,14 +2,12 @@ package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage.MessageType;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
 import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
-import com.hoanghuy04.instagrambackend.service.message.ConversationMessageServiceImpl;
-import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;

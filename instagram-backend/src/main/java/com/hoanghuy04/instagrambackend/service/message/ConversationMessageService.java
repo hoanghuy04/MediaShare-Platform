@@ -4,7 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
 import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

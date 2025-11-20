@@ -118,17 +118,39 @@ public class UserController {
     }
     
     /**
-     * Get user following.
+     * Get user following list (detailed).
      *
      * @param id the user ID
      * @return ResponseEntity with List of UserResponse
      */
     @GetMapping("/{id}/following")
-    @Operation(summary = "Get user following")
+    @Operation(summary = "Get user following (detailed)")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getUserFollowing(@PathVariable String id) {
         log.info("Get following request received for user: {}", id);
         
         List<UserResponse> response = userService.getUserFollowing(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+    
+    /**
+     * Get user following summary (lightweight).
+     *
+     * @param id user ID
+     * @param query optional search keyword
+     * @param page page number
+     * @param size page size
+     * @return ResponseEntity with List of UserSummaryDTO
+     */
+    @GetMapping("/{id}/following-summary")
+    @Operation(summary = "Get user following summary")
+    public ResponseEntity<ApiResponse<List<UserSummaryDTO>>> getUserFollowingSummary(
+            @PathVariable String id,
+            @RequestParam(required = false, defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        
+        log.info("Get following summary request received for user: {} with query: {}", id, query);
+        List<UserSummaryDTO> response = userService.getUserFollowingSummary(id, query, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     

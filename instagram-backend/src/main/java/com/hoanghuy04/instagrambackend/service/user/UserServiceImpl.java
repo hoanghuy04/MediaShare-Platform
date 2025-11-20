@@ -19,7 +19,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -137,6 +139,67 @@ public class UserServiceImpl implements UserService {
 
         return followRepository.findByFollower(user).stream()
                 .map(follow -> convertToUserResponse(follow.getFollowing()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<UserSummaryDTO> getUserFollowingSummary(String userId, String query, int page, int size) {
+        log.debug("Getting following summary for user {} with query: {}", userId, query);
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        int normalizedPage = Math.max(page, 0);
+
+        List<Follow> followings = followRepository.findByFollowerId(userId);
+        if (followings.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String loweredQuery = query != null ? query.trim().toLowerCase() : "";
+        if (!loweredQuery.isEmpty()) {
+            followings = followings.stream()
+                    .filter(follow -> {
+                        User followed = follow.getFollowing();
+                        if (followed == null) {
+                            return false;
+                        }
+                        String username = followed.getUsername() != null ? followed.getUsername().toLowerCase() : "";
+                        String firstName = followed.getProfile() != null && followed.getProfile().getFirstName() != null
+                                ? followed.getProfile().getFirstName().toLowerCase() : "";
+                        String lastName = followed.getProfile() != null && followed.getProfile().getLastName() != null
+                                ? followed.getProfile().getLastName().toLowerCase() : "";
+                        return username.contains(loweredQuery) ||
+                                firstName.contains(loweredQuery) ||
+                                lastName.contains(loweredQuery);
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        Comparator<Follow> comparator = Comparator
+                .comparing((Follow follow) -> follow.getCreatedAt() != null ? follow.getCreatedAt() : LocalDateTime.MIN)
+                .reversed()
+                .thenComparing(follow -> {
+                    User followed = follow.getFollowing();
+                    return followed != null && followed.getUsername() != null
+                            ? followed.getUsername().toLowerCase()
+                            : "";
+                });
+
+        List<Follow> sorted = followings.stream()
+                .sorted(comparator)
+                .collect(Collectors.toList());
+
+        int start = normalizedPage * normalizedSize;
+        if (start >= sorted.size()) {
+            return new ArrayList<>();
+        }
+        int end = Math.min(start + normalizedSize, sorted.size());
+
+        return sorted.subList(start, end).stream()
+                .map(follow -> toUserSummary(follow.getFollowing()))
                 .collect(Collectors.toList());
     }
 

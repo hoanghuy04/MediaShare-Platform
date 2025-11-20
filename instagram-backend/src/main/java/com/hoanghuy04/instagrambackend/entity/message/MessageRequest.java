@@ -1,6 +1,5 @@
 package com.hoanghuy04.instagrambackend.entity.message;
 
-import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import lombok.AllArgsConstructor;

@@ -1,6 +1,6 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -5,7 +5,7 @@ import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;

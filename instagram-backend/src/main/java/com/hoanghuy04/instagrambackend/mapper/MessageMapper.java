@@ -1,23 +1,16 @@
 package com.hoanghuy04.instagrambackend.mapper;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.ConversationMemberDTO;
-import com.hoanghuy04.instagrambackend.dto.response.LastMessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.entity.message.LastMessageInfo;
-import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * MapStruct mapper for Message and Conversation entities to DTOs.

@@ -38,7 +38,17 @@ export interface Conversation {
   admins?: string[];
   lastMessage?: LastMessage;
   createdAt: string;
+  wallpaperUrl?: string;
+  themeColor?: string;
   // Note: unreadCount removed - calculate on frontend from messages
+}
+
+export type MessageKind = 'TEXT' | 'STICKER' | 'IMAGE' | 'AUDIO' | 'SYSTEM';
+
+export interface MessageRef {
+  id: string;
+  content?: string;
+  sender?: UserSummary;
 }
 
 // Message DTO (matches backend MessageDTO)
@@ -49,7 +59,8 @@ export interface Message {
   content: string;
   mediaUrl?: string;
   readBy: string[]; // Changed from isRead: boolean
-  replyTo?: Message; // For threading
+  replyTo?: MessageRef; // For threading
+  type?: MessageKind;
   createdAt: string;
   isDeleted: boolean;
 }
