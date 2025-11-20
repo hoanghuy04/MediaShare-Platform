@@ -38,6 +38,7 @@ public interface ConversationService {
     @Transactional
     Conversation createDirectConversation(String userId1, String userId2);
 
+    
     /**
      * Create a group conversation.
      *
