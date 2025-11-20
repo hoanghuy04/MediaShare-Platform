@@ -35,13 +35,12 @@ type GalleryPageProps = {
   onOpenAlbumPicker?: () => void;
   onClose: () => void;
 
-  // 👇 thêm lại 3 callback để parent (ReelsCreationScreen) bắt được gesture
   onScrollBeginDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   onScrollEndDrag: () => void;
 };
 
-export function GalleryPage({
+export function ReelGaleryView({
   height,
   gallery,
   loadingGallery,

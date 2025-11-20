@@ -3,33 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Platform } from 'react
 import { Ionicons } from '@expo/vector-icons';
 
 type TopOverlayProps = {
-  recordState: 'idle' | 'recording';
   torch: boolean;
   onToggleFlash: () => void;
-  onAvatarPress: () => void;
   onClose?: () => void;
 };
 
-export function TopOverlay({
-  recordState,
-  torch,
-  onToggleFlash,
-  onAvatarPress,
-  onClose,
-}: TopOverlayProps) {
-  if (recordState === 'recording') {
-    return (
-      <View style={styles.topRowRecordingOnlyRight}>
-        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={styles.avatarBubble}>
-          <View style={styles.avatarBadge}>
-            <Text style={styles.avatarBadgeText}>2</Text>
-          </View>
-          <Image source={{ uri: 'https://placekitten.com/200/200' }} style={styles.avatarInner} />
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+export function TopOverlay({ torch, onToggleFlash, onClose }: TopOverlayProps) {
   return (
     <View style={styles.topRowWrapper}>
       <View style={styles.topLeft}>

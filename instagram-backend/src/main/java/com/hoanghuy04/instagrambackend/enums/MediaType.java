@@ -16,6 +16,8 @@ public enum MediaType {
     /**
      * Video media type (MP4, MOV, etc.)
      */
-    VIDEO
+    VIDEO,
+
+    REEL
 }
 

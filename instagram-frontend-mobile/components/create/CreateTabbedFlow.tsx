@@ -1,19 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-  StatusBar,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 
 import PostCreationScreen from './posts/PostCreationScreen';
-import { ReelsCreationScreen } from './reels';
-
-const { width } = Dimensions.get('window');
+import ReelsCreationScreen from '@/app/create/reels/index';
 
 type TabType = 'post' | 'story' | 'reels';
 

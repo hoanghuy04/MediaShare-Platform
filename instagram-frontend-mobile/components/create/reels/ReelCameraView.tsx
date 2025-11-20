@@ -1,11 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { CameraView, CameraType, FlashMode } from 'expo-camera';
-import {
-  PinchGestureHandler,
-  PinchGestureHandlerGestureEvent,
-  State,
-} from 'react-native-gesture-handler';
+import { CameraView, CameraType } from 'expo-camera';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 
 import { TopOverlay } from './TopOverlay';
 import { BottomOverlay } from './BottomOverlay';
@@ -42,7 +39,7 @@ const MIN_ZOOM = 0;
 const MAX_ZOOM = 1;
 const ZOOM_SENSITIVITY = 0.25;
 
-export function CameraPage(props: CameraPageProps) {
+export function ReelCameraView(props: CameraPageProps) {
   const {
     height,
     width,
@@ -66,6 +63,7 @@ export function CameraPage(props: CameraPageProps) {
   const [internalZoom, setInternalZoom] = useState(zoomLevel ?? 0);
   const baseZoomRef = useRef(internalZoom);
 
+  // Đồng bộ props zoomLevel vào state nội bộ
   useEffect(() => {
     setInternalZoom(zoomLevel ?? 0);
     baseZoomRef.current = zoomLevel ?? 0;
@@ -73,32 +71,42 @@ export function CameraPage(props: CameraPageProps) {
 
   const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
-  const onPinchGesture = (event: PinchGestureHandlerGestureEvent) => {
-    const { scale } = event.nativeEvent;
+  // Các hàm xử lý logic zoom (cần chạy trên JS thread)
+  const handlePinchStart = () => {
+    baseZoomRef.current = internalZoom;
+  };
+
+  const handlePinchUpdate = (scale: number) => {
+    // Tính toán zoom mới dựa trên scale của gesture
+    // Công thức: Zoom cũ + (tỉ lệ thay đổi * độ nhạy)
     const nextZoom = clampZoom(baseZoomRef.current + (scale - 1) * ZOOM_SENSITIVITY);
     setInternalZoom(nextZoom);
   };
 
-  const onPinchStateChange = (event: PinchGestureHandlerGestureEvent) => {
-    const { state, oldState } = event.nativeEvent as any;
+  // Định nghĩa Gesture Pinch mới
+  const pinchGesture = useMemo(() => {
+    const gesture = Gesture.Pinch()
+      .onStart(() => {
+        'worklet';
+        runOnJS(handlePinchStart)();
+      })
+      .onUpdate(e => {
+        'worklet';
+        runOnJS(handlePinchUpdate)(e.scale);
+      });
 
-    if (state === State.BEGAN) {
-      baseZoomRef.current = internalZoom;
+    // Kết hợp với scroll view bên ngoài (nếu có) để tránh xung đột
+    if (scrollSimultaneousRef) {
+      gesture.simultaneousWithExternalGesture(scrollSimultaneousRef);
     }
 
-    if (oldState === State.ACTIVE && (state === State.END || state === State.CANCELLED)) {
-      baseZoomRef.current = internalZoom;
-    }
-  };
+    return gesture;
+  }, [internalZoom, scrollSimultaneousRef]); // Dependencies để cập nhật gesture khi cần
 
   return (
     <View style={[styles.page, { height, width }]}>
-      <PinchGestureHandler
-        enabled={isVisible}
-        onGestureEvent={onPinchGesture}
-        onHandlerStateChange={onPinchStateChange}
-        simultaneousHandlers={scrollSimultaneousRef}
-      >
+      {/* GestureDetector bao bọc View chứa Camera */}
+      <GestureDetector gesture={pinchGesture}>
         <View style={StyleSheet.absoluteFill}>
           <CameraView
             ref={cameraRef}
@@ -110,17 +118,11 @@ export function CameraPage(props: CameraPageProps) {
             onCameraReady={onCameraReady}
           />
         </View>
-      </PinchGestureHandler>
+      </GestureDetector>
 
       {isVisible && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <TopOverlay
-            recordState={recordState}
-            torch={torch}
-            onToggleFlash={onToggleFlash}
-            onAvatarPress={onAvatarPress}
-            onClose={onClose}
-          />
+          <TopOverlay torch={torch} onToggleFlash={onToggleFlash} onClose={onClose} />
 
           <BottomOverlay
             recordState={recordState}
