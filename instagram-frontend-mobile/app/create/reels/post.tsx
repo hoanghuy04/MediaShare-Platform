@@ -117,7 +117,7 @@ export default function ReelPostScreen() {
         type: mimeType,
       } as any);
 
-      const mediaUrl = await uploadAPI.uploadFile(formData, 'post', user.id);
+      const mediaUrl = await uploadAPI.uploadFile(formData);
       const hashtags = extractHashtags(caption);
 
       const postData = {
