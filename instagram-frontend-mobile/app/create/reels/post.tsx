@@ -8,18 +8,17 @@ import {
   Image,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { uploadAPI, postAPI } from '@/services/api';
+import { useUpload } from '@/context/UploadContext';
 import { useAuth } from '@/context/AuthContext';
-import { extractHashtags } from '@/utils/hashtag';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LocationSearchScreen } from '@components/create/reels/LocationSearchScreen';
+import { LocationSearchScreen } from '@/components/create/reels/LocationSearchScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
@@ -36,6 +35,8 @@ export default function ReelPostScreen() {
   const params = useLocalSearchParams();
   const { user } = useAuth();
 
+  const { startUpload } = useUpload();
+
   const rawUri = params.mediaUri as string;
   const mediaUri = rawUri ? decodeURIComponent(rawUri) : '';
   const mediaType = (params.mediaType as 'photo' | 'video') || 'video';
@@ -43,7 +44,8 @@ export default function ReelPostScreen() {
   const [caption, setCaption] = useState('');
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
-  const [isUploading, setIsUploading] = useState(false);
+
+  const isSubmittingRef = useRef(false);
 
   const scrollRef = useRef<ScrollView | null>(null);
   const captionInputRef = useRef<TextInput | null>(null);
@@ -76,89 +78,27 @@ export default function ReelPostScreen() {
     }, 50);
   };
 
-  const handleShare = async () => {
-    if (isUploading) {
-      console.log('⚠️ Upload already in progress, skipping...');
-      return;
-    }
+  const handleShare = () => {
+    if (isSubmittingRef.current) return;
 
     if (!user || !user.id) {
       Alert.alert('Lỗi', 'Vui lòng đăng nhập để chia sẻ Reel.');
       return;
     }
 
-    try {
-      console.log('🚀 Starting upload process...');
-      setIsUploading(true);
+    isSubmittingRef.current = true;
 
-      const formData = new FormData();
-      const filename = mediaUri.split('/').pop() || `upload_${Date.now()}`;
+    router.replace('/(tabs)/feed');
 
-      let fileExtension = filename.split('.').pop()?.toLowerCase() || '';
-      let mimeType = '';
-
-      if (mediaType === 'video') {
-        if (['mp4', 'mov', 'avi', 'mkv', 'm4v'].includes(fileExtension)) {
-          mimeType = `video/${fileExtension}`;
-        } else {
-          mimeType = 'video/mp4';
-          fileExtension = 'mp4';
-        }
-      } else {
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
-          mimeType = `image/${fileExtension}`;
-        } else {
-          mimeType = 'image/jpeg';
-          fileExtension = 'jpg';
-        }
-      }
-
-      const newFilename = `upload_${Date.now()}.${fileExtension}`;
-
-      formData.append('file', {
-        uri: mediaUri,
-        name: newFilename,
-        type: mimeType,
-      } as any);
-
-      // Upload file và nhận file ID (không phải URL)
-      console.log('📤 Uploading file...');
-      const fileId = await uploadAPI.uploadFile(formData, 'REEL');
-      console.log('✅ File uploaded, ID:', fileId);
-
-      const hashtags = extractHashtags(caption);
-
-      const postData = {
-        caption: caption.trim(),
-        mediaFileIds: [fileId],
-        type: 'REEL' as const,
-        tags: hashtags,
+    setTimeout(() => {
+      startUpload({
+        mediaUri: mediaUri,
+        mediaType: mediaType,
+        caption: caption,
         location: pickedLocation?.name,
-      };
-
-      console.log('📝 Creating post with data:', postData);
-      await postAPI.createPost(postData);
-      console.log('✅ Post created successfully!');
-
-      Alert.alert('Thành công! 🎉', 'Reel của bạn đã được chia sẻ', [
-        {
-          text: 'OK',
-          onPress: () => {
-            router.replace('/(tabs)/feed');
-          },
-        },
-      ]);
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || 'Không thể chia sẻ Reel. Vui lòng thử lại.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      console.log('🏁 Upload process finished');
-      setIsUploading(false);
-    }
+        userId: user.id,
+      });
+    }, 100);
   };
 
   const handleSelectLocation = (loc: { name: string; address: string; distance: string }) => {
@@ -312,30 +252,12 @@ export default function ReelPostScreen() {
 
       <View style={styles.bottomBar}>
         <View style={styles.bottomRow}>
-          <TouchableOpacity
-            style={[styles.saveDraftBtn, isUploading && styles.btnDisabled]}
-            disabled={isUploading}
-            onPress={() => {
-              console.log('Lưu bản nháp');
-            }}
-          >
+          <TouchableOpacity style={styles.saveDraftBtn} onPress={() => console.log('Lưu bản nháp')}>
             <Text style={styles.saveDraftText}>Lưu bản nháp</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.shareBtn, isUploading && styles.btnDisabled]}
-            onPress={handleShare}
-            disabled={isUploading}
-            activeOpacity={0.7}
-          >
-            {isUploading ? (
-              <>
-                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.shareBtnText}>Đang tải...</Text>
-              </>
-            ) : (
-              <Text style={styles.shareBtnText}>Chia sẻ</Text>
-            )}
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.7}>
+            <Text style={styles.shareBtnText}>Chia sẻ</Text>
           </TouchableOpacity>
         </View>
       </View>

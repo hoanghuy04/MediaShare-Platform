@@ -29,7 +29,7 @@ interface PostCardProps {
   onShare?: (postId: string) => void;
   onBookmark?: (postId: string) => void;
   onFollow?: (userId: string) => void;
-  disableNavigation?: boolean; // Add prop to disable navigation
+  disableNavigation?: boolean;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({

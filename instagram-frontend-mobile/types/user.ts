@@ -1,3 +1,5 @@
+import { UserRole } from './enum.type';
+
 export interface ProfileData {
   firstName?: string;
   lastName?: string;
@@ -44,4 +46,19 @@ export interface UserStats {
   followersCount: number;
   followingCount: number;
   postsCount: number;
+}
+
+export interface UserResponse {
+  id: string;
+  username: string;
+  email: string;
+  profile: UserProfile | null;
+  roles: UserRole[];
+  followersCount: number;
+  followingCount: number;
+  isPrivate: boolean;
+  isVerified: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

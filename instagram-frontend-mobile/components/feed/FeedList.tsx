@@ -1,16 +1,25 @@
-import React, { forwardRef, useImperativeHandle } from 'react';
-import { FlatList, RefreshControl, View, StyleSheet } from 'react-native';
-import { Post } from '@types';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  RefreshControl,
+  View,
+  StyleSheet,
+  ViewToken,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import { useTheme } from '@hooks/useTheme';
 import { PostCard } from './PostCard';
-import { StoriesRow } from './StoriesRow';
+import { FeedReelItem } from './FeedReelItem';
 import { CaughtUpNotice } from './CaughtUpNotice';
 import { SuggestedAccountCard } from './SuggestedAccountCard';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { EmptyState } from '../common/EmptyState';
+import { PostResponse } from '../../types/post.type';
+import Animated from 'react-native-reanimated';
+import { StoryList } from './StoryList';
 
 interface FeedListProps {
-  posts: Post[];
+  posts: PostResponse[];
   isLoading: boolean;
   isRefreshing: boolean;
   hasMore: boolean;
@@ -21,12 +30,15 @@ interface FeedListProps {
   onShare?: (postId: string) => void;
   onBookmark?: (postId: string) => void;
   onFollow?: (userId: string) => void;
-  showStories?: boolean;
   showCaughtUp?: boolean;
   suggestedAccount?: any;
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  contentContainerStyle?: any;
+  stories?: any[];
+  showStories?: boolean;
 }
 
-export const FeedList = forwardRef<FlatList, FeedListProps>(({
+export const FeedList: React.FC<FeedListProps> = ({
   posts = [],
   isLoading,
   isRefreshing,
@@ -38,45 +50,57 @@ export const FeedList = forwardRef<FlatList, FeedListProps>(({
   onShare,
   onBookmark,
   onFollow,
-  showStories = true,
   showCaughtUp = true,
   suggestedAccount,
-}, ref) => {
+  onScroll,
+  contentContainerStyle,
+  stories = [],
+  showStories = true,
+}) => {
   const { theme } = useTheme();
-  const flatListRef = React.useRef<FlatList>(null);
+  const [viewableItemId, setViewableItemId] = useState<string | null>(null);
 
-  useImperativeHandle(ref, () => flatListRef.current as any);
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+    waitForInteraction: false,
+  }).current;
 
-  // Mock stories data - in production, fetch from API
-  const mockStories = [
-    { id: '1', username: 'hoanghuy_12', hasStory: true },
-    { id: '2', username: 'trnngochn_19', hasStory: false },
-    { id: '3', username: 'varmos_0212', hasStory: true },
-  ];
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0) {
+        const visibleItem = viewableItems[0];
+        if (visibleItem.item.id) {
+          setViewableItemId(visibleItem.item.id);
+        }
+      }
+    },
+    []
+  );
 
-  const renderPost = ({ item, index }: { item: Post; index: number }) => {
-    // Show "Caught Up" notice after 3 posts
+  const renderPost = ({ item, index }: { item: PostResponse; index: number }) => {
+    const isReel = item.type === 'REEL';
     const showCaughtUpAfterThis = showCaughtUp && index === 2;
-    // Show suggested account after 5 posts
     const showSuggestedAfterThis = suggestedAccount && index === 4;
+    const isVisible = viewableItemId === item.id;
 
     return (
       <>
-        <PostCard
-          post={item}
-          showFollowButton={!item.author.isFollowing}
-          onLike={onLike}
-          onComment={onComment}
-          onShare={onShare}
-          onBookmark={onBookmark}
-          onFollow={onFollow}
-        />
-        {showCaughtUpAfterThis && <CaughtUpNotice />}
-        {showSuggestedAfterThis && (
-          <SuggestedAccountCard
-            account={suggestedAccount}
+        {isReel ? (
+          <FeedReelItem post={item} isVisible={isVisible} />
+        ) : (
+          <PostCard
+            post={item}
+            showFollowButton={false}
+            onLike={onLike}
+            onComment={onComment}
+            onShare={onShare}
+            onBookmark={onBookmark}
             onFollow={onFollow}
           />
+        )}
+        {showCaughtUpAfterThis && <CaughtUpNotice />}
+        {showSuggestedAfterThis && (
+          <SuggestedAccountCard account={suggestedAccount} onFollow={onFollow} />
         )}
       </>
     );
@@ -84,7 +108,12 @@ export const FeedList = forwardRef<FlatList, FeedListProps>(({
 
   const renderHeader = () => {
     if (!showStories) return null;
-    return <StoriesRow stories={mockStories} />;
+    return (
+      <View style={styles.headerContainer}>
+        <StoryList stories={stories} />
+        <View style={styles.separator} />
+      </View>
+    );
   };
 
   const renderFooter = () => {
@@ -108,18 +137,18 @@ export const FeedList = forwardRef<FlatList, FeedListProps>(({
   };
 
   return (
-    <FlatList
-      ref={flatListRef}
+    <Animated.FlatList
       data={posts}
       renderItem={renderPost}
       keyExtractor={item => item.id}
-      contentContainerStyle={[styles.container, posts?.length === 0 && styles.emptyContainer]}
+      contentContainerStyle={[posts?.length === 0 && styles.emptyContainer, contentContainerStyle]}
       ListHeaderComponent={renderHeader}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={onRefresh}
           tintColor={theme.colors.primary}
+          progressViewOffset={60}
         />
       }
       onEndReached={onLoadMore}
@@ -127,18 +156,28 @@ export const FeedList = forwardRef<FlatList, FeedListProps>(({
       ListFooterComponent={renderFooter}
       ListEmptyComponent={renderEmpty}
       showsVerticalScrollIndicator={false}
+      onViewableItemsChanged={onViewableItemsChanged}
+      viewabilityConfig={viewabilityConfig}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
     />
   );
-});
+};
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: 8,
-  },
   emptyContainer: {
     flexGrow: 1,
   },
   footer: {
     paddingVertical: 20,
+  },
+  headerContainer: {
+    paddingTop: 8,
+    paddingBottom: 0,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginTop: 8,
   },
 });

@@ -15,20 +15,13 @@ export interface Post {
   isSaved?: boolean;
   createdAt: string;
   updatedAt: string;
+  type?: 'FEED' | 'REEL' | 'STORY';
 }
 
 export interface Media {
   url: string;
   type: 'IMAGE' | 'VIDEO' | 'image' | 'video' | 'REEL';
   uploadedAt?: string;
-}
-
-export interface CreatePostRequest {
-  caption: string;
-  mediaFileIds: string[];
-  type: 'FEED' | 'REEL' | 'STORY';
-  tags?: string[];
-  location?: string;
 }
 
 export interface UpdatePostRequest {

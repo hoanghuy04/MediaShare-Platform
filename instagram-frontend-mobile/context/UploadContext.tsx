@@ -1,25 +1,32 @@
 import React, { createContext, useContext, useState } from 'react';
-import { uploadAPI, postAPI } from '@/services/api';
+import { Platform } from 'react-native'; // Nhớ import Platform
 import { extractHashtags } from '@/utils/hashtag';
+import { fileService } from '../services/file.service';
+import { PostType } from '../types/enum.type';
+import { postService } from '../services/post.service';
 
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
+
+interface UploadParams {
+  mediaUri: string;
+  mediaType: string;
+  caption: string;
+  location?: string;
+  userId: string;
+}
 
 interface UploadState {
   status: UploadStatus;
   progress: number;
   thumbnailUri: string | null;
   errorMessage?: string;
+  lastParams?: UploadParams;
 }
 
 interface UploadContextType {
   uploadState: UploadState;
-  startUpload: (data: {
-    mediaUri: string;
-    mediaType: string;
-    caption: string;
-    location?: string;
-    userId: string;
-  }) => Promise<void>;
+  startUpload: (data: UploadParams) => Promise<void>;
+  retryUpload: () => Promise<void>;
   resetUpload: () => void;
 }
 
@@ -32,58 +39,76 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
     thumbnailUri: null,
   });
 
-  const startUpload = async ({ mediaUri, mediaType, caption, location, userId }: any) => {
-    setUploadState({ status: 'uploading', progress: 0, thumbnailUri: mediaUri });
+  const startUpload = async (params: UploadParams) => {
+    const { mediaUri, mediaType, caption, location, userId } = params;
+
+    setUploadState({
+      status: 'uploading',
+      progress: 0,
+      thumbnailUri: mediaUri,
+      lastParams: params,
+    });
 
     try {
-      const progressInterval = setInterval(() => {
-        setUploadState(prev => {
-          if (prev.status !== 'uploading') return prev;
-          return { ...prev, progress: Math.min(prev.progress + 0.1, 0.9) };
-        });
-      }, 500);
-
       const formData = new FormData();
       const filename = mediaUri.split('/').pop() || `upload_${Date.now()}`;
-      let fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
-      let mimeType = mediaType === 'video' ? `video/${fileExtension}` : `image/${fileExtension}`;
 
-      formData.append('file', {
-        uri: mediaUri,
+      let fileExtension = filename.split('.').pop()?.toLowerCase();
+      if (!fileExtension || fileExtension === filename) {
+        fileExtension = mediaType === 'video' ? 'mp4' : 'jpg';
+      }
+
+      let mimeType = mediaType === 'video' ? `video/${fileExtension}` : `image/${fileExtension}`;
+      if (mimeType === 'video/mov') mimeType = 'video/quicktime';
+
+      const cleanUri = Platform.OS === 'ios' ? mediaUri.replace('file://', '') : mediaUri;
+
+      const filePayload = {
+        uri: cleanUri,
         name: filename,
         type: mimeType,
-      } as any);
+      };
 
-      const mediaUrl = await uploadAPI.uploadFile(formData, 'post', userId);
+      formData.append('file', filePayload as any);
+
+      const fileId = await fileService.uploadFile(formData, 'REEL', progress => {
+        setUploadState(prev => ({
+          ...prev,
+          progress: progress * 0.9,
+        }));
+      });
 
       const hashtags = extractHashtags(caption);
       const postData = {
+        mediaFileIds: [fileId],
+        type: PostType.REEL,
         caption: caption.trim(),
-        media: [{ url: mediaUrl, type: mediaType === 'video' ? 'REEL' : 'IMAGE' }],
         tags: hashtags,
         location: location,
       };
 
-      await postAPI.createPost(postData);
+      await postService.createPost(postData);
 
-      clearInterval(progressInterval);
-
-      setUploadState({
+      setUploadState(prev => ({
+        ...prev,
         status: 'success',
         progress: 1,
         thumbnailUri: mediaUri,
-      });
-
-      setTimeout(() => {
-        setUploadState(prev => (prev.status === 'success' ? { ...prev, status: 'idle' } : prev));
-      }, 5000);
+      }));
     } catch (error: any) {
-      setUploadState({
+      console.error('❌ Upload error:', error);
+      setUploadState(prev => ({
+        ...prev,
         status: 'error',
         progress: 0,
-        thumbnailUri: mediaUri,
-        errorMessage: error.message,
-      });
+        errorMessage: error.response?.data?.message || error.message || 'Upload failed',
+      }));
+    }
+  };
+
+  const retryUpload = async () => {
+    if (uploadState.lastParams) {
+      await startUpload(uploadState.lastParams);
     }
   };
 
@@ -92,7 +117,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <UploadContext.Provider value={{ uploadState, startUpload, resetUpload }}>
+    <UploadContext.Provider value={{ uploadState, startUpload, retryUpload, resetUpload }}>
       {children}
     </UploadContext.Provider>
   );
