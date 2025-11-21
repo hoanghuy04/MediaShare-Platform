@@ -28,53 +28,31 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "comments")
 public class Comment {
-    
-    /**
-     * Unique identifier for the comment
-     */
+
     @Id
     private String id;
-    
-    /**
-     * Reference to the post this comment belongs to
-     */
+
     @DocumentReference
     @Indexed
     private Post post;
-    
-    /**
-     * Reference to the user who created this comment
-     */
+
     @DocumentReference
     @Indexed
     private User author;
-    
-    /**
-     * The comment text content
-     */
+
     private String text;
-    
-    /**
-     * List of user IDs who liked this comment
-     */
+
+    @Indexed
+    private String parentCommentId;
+
+    private String mention;
+
     @Builder.Default
     private List<String> likes = new ArrayList<>();
-    
-    /**
-     * List of reply comment IDs (nested comments)
-     */
-    @Builder.Default
-    private List<String> replies = new ArrayList<>();
-    
-    /**
-     * Timestamp when the comment was created
-     */
+
     @CreatedDate
     private LocalDateTime createdAt;
-    
-    /**
-     * Timestamp when the comment was last updated
-     */
+
     @LastModifiedDate
     private LocalDateTime updatedAt;
 }

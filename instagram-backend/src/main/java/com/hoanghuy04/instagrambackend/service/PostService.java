@@ -239,47 +239,6 @@ public class PostService {
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
     }
 
-    /**
-     * Like a post.
-     *
-     * @param postId the post ID
-     */
-    @Transactional
-    public void likePost(String postId) {
-        String userId = securityUtil.getCurrentUserId();
-        log.info("Liking post: {} by user: {}", postId, userId);
-
-        Post post = getPostEntityById(postId);
-
-        if (post.getLikes() == null) {
-            post.setLikes(new ArrayList<>());
-        }
-
-        if (!post.getLikes().contains(userId)) {
-            post.getLikes().add(userId);
-            postRepository.save(post);
-            log.info("Post liked successfully");
-        }
-    }
-
-    /**
-     * Unlike a post.
-     *
-     * @param postId the post ID
-     */
-    @Transactional
-    public void unlikePost(String postId) {
-        String userId = securityUtil.getCurrentUserId();
-        log.info("Unliking post: {} by user: {}", postId, userId);
-
-        Post post = getPostEntityById(postId);
-
-        if (post.getLikes() != null && post.getLikes().contains(userId)) {
-            post.getLikes().remove(userId);
-            postRepository.save(post);
-            log.info("Post unliked successfully");
-        }
-    }
 
     /**
      * Convert Post entity to PostResponse DTO with media URLs.

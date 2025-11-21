@@ -180,6 +180,13 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public User getUserByName(String userName) {
+        return userRepository.findByUsername(userName)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with name: " + userName));
+    }
+
     @Override
     public UserResponse convertToUserResponse(User user) {
         return UserResponse.builder()

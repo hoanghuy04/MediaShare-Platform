@@ -30,6 +30,9 @@ public interface UserService {
     @Transactional(readOnly = true)
     UserResponse getUserById(String userId);
 
+    @Transactional(readOnly = true)
+    User getUserByName(String userName);
+
     /**
      * Get all users with pagination.
      *

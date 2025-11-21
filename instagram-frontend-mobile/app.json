@@ -55,16 +55,15 @@
           "icon": "./assets/icon.png",
           "color": "#ffffff"
         }
-      ],
-      "expo-video"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "dev": {
-        "apiUrl": "http://192.168.78.243:8080",
-        "wsUrl": "http://192.168.78.243:8080"
+        "apiUrl": "http://172.20.33.241:8080",
+        "wsUrl": "http://172.20.33.241:8080"
       },
       "prod": {
         "apiUrl": "https://your-production-api.com",

@@ -1,8 +1,10 @@
 export * from './auth';
 export * from './user';
 export * from './post';
+export * from './comment';
 export * from './message';
 export * from './api';
+export * from './gallery';
 
 export type Theme = 'light' | 'dark' | 'auto';
 

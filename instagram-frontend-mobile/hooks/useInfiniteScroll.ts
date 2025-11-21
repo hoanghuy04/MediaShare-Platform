@@ -17,6 +17,7 @@ interface UseInfiniteScrollReturn<T> {
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
   reset: () => void;
+  updateItem: (id: string, updater: (item: T) => T) => void;
 }
 
 export const useInfiniteScroll = <T>({
@@ -100,6 +101,15 @@ export const useInfiniteScroll = <T>({
     setError(null);
   }, []);
 
+  const updateItem = useCallback((id: string, updater: (item: T) => T) => {
+    setData(prev => prev.map(item => {
+      if ((item as any).id === id) {
+        return updater(item);
+      }
+      return item;
+    }));
+  }, []);
+
   return {
     data,
     isLoading,
@@ -110,5 +120,6 @@ export const useInfiniteScroll = <T>({
     loadMore,
     refresh,
     reset,
+    updateItem,
   };
 };

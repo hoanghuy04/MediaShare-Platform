@@ -15,49 +15,17 @@ import java.util.List;
  */
 @Service
 public interface LikeService {
-    
-    /**
-     * Like a post.
-     *
-     * @param postId the post ID
-     * @param userId the user ID liking the post
-     */
-    @Transactional
-    void likePost(String postId, String userId);
 
-    /**
-     * Unlike a post.
-     *
-     * @param postId the post ID
-     * @param userId the user ID unliking the post
-     */
     @Transactional
-    void unlikePost(String postId, String userId);
+    boolean toggleLikePost(String postId);
 
-    /**
-     * Like a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID liking the comment
-     */
     @Transactional
-    void likeComment(String commentId, String userId);
+    void likeComment(String commentId);
 
-    /**
-     * Unlike a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID unliking the comment
-     */
     @Transactional
-    void unlikeComment(String commentId, String userId);
+    void unlikeComment(String commentId);
 
-    /**
-     * Get users who liked a post.
-     *
-     * @param postId the post ID
-     * @return List of UserResponse
-     */
+
     @Transactional(readOnly = true)
     List<UserResponse> getPostLikes(String postId);
 }

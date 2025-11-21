@@ -80,12 +80,48 @@ export default function ReelsCreationScreen() {
           first: 80,
         });
 
-        const mapped: GalleryAsset[] = assets.assets.map(a => ({
-          id: a.id,
-          uri: a.uri,
-          mediaType: a.mediaType,
-          duration: a.duration,
-        }));
+        const mapped: GalleryAsset[] = await Promise.all(
+          assets.assets.map(async a => {
+            try {
+              const assetInfo = await MediaLibrary.getAssetInfoAsync(a.id, {
+                shouldDownloadFromNetwork: false,
+              });
+              const finalUri = assetInfo.localUri || a.uri;
+
+              if (finalUri.startsWith('ph://')) {
+                try {
+                  const retryInfo = await MediaLibrary.getAssetInfoAsync(a.id, {
+                    shouldDownloadFromNetwork: true,
+                  });
+                  if (retryInfo.localUri) {
+                    return {
+                      id: a.id,
+                      uri: retryInfo.localUri,
+                      mediaType: a.mediaType,
+                      duration: a.duration,
+                    };
+                  }
+                } catch (retryErr) {
+                  console.warn('Failed to get localUri for asset:', a.id);
+                }
+              }
+
+              return {
+                id: a.id,
+                uri: finalUri,
+                mediaType: a.mediaType,
+                duration: a.duration,
+              };
+            } catch (err) {
+              return {
+                id: a.id,
+                uri: a.uri,
+                mediaType: a.mediaType,
+                duration: a.duration,
+              };
+            }
+          })
+        );
 
         setGallery(mapped);
       } catch (err) {

@@ -46,8 +46,7 @@ export const API_ENDPOINTS = {
   CREATE_POST: '/api/posts',
   UPDATE_POST: (id: string) => `/api/posts/${id}`,
   DELETE_POST: (id: string) => `/api/posts/${id}`,
-  LIKE_POST: (id: string) => `/api/posts/${id}/like`,
-  UNLIKE_POST: (id: string) => `/api/posts/${id}/unlike`,
+  TOGGLE_LIKE_POST: (id: string) => `/api/posts/${id}/like`,
   USER_POSTS: (userId: string) => `/api/posts/user/${userId}`,
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',
@@ -55,11 +54,12 @@ export const API_ENDPOINTS = {
 
   // Comments (khớp với backend: /comments/*)
   COMMENTS: (postId: string) => `/api/comments/post/${postId}`,
+  COMMENT_REPLIES: (commentId: string) => `/api/comments/${commentId}/replies`,
   CREATE_COMMENT: `/api/comments`,
   DELETE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
   UPDATE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
-  LIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
-  UNLIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
+  TOGGLE_LIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
+  REPLY_TO_COMMENT: (commentId: string) => `/api/comments/${commentId}/replies`,
 
   // Messages / Conversations
   INBOX: '/api/conversations/inbox',

@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * REST controller for comment management endpoints.
  * Handles comment creation, updates, and queries.
@@ -33,22 +35,19 @@ import org.springframework.web.bind.annotation.*;
 public class CommentController {
     
     private final CommentService commentService;
-    
+
     /**
      * Create a new comment.
      *
      * @param request the comment creation request
-     * @param userId the user ID creating the comment
      * @return ResponseEntity with CommentResponse
      */
     @PostMapping
     @Operation(summary = "Create a new comment")
     public ResponseEntity<ApiResponse<CommentResponse>> createComment(
-            @Valid @RequestBody CreateCommentRequest request,
-            @RequestParam String userId) {
-        log.info("Create comment request received from user: {}", userId);
-        
-        CommentResponse response = commentService.createComment(request, userId);
+            @Valid @RequestBody CreateCommentRequest request
+            ) {
+        CommentResponse response = commentService.createComment(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Comment created successfully", response));
     }
@@ -67,7 +66,7 @@ public class CommentController {
         CommentResponse response = commentService.getComment(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-    
+
     /**
      * Get comments for a post.
      *
@@ -81,7 +80,7 @@ public class CommentController {
             @PathVariable String postId,
             Pageable pageable) {
         log.info("Get post comments request received for post: {}", postId);
-        
+
         PageResponse<CommentResponse> response = commentService.getPostComments(postId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -91,18 +90,17 @@ public class CommentController {
      *
      * @param id the comment ID
      * @param text the new comment text
-     * @param userId the user ID updating the comment
      * @return ResponseEntity with updated CommentResponse
      */
     @PutMapping("/{id}")
     @Operation(summary = "Update a comment")
     public ResponseEntity<ApiResponse<CommentResponse>> updateComment(
             @PathVariable String id,
-            @RequestParam String text,
-            @RequestParam String userId) {
+            @RequestParam String text
+            ) {
         log.info("Update comment request received for ID: {}", id);
         
-        CommentResponse response = commentService.updateComment(id, text, userId);
+        CommentResponse response = commentService.updateComment(id, text);
         return ResponseEntity.ok(ApiResponse.success("Comment updated successfully", response));
     }
     
@@ -120,7 +118,7 @@ public class CommentController {
             @RequestParam String userId) {
         log.info("Delete comment request received for ID: {}", id);
         
-        commentService.deleteComment(id, userId);
+        commentService.deleteComment(id);
         return ResponseEntity.ok(ApiResponse.success("Comment deleted successfully", null));
     }
     
@@ -129,56 +127,43 @@ public class CommentController {
      *
      * @param id the comment ID to reply to
      * @param request the comment request
-     * @param userId the user ID creating the reply
      * @return ResponseEntity with CommentResponse
      */
     @PostMapping("/{id}/replies")
     @Operation(summary = "Reply to a comment")
     public ResponseEntity<ApiResponse<CommentResponse>> replyToComment(
             @PathVariable String id,
-            @Valid @RequestBody CreateCommentRequest request,
-            @RequestParam String userId) {
+            @Valid @RequestBody CreateCommentRequest request
+            ) {
         log.info("Reply to comment request received for comment: {}", id);
-        
-        CommentResponse response = commentService.replyToComment(id, request, userId);
+
+        CommentResponse response = commentService.replyToComment(id, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Reply created successfully", response));
     }
-    
-    /**
-     * Like a comment.
-     *
-     * @param id the comment ID
-     * @param userId the user ID liking the comment
-     * @return ResponseEntity with success message
-     */
-    @PostMapping("/{id}/like")
-    @Operation(summary = "Like a comment")
-    public ResponseEntity<ApiResponse<Void>> likeComment(
-            @PathVariable String id,
-            @RequestParam String userId) {
-        log.info("Like comment request received for comment: {}", id);
-        
-        commentService.likeComment(id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Comment liked successfully", null));
+
+    @PostMapping("{id}/like")
+    public ResponseEntity<ApiResponse<Boolean>> toggleLikeComment(@PathVariable String id) {
+
+        boolean isLiked = commentService.toggleLikeComment(id);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        isLiked ? "Liked" : "Unliked",
+                        isLiked
+                )
+        );
     }
-    
-    /**
-     * Unlike a comment.
-     *
-     * @param id the comment ID
-     * @param userId the user ID unliking the comment
-     * @return ResponseEntity with success message
-     */
-    @DeleteMapping("/{id}/like")
-    @Operation(summary = "Unlike a comment")
-    public ResponseEntity<ApiResponse<Void>> unlikeComment(
-            @PathVariable String id,
-            @RequestParam String userId) {
-        log.info("Unlike comment request received for comment: {}", id);
-        
-        commentService.unlikeComment(id, userId);
-        return ResponseEntity.ok(ApiResponse.success("Comment unliked successfully", null));
+
+    @GetMapping("/{id}/replies")
+    @Operation(summary = "Get comment replies")
+    public ResponseEntity<ApiResponse<List<CommentResponse>>> getCommentReplies(
+            @PathVariable String id) {
+        log.info("Get replies for comment: {}", id);
+
+        List<CommentResponse> responses = commentService.getCommentReplies(id);
+        return ResponseEntity.ok(ApiResponse.success(responses));
     }
+
 }
 

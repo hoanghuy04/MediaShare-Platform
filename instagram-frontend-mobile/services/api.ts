@@ -133,7 +133,17 @@ export const commentAPI = {
     const response = await axiosInstance.get(API_ENDPOINTS.COMMENTS(postId), {
       params: { page, limit },
     });
-    return response.data.data;
+    
+    // Map comments to add isLiked field
+    const mappedContent = response.data.data.content.map((comment: any) => ({
+      ...comment,
+      isLiked: comment.likedByCurrentUser || false,
+    }));
+    
+    return {
+      ...response.data.data,
+      content: mappedContent,
+    };
   },
 
   createComment: async (data: CreateCommentRequest): Promise<Comment> => {
@@ -141,37 +151,49 @@ export const commentAPI = {
       postId: data.postId,
       text: data.text,
     });
-    return response.data.data;
+    const comment = response.data.data;
+    return {
+      ...comment,
+      isLiked: comment.likedByCurrentUser || false,
+    };
   },
 
   updateComment: async (commentId: string, text: string): Promise<Comment> => {
     const response = await axiosInstance.put(API_ENDPOINTS.UPDATE_COMMENT(commentId), null, {
       params: { text },
     });
-    return response.data.data;
+    const comment = response.data.data;
+    return {
+      ...comment,
+      isLiked: comment.likedByCurrentUser || false,
+    };
   },
 
   deleteComment: async (commentId: string): Promise<void> => {
     await axiosInstance.delete(API_ENDPOINTS.DELETE_COMMENT(commentId));
   },
 
-  likeComment: async (commentId: string): Promise<void> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_COMMENT(commentId), null, {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
-    });
-    return response.data.data;
+  toggleLikeComment: async (commentId: string): Promise<boolean> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.TOGGLE_LIKE_COMMENT(commentId));
+    return response.data.data; // Backend returns boolean: true = liked, false = unliked
   },
 
-  unlikeComment: async (commentId: string): Promise<void> => {
-    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_COMMENT(commentId), {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
-    });
-    return response.data.data;
+  replyToComment: async (commentId: string, data: CreateCommentRequest): Promise<Comment> => {
+    const response = await axiosInstance.post(API_ENDPOINTS.REPLY_TO_COMMENT(commentId), data);
+    const comment = response.data.data;
+    return {
+      ...comment,
+      isLiked: comment.likedByCurrentUser || false,
+    };
   },
 
-  replyToComment: async (commentId: string, text: string): Promise<Comment> => {
-    const response = await axiosInstance.post(`/api/comments/${commentId}/replies`, { text });
-    return response.data.data;
+  getReplies: async (commentId: string): Promise<Comment[]> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.COMMENT_REPLIES(commentId));
+    const replies = response.data.data || [];
+    return replies.map((comment: any) => ({
+      ...comment,
+      isLiked: comment.likedByCurrentUser || false,
+    }));
   },
 };
 

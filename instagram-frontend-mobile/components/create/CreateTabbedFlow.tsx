@@ -17,7 +17,6 @@ import Animated, {
 
 import PostCreationScreen from './posts/PostCreationScreen';
 import ReelsCreationScreen from '@/app/create/reels/index';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type TabType = 'post' | 'story' | 'reels';
@@ -98,26 +97,26 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
-          onPress={() => handleTabPress('story')}
-        >
-          <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
-            TIN
-          </Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
+        onPress={() => handleTabPress('story')}
+      >
+        <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
+          TIN
+        </Text>
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
-          onPress={() => handleTabPress('reels')}
-        >
-          <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
-            THƯỚC PHIM
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+      <TouchableOpacity
+        style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
+        onPress={() => handleTabPress('reels')}
+      >
+        <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
+          THƯỚC PHIM
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
   const shouldHideBottomTabs =
     tabsHidden || (activeTab === 'post' && (postStep === 2 || postStep === 3));

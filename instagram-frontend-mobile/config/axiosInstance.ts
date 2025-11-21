@@ -37,7 +37,7 @@ axiosInstance.interceptors.request.use(
 
         // Endpoints that need userId (for all HTTP methods)
         const needsUserId =
-          url.includes('/posts') ||
+          (url.includes('/posts') && !url.includes('/like')) ||
           url.includes('/comments') ||
           url.includes('/upload') ||
           url.includes('/notifications') ||
