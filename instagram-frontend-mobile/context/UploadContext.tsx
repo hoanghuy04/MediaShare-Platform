@@ -73,7 +73,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
       formData.append('file', filePayload as any);
 
       const usage = postType === 'FEED' ? 'POST' : 'REEL';
-      const fileId = await fileService.uploadFile(formData, usage, progress => {
+      const response = await fileService.uploadFile(formData, usage, progress => {
         setUploadState(prev => ({
           ...prev,
           progress: progress * 0.9,
@@ -82,7 +82,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
 
       const hashtags = extractHashtags(caption);
       const postData = {
-        mediaFileIds: [fileId],
+        mediaFileIds: [response.id],
         type: postType === 'FEED' ? PostType.FEED : PostType.REEL,
         caption: caption.trim(),
         tags: hashtags,

@@ -1,6 +1,7 @@
 package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.enums.MediaUsage;
 import com.hoanghuy04.instagrambackend.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,13 +51,13 @@ public class FileController {
     @PostMapping("/upload/profile-image")
     @Operation(summary = "Upload profile image")
     @SecurityRequirement(name = "Bearer Authentication")
-    public ResponseEntity<ApiResponse<String>> uploadProfileImage(
+    public ResponseEntity<ApiResponse<MediaFileResponse>> uploadProfileImage(
             @RequestParam("file") MultipartFile file) {
-        String fileId = fileService.uploadFile(file, MediaUsage.PROFILE);
+        MediaFileResponse mediaFileResponse = fileService.uploadFile(file, MediaUsage.PROFILE);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("File uploaded successfully", fileId));
+                .body(ApiResponse.success("File uploaded successfully", mediaFileResponse));
     }
-    
+
     /**
      * Upload post media.
      *
@@ -67,14 +68,14 @@ public class FileController {
     @PostMapping("/upload/post-media")
     @Operation(summary = "Upload post media")
     @SecurityRequirement(name = "Bearer Authentication")
-    public ResponseEntity<ApiResponse<String>> uploadPostMedia(
+    public ResponseEntity<ApiResponse<MediaFileResponse>> uploadPostMedia(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "usage", defaultValue = "POST") MediaUsage usage) {
-        String fileId = fileService.uploadFile(file, usage);
+        MediaFileResponse mediaFileResponse = fileService.uploadFile(file, usage);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("File uploaded successfully", fileId));
+                .body(ApiResponse.success("File uploaded successfully", mediaFileResponse));
     }
-    
+
     /**
      * Upload multiple post media files (batch upload).
      *
@@ -93,7 +94,7 @@ public class FileController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Files uploaded successfully", fileIds));
     }
-    
+
     /**
      * Delete a file.
      *
@@ -105,7 +106,7 @@ public class FileController {
     @SecurityRequirement(name = "Bearer Authentication")
     public ResponseEntity<ApiResponse<Void>> deleteFile(@PathVariable String fileId) {
         log.info("Delete file request received for file: {}", fileId);
-        
+
         fileService.deleteFile(fileId);
         return ResponseEntity.ok(ApiResponse.success("File deleted successfully", null));
     }

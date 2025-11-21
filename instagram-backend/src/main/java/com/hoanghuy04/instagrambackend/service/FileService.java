@@ -68,7 +68,7 @@ public class FileService {
      * @return the MediaFile ID
      */
     @Transactional
-    public String uploadFile(MultipartFile file, MediaUsage usage) {
+    public MediaFileResponse uploadFile(MultipartFile file, MediaUsage usage) {
         String userId = securityUtil.getCurrentUserId();
         log.info("Uploading file for user: {} with usage: {}", userId, usage);
 
@@ -103,7 +103,17 @@ public class FileService {
 
         log.info("File uploaded successfully: {} -> ID: {}", filePath, mediaFile.getId());
 
-        return mediaFile.getId();
+        String url = getFileUrl(mediaFile.getFileName());
+        return MediaFileResponse.builder()
+                .id(mediaFile.getId())
+                .url(url)
+                .fileName(mediaFile.getFileName())
+                .fileSize(mediaFile.getFileSize())
+                .category(mediaFile.getCategory())
+                .usage(mediaFile.getUsage())
+                .contentType(mediaFile.getContentType())
+                .uploadedAt(mediaFile.getUploadedAt())
+                .build();
     }
 
     /**
@@ -126,7 +136,7 @@ public class FileService {
 
         for (MultipartFile file : files) {
             if (!file.isEmpty()) {
-                String fileId = uploadFile(file, usage);
+                String fileId = uploadFile(file, usage).getId();
                 fileIds.add(fileId);
             }
         }
@@ -143,6 +153,9 @@ public class FileService {
      */
     @Transactional(readOnly = true)
     public MediaFileResponse getMediaFileResponse(String fileId) {
+        if (fileId == null) {
+            return null;
+        }
         MediaFile mediaFile = mediaFileRepository.findById(fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Media file not found with id: " + fileId));
 

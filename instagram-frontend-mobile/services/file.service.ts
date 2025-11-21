@@ -1,12 +1,13 @@
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
+import { MediaFileResponse } from '../types/media.type';
 
 export const fileService = {
   uploadFile: async (
     file: FormData,
     usage: 'PROFILE' | 'POST' | 'REEL' | 'STORY' = 'POST',
     onProgress?: (progress: number) => void
-  ): Promise<string> => {
+  ): Promise<MediaFileResponse> => {
     const response = await axiosInstance.post(
       `${API_ENDPOINTS.UPLOAD_POST_MEDIA}?usage=${usage}`,
       file,
