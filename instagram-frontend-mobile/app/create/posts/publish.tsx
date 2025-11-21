@@ -1,14 +1,7 @@
 import React from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-
 import { SharePage } from '@/components/create/posts/SharePage';
-
-type GalleryAsset = {
-  id: string;
-  uri: string;
-  mediaType: 'photo' | 'video';
-  duration?: number;
-};
+import { GalleryAsset } from '@/types';
 
 export default function PublishPostScreen() {
   const params = useLocalSearchParams();

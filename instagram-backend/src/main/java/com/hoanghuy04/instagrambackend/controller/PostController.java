@@ -166,36 +166,6 @@ public class PostController {
         return ResponseEntity.ok(ApiResponse.success("Post deleted successfully", null));
     }
     
-    /**
-     * Like a post.
-     *
-     * @param id the post ID
-     * @return ResponseEntity with success message
-     */
-    @PostMapping("/{id}/like")
-    @Operation(summary = "Like a post")
-    public ResponseEntity<ApiResponse<Void>> likePost(
-            @PathVariable String id) {
-        log.info("Like post request received for post: {}", id);
-        
-        postService.likePost(id);
-        return ResponseEntity.ok(ApiResponse.success("Post liked successfully", null));
-    }
-    
-    /**
-     * Unlike a post.
-     *
-     * @param id the post ID
-     * @return ResponseEntity with success message
-     */
-    @DeleteMapping("/{id}/like")
-    @Operation(summary = "Unlike a post")
-    public ResponseEntity<ApiResponse<Void>> unlikePost(
-            @PathVariable String id) {
-        log.info("Unlike post request received for post: {}", id);
-        
-        postService.unlikePost(id);
-        return ResponseEntity.ok(ApiResponse.success("Post unliked successfully", null));
-    }
+
 }
 

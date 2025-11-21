@@ -34,5 +34,11 @@ public class CommentResponse {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+
+    private String parentCommentId;
+
+    private String mention;
+
+    private boolean isLikedByCurrentUser;
 }
 

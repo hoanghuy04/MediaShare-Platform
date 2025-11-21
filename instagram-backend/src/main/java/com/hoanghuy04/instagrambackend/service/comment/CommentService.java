@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * Service interface for comment operations.
  * Handles comment creation, updates, and queries.
@@ -21,11 +23,10 @@ public interface CommentService {
      * Create a new comment on a post.
      *
      * @param request the comment creation request
-     * @param userId the user ID creating the comment
      * @return CommentResponse
      */
     @Transactional
-    CommentResponse createComment(CreateCommentRequest request, String userId);
+    CommentResponse createComment(CreateCommentRequest request);
 
     /**
      * Get comment by ID.
@@ -43,55 +44,47 @@ public interface CommentService {
      * @param pageable pagination information
      * @return PageResponse of CommentResponse
      */
-    @Transactional(readOnly = true)
-    PageResponse<CommentResponse> getPostComments(String postId, Pageable pageable);
 
     /**
      * Update a comment.
      *
      * @param commentId the comment ID
      * @param text the new comment text
-     * @param userId the user ID updating the comment
      * @return updated CommentResponse
      */
     @Transactional
-    CommentResponse updateComment(String commentId, String text, String userId);
+    CommentResponse updateComment(String commentId, String text);
 
     /**
      * Delete a comment.
      *
      * @param commentId the comment ID
-     * @param userId the user ID deleting the comment
      */
     @Transactional
-    void deleteComment(String commentId, String userId);
+    void deleteComment(String commentId);
 
     /**
      * Reply to a comment.
      *
      * @param commentId the comment ID to reply to
      * @param request the comment request
-     * @param userId the user ID creating the reply
      * @return CommentResponse
      */
     @Transactional
-    CommentResponse replyToComment(String commentId, CreateCommentRequest request, String userId);
+    CommentResponse replyToComment(String commentId, CreateCommentRequest request);
 
     /**
      * Like a comment.
      *
      * @param commentId the comment ID
-     * @param userId the user ID liking the comment
      */
     @Transactional
-    void likeComment(String commentId, String userId);
+    boolean toggleLikeComment(String commentId);
 
-    /**
-     * Unlike a comment.
-     *
-     * @param commentId the comment ID
-     * @param userId the user ID unliking the comment
-     */
+    @Transactional(readOnly = true)
+    PageResponse<CommentResponse> getPostComments(String postId, Pageable pageable);
+
     @Transactional
-    void unlikeComment(String commentId, String userId);
+    List<CommentResponse> getCommentReplies(String commentId);
+
 }

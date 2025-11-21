@@ -8,26 +8,53 @@ export const postService = {
     const response = await axiosInstance.get(API_ENDPOINTS.FEED, {
       params: { page, limit },
     });
-    return response.data.data;
+    console.log('[getFeed] Sample post:', response.data.data.content[0]);
+    // Map backend field names to frontend
+    const mappedContent = response.data.data.content.map((post: any) => ({
+      ...post,
+      isLikedByCurrentUser: post.likedByCurrentUser,
+    }));
+    return {
+      ...response.data.data,
+      content: mappedContent,
+    };
   },
 
   getExplorePosts: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.EXPLORE, {
       params: { page, limit },
     });
-    return response.data.data;
+    const mappedContent = response.data.data.content.map((post: any) => ({
+      ...post,
+      isLikedByCurrentUser: post.likedByCurrentUser,
+    }));
+    return {
+      ...response.data.data,
+      content: mappedContent,
+    };
   },
 
   getPost: async (postId: string): Promise<Post> => {
     const response = await axiosInstance.get(API_ENDPOINTS.POST_DETAIL(postId));
-    return response.data.data;
+    const post = response.data.data;
+    return {
+      ...post,
+      isLikedByCurrentUser: post.likedByCurrentUser,
+    };
   },
 
   getUserPosts: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.USER_POSTS(userId), {
       params: { page, limit },
     });
-    return response.data.data;
+    const mappedContent = response.data.data.content.map((post: any) => ({
+      ...post,
+      isLikedByCurrentUser: post.likedByCurrentUser,
+    }));
+    return {
+      ...response.data.data,
+      content: mappedContent,
+    };
   },
 
   createPost: async (data: CreatePostRequest): Promise<Post> => {
@@ -44,28 +71,26 @@ export const postService = {
     await axiosInstance.delete(API_ENDPOINTS.DELETE_POST(postId));
   },
 
-  likePost: async (postId: string): Promise<void> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId));
-    return response.data.data;
-  },
-
-  unlikePost: async (postId: string): Promise<void> => {
-    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId));
-    return response.data.data;
+  toggleLikePost: async (postId: string): Promise<boolean> => {
+    try {
+      const response = await axiosInstance.post(API_ENDPOINTS.TOGGLE_LIKE_POST(postId));
+      return response.data.data; // Returns true if liked, false if unliked
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to toggle like';
+      throw new Error(errorMsg);
+    }
   },
 
   searchPosts: async (query: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
     try {
-      // Try to use dedicated search endpoint if available
       const response = await axiosInstance.get('/api/posts/search', {
         params: { query, page, limit },
       });
       return response.data.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        // Fallback to explore posts if search endpoint doesn't exist
         console.log('Search posts endpoint not found, using explore posts as fallback');
-        return await postAPI.getExplorePosts(page, limit);
+        return await postService.getExplorePosts(page, limit);
       }
       throw error;
     }
@@ -82,7 +107,7 @@ export const postService = {
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.log('Search reels endpoint not found, using explore posts as fallback');
-        const exploreResponse = await postAPI.getExplorePosts(page, limit);
+        const exploreResponse = await postService.getExplorePosts(page, limit);
         // Filter for video posts (reels)
         const videoPosts = exploreResponse.content.filter(post =>
           post.media.some(media => media.type === 'VIDEO' || media.type === 'video')

@@ -1,15 +1,8 @@
 import React from 'react';
 import { Dimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-
 import { EditPage } from '@/components/create/posts/EditPage';
-
-type GalleryAsset = {
-  id: string;
-  uri: string;
-  mediaType: 'photo' | 'video';
-  duration?: number;
-};
+import { GalleryAsset } from '@/types';
 
 const { height: screenHeight } = Dimensions.get('window');
 

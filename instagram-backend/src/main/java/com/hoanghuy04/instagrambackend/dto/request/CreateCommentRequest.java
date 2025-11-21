@@ -26,5 +26,9 @@ public class CreateCommentRequest {
     @NotBlank(message = "Comment text is required")
     @Size(max = 2200, message = "Comment must not exceed 2200 characters")
     private String text;
+
+    private String mention;
+
+
 }
 

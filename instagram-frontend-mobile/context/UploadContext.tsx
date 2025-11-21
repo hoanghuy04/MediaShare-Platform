@@ -13,6 +13,7 @@ interface UploadParams {
   caption: string;
   location?: string;
   userId: string;
+  postType?: 'FEED' | 'REEL'; // Add post type option
 }
 
 interface UploadState {
@@ -40,7 +41,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const startUpload = async (params: UploadParams) => {
-    const { mediaUri, mediaType, caption, location, userId } = params;
+    const { mediaUri, mediaType, caption, location, userId, postType = 'REEL' } = params;
 
     setUploadState({
       status: 'uploading',
@@ -71,7 +72,8 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
 
       formData.append('file', filePayload as any);
 
-      const fileId = await fileService.uploadFile(formData, 'REEL', progress => {
+      const usage = postType === 'FEED' ? 'POST' : 'REEL';
+      const fileId = await fileService.uploadFile(formData, usage, progress => {
         setUploadState(prev => ({
           ...prev,
           progress: progress * 0.9,
@@ -81,7 +83,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
       const hashtags = extractHashtags(caption);
       const postData = {
         mediaFileIds: [fileId],
-        type: PostType.REEL,
+        type: postType === 'FEED' ? PostType.FEED : PostType.REEL,
         caption: caption.trim(),
         tags: hashtags,
         location: location,
@@ -96,7 +98,6 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
         thumbnailUri: mediaUri,
       }));
     } catch (error: any) {
-      console.error('❌ Upload error:', error);
       setUploadState(prev => ({
         ...prev,
         status: 'error',

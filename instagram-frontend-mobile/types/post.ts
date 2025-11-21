@@ -28,23 +28,6 @@ export interface UpdatePostRequest {
   caption?: string;
 }
 
-export interface Comment {
-  id: string;
-  postId: string;
-  author: UserProfile;
-  text: string;
-  likesCount: number;
-  repliesCount?: number;
-  isLiked?: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateCommentRequest {
-  postId: string;
-  text: string;
-}
-
 export interface LikeResponse {
   success: boolean;
   isLiked: boolean;

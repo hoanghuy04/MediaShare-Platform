@@ -15,18 +15,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GalleryAsset } from '../../../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_GAP = 1; 
 const TILE_SIZE = (SCREEN_WIDTH - TILE_GAP * 2) / 3; 
 const PREVIEW_HEIGHT = SCREEN_WIDTH * 0.8;
-
-type GalleryAsset = {
-  id: string;
-  uri: string;
-  mediaType: 'photo' | 'video';
-  duration?: number;
-};
 
 type GalleryPageProps = {
   height: number;

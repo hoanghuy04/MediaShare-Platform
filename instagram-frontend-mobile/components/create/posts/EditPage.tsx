@@ -11,16 +11,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GalleryAsset } from '../../../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.5; 
-
-type GalleryAsset = {
-  id: string;
-  uri: string;
-  mediaType: 'photo' | 'video';
-  duration?: number;
-};
+const PREVIEW_HEIGHT = SCREEN_HEIGHT * 0.5;
 
 type EditPageProps = {
   height: number;

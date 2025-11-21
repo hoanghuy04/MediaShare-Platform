@@ -1,24 +1,26 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import { useTheme } from '@hooks/useTheme';
+import { useAuth } from '@hooks/useAuth';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
 
 import { FeedHeader } from '@components/feed/FeedHeader';
 import { FeedList } from '@components/feed/FeedList';
 import { UploadProgressWidget } from '@components/feed/UploadProgressWidget';
 
-import { postAPI, userAPI } from '@services/api';
+import { userAPI } from '@services/api';
 import { postService } from '../../services/post.service';
 import { showAlert } from '@utils/helpers';
 
 export default function FeedScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasInitialized = useRef(false);
@@ -73,6 +75,7 @@ export default function FeedScreen() {
     hasMore,
     loadMore,
     refresh,
+    updateItem,
   } = useInfiniteScroll({
     fetchFunc: postService.getFeed,
     limit: 20,
@@ -86,6 +89,16 @@ export default function FeedScreen() {
     }
   }, []);
 
+  // Reload feed when returning from post detail
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasInitialized.current) {
+        // Silent refresh to sync like/comment changes
+        refresh();
+      }
+    }, [])
+  );
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refresh();
@@ -95,8 +108,34 @@ export default function FeedScreen() {
 
   const handleLike = async (id: string) => {
     try {
-      await postAPI.likePost(id);
+      if (!user?.id) {
+        showAlert('Error', 'Please login to like posts');
+        return;
+      }
+      const post = posts.find(p => p.id === id);
+      const wasLiked = post?.isLikedByCurrentUser;
+      
+      updateItem(id, (item) => ({
+        ...item,
+        isLikedByCurrentUser: !item.isLikedByCurrentUser,
+        likesCount: item.isLikedByCurrentUser ? item.likesCount - 1 : item.likesCount + 1,
+      }));
+
+      const isLiked = await postService.toggleLikePost(id);
+      
+      updateItem(id, (item) => ({
+        ...item,
+        isLikedByCurrentUser: isLiked,
+        likesCount: wasLiked && !isLiked ? item.likesCount : !wasLiked && isLiked ? item.likesCount : item.likesCount,
+      }));
     } catch (e: any) {
+      console.error('Error liking post:', e);
+      // Revert on error
+      updateItem(id, (item) => ({
+        ...item,
+        isLikedByCurrentUser: !item.isLikedByCurrentUser,
+        likesCount: item.isLikedByCurrentUser ? item.likesCount - 1 : item.likesCount + 1,
+      }));
       showAlert('Error', e.message);
     }
   };

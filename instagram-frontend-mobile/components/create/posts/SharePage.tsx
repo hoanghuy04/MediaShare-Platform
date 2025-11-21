@@ -17,23 +17,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LocationSearchScreen } from '../reels/LocationSearchScreen';
-import { uploadAPI, postAPI } from '@/services/api';
-import { useAuth } from '@/context/AuthContext';
-import { extractHashtags } from '@/utils/hashtag';
-import { CreatePostRequest, Media } from '@/types';
-import apiConfig from '@/config/apiConfig';
-import { isVideoFormatSupported } from '@/utils/videoUtils';
+import { useUpload } from '../../../context/UploadContext';
+import { useAuth } from '../../../context/AuthContext';
+import { extractHashtags } from '../../../utils/hashtag';
+import { GalleryAsset } from '../../../types';
+import { isVideoFormatSupported } from '../../../utils/videoUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
 const PREVIEW_HEIGHT = PREVIEW_WIDTH;
-
-type GalleryAsset = {
-  id: string;
-  uri: string;
-  mediaType: 'photo' | 'video';
-  duration?: number;
-};
 
 type PickedLocation = {
   name: string;
@@ -60,7 +52,7 @@ type SharePageProps = {
   onBack: () => void;
   onShare: (data: PostData) => void;
   hideTabbedFlow?: boolean;
-  onPostCreated?: () => void; // Callback để refresh feed
+  onPostCreated?: () => void; 
 };
 
 export function SharePage({
@@ -73,6 +65,7 @@ export function SharePage({
 }: SharePageProps) {
   const { user } = useAuth();
   const router = useRouter();
+  const { startUpload } = useUpload();
   const [caption, setCaption] = useState('');
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
@@ -80,6 +73,7 @@ export function SharePage({
   const [isSharing, setIsSharing] = useState(false);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const isSubmittingRef = useRef(false);
 
   const selectedAssets = gallery.filter(asset => selectedMedia.includes(asset.id));
 
@@ -96,159 +90,36 @@ export function SharePage({
   };
 
   const handleShare = async () => {
-    if (isSharing) return;
+    if (isSharing || isSubmittingRef.current) return;
 
-    setIsSharing(true);
-    try {
-      console.log('Starting share process...');
-      console.log('Selected assets:', selectedAssets);
-      console.log('Caption:', caption);
-      console.log('User:', user);
-
-      // Validate video formats before uploading
-      const unsupportedVideos = selectedAssets.filter(asset => !validateVideoFormat(asset));
-      if (unsupportedVideos.length > 0) {
-        Alert.alert(
-          'Video Format Not Supported',
-          'Some videos have unsupported formats and will be treated as images.',
-          [{ text: 'OK' }]
-        );
-      }
-
-      const hashtags = extractHashtags(caption);
-      console.log('Extracted hashtags:', hashtags);
-
-      // Upload media files first
-      console.log('Starting media upload...');
-      const uploadedMedia = await Promise.all(
-        selectedAssets.map(async (asset, index) => {
-          console.log(`Uploading asset ${index + 1}:`, asset);
-          const formData = new FormData();
-          const filename = asset.uri.split('/').pop() || 'upload';
-
-          // Determine file type and extension
-          let fileExtension = filename.split('.').pop()?.toLowerCase() || '';
-          let mimeType = '';
-
-          // Check if video format is supported
-          const isVideoSupported = asset.mediaType === 'video' && isVideoFormatSupported(asset.uri);
-
-          if (asset.mediaType === 'video' && isVideoSupported) {
-            if (['mp4', 'mov', 'avi', 'mkv', 'm4v'].includes(fileExtension)) {
-              mimeType = `video/${fileExtension}`;
-            } else {
-              mimeType = 'video/mp4';
-              fileExtension = 'mp4';
-            }
-          } else {
-            // Treat as image if video format is not supported
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
-              mimeType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`;
-            } else {
-              mimeType = 'image/jpeg';
-              fileExtension = 'jpg';
-            }
-          }
-
-          console.log(`Asset ${index + 1} - MIME type:`, mimeType, 'Extension:', fileExtension);
-
-          formData.append('file', {
-            uri: asset.uri,
-            type: mimeType,
-            name: `upload.${fileExtension}`,
-          } as any);
-
-          // Check if this is a mock URL (picsum.photos)
-          if (asset.uri.includes('picsum.photos')) {
-            console.log(`Asset ${index + 1} is mock data, skipping upload`);
-            return {
-              url: asset.uri, // Use mock URL directly
-              type: asset.mediaType === 'video' ? 'VIDEO' : 'IMAGE',
-            } as Media;
-          }
-
-          const uploadResponse = await uploadAPI.uploadFile(formData, 'post', user?.id);
-          console.log(`Asset ${index + 1} uploaded successfully:`, uploadResponse);
-          console.log(`Asset ${index + 1} upload response type:`, typeof uploadResponse);
-          console.log(`Asset ${index + 1} upload response length:`, uploadResponse?.length);
-
-          // Backend returns full URL, but might contain localhost
-          let mediaUrl = uploadResponse;
-
-          // Replace localhost with actual API URL if needed
-          if (typeof mediaUrl === 'string') {
-            if (mediaUrl.includes('localhost:8080') || mediaUrl.includes('127.0.0.1:8080')) {
-              mediaUrl = mediaUrl.replace(/https?:\/\/localhost:8080/g, apiConfig.apiUrl);
-              mediaUrl = mediaUrl.replace(/https?:\/\/127\.0\.0\.1:8080/g, apiConfig.apiUrl);
-              console.log(`Asset ${index + 1} replaced localhost with API URL:`, mediaUrl);
-            }
-            // If it's a relative path (shouldn't happen with current backend), make it absolute
-            else if (!mediaUrl.startsWith('http')) {
-              mediaUrl = `${apiConfig.apiUrl}${mediaUrl}`;
-              console.log(`Asset ${index + 1} converted to absolute URL:`, mediaUrl);
-            }
-          }
-
-          console.log(`Asset ${index + 1} final media URL:`, mediaUrl);
-
-          return {
-            url: mediaUrl,
-            type: asset.mediaType === 'video' && isVideoSupported ? 'VIDEO' : 'IMAGE',
-          } as Media;
-        })
-      );
-
-      console.log('All media uploaded successfully:', uploadedMedia);
-
-      // Create post with uploaded media
-      const postData: CreatePostRequest = {
-        caption,
-        media: uploadedMedia,
-        tags: hashtags,
-        location: pickedLocation?.name,
-      };
-
-      console.log('Creating post with data:', postData);
-      const newPost = await postAPI.createPost(postData);
-      console.log('Post created successfully:', newPost);
-
-      // Trigger refresh feed trước khi navigate
-      onPostCreated?.();
-      
-      // Show success message
-      Alert.alert('Thành công', 'Bài viết đã được chia sẻ!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate to feed after successful post creation
-            router.replace('/(tabs)/feed');
-          },
-        },
-      ]);
-
-      // Call onShare callback to close the screen
-      await onShare({
-        mediaUris: selectedAssets.map(asset => asset.uri),
-        mediaType: selectedAssets[0]?.mediaType || 'photo',
-        caption,
-        hashtags,
-        location: pickedLocation
-          ? {
-              name: pickedLocation.name,
-              address: pickedLocation.address,
-              distance: pickedLocation.distance,
-            }
-          : undefined,
-        aiTagEnabled,
-      });
-    } catch (error: any) {
-      console.error('Error sharing post:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      Alert.alert('Lỗi', `Không thể chia sẻ bài viết: ${error.message || 'Unknown error'}`);
-    } finally {
-      setIsSharing(false);
+    if (!user || !user.id) {
+      Alert.alert('Lỗi', 'Vui lòng đăng nhập để chia sẻ bài viết.');
+      return;
     }
+
+    if (selectedAssets.length === 0) return;
+
+    isSubmittingRef.current = true;
+    setIsSharing(true);
+
+    router.replace('/(tabs)/feed');
+
+    onPostCreated?.();
+
+    setTimeout(() => {
+      const firstAsset = selectedAssets[0];
+      
+      console.log('Starting upload for:', firstAsset);
+      
+      startUpload({
+        mediaUri: firstAsset.uri,
+        mediaType: firstAsset.mediaType === 'video' ? 'video' : 'photo',
+        caption: caption,
+        location: pickedLocation?.name,
+        userId: user.id,
+        postType: 'FEED',
+      });
+    }, 100);
   };
 
   const handlePreviewScroll = (event: any) => {
@@ -453,15 +324,10 @@ export function SharePage({
       {/* Share Button */}
       <View style={styles.shareButtonContainer}>
         <TouchableOpacity
-          style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+          style={styles.shareButton}
           onPress={handleShare}
-          disabled={isSharing}
         >
-          {isSharing ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text style={styles.shareButtonText}>Chia sẻ</Text>
-          )}
+          <Text style={styles.shareButtonText}>Chia sẻ</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -634,13 +500,10 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   shareButton: {
-    backgroundColor: '#007AFF', // Màu đậm hơn primary
+    backgroundColor: '#007AFF',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  shareButtonDisabled: {
-    backgroundColor: '#999',
   },
   shareButtonText: {
     color: 'white',

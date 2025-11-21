@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -55,6 +55,12 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [videoError, setVideoError] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const videoRef = useRef<Video>(null);
+
+  // Sync local state with props when post changes
+  useEffect(() => {
+    setIsLiked(post.isLikedByCurrentUser || false);
+    setLikesCount(post.likesCount || 0);
+  }, [post.isLikedByCurrentUser, post.likesCount, post.commentsCount]);
 
   const handleUserPress = () => {
     router.push(`/users/${post.author.id}`);

@@ -25,6 +25,8 @@ export const UploadProgressWidget = ({ onRefreshFeed }: { onRefreshFeed: () => v
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const { user } = useAuth();
 
+  console.log('🎨 UploadProgressWidget render - status:', uploadState.status, 'progress:', uploadState.progress);
+
   useEffect(() => {
     if (uploadState.status === 'uploading') {
       const targetValue = uploadState.progress * width;
