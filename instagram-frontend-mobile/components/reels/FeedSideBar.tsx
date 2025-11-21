@@ -27,12 +27,7 @@ const IconWithText = ({
 );
 
 const FeedSideBar = ({ data, isLiked, onLike }: FeedSideBarProps) => {
-  const { totalLike: initialLikes, totalComment } = data;
-  const [totalLike, setTotalLike] = useState(initialLikes);
-
-  React.useEffect(() => {
-    setTotalLike(prev => (isLiked ? initialLikes + 1 : initialLikes));
-  }, [isLiked, initialLikes]);
+  const { totalLike, totalComment } = data;
 
   return (
     <View style={styles.container}>

@@ -20,7 +20,7 @@ export interface PostResponse {
   totalComment: number;
   tags: string[];
   location: string | null;
-  isLikedByCurrentUser: boolean;
+  likedByCurrentUser: boolean;
   createdAt: string;
   updatedAt: string;
 }

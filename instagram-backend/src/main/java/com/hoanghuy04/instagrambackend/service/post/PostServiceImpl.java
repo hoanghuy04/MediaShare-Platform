@@ -5,12 +5,15 @@ import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
+import com.hoanghuy04.instagrambackend.entity.Like;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
 import com.hoanghuy04.instagrambackend.enums.PostType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
+import com.hoanghuy04.instagrambackend.repository.LikeRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
 import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
@@ -22,7 +25,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -41,7 +46,9 @@ public class PostServiceImpl implements PostService {
     private final UserService userService;
     private final FollowRepository followRepository;
     private final FileService fileService;
+    private final LikeRepository likeRepository;
     private final SecurityUtil securityUtil;
+
 
     /**
      * Create a new post.
@@ -157,10 +164,40 @@ public class PostServiceImpl implements PostService {
     @Override
     public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
 
-        Page<PostResponse> page = postRepository.findByType(type, pageable)
-                .map(this::convertToPostResponse);
+        Page<Post> postPage = postRepository.findByType(type, pageable);
 
-        return PageResponse.of(page);
+        User currentUser = securityUtil.getCurrentUser();
+
+        Set<String> likedPostIds;
+
+        if (currentUser != null && !postPage.isEmpty()) {
+            List<String> postIds = postPage
+                    .getContent()
+                    .stream()
+                    .map(Post::getId)
+                    .toList();
+
+            List<Like> likes = likeRepository.findByUserAndTargetTypeAndTargetIdIn(
+                    currentUser,
+                    LikeTargetType.POST,
+                    postIds
+            );
+
+            likedPostIds = likes.stream()
+                    .map(Like::getTargetId)
+                    .collect(Collectors.toSet());
+        } else {
+            likedPostIds = Collections.emptySet();
+        }
+
+        Page<PostResponse> dtoPage = postPage.map(post -> {
+            boolean liked = currentUser != null && likedPostIds.contains(post.getId());
+            PostResponse dto = convertToPostResponse(post);
+            dto.setLikedByCurrentUser(liked);
+            return dto;
+        });
+
+        return PageResponse.of(dtoPage);
     }
 
     /**
