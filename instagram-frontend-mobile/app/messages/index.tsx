@@ -190,18 +190,16 @@ export default function MessagesScreen() {
     router.push(`/messages/${conversationId}`);
   };
 
-  const handlePressFollowingUser = (userId: string) => {
-    if (!currentUser?.id) return;
-    router.push({
-      pathname: '/messages/[conversationId]',
-      params: {
-        conversationId: userId,
-        isNewConversation: 'true',
-        direction: 'sent',
-        senderId: currentUser.id,
-        receiverId: userId,
-      },
-    });
+  const handlePressFollowingUser = async (peerId: string) => {
+    const convId = await messageAPI.resolveDirectByPeer(peerId);
+    if (convId) {
+      router.push({ pathname: '/messages/[conversationId]', params: { conversationId: convId } });
+    } else {
+      router.push({
+        pathname: '/messages/[conversationId]',
+        params: { conversationId: peerId, isNewConversation: 'true', direction: 'sent', senderId: currentUser.id, receiverId: peerId },
+      });
+    }
   };
 
   const handleLongPress = (conversation: Conversation) => {
@@ -418,7 +416,7 @@ export default function MessagesScreen() {
     }
 
     // Handle message request type
-    if (item.type === 'MESSAGE_REQUEST' && item.messageRequest) {
+    if (item.type === 'MESSAGE_REQUEST' && item.messageRequest && item.messageRequest.status === 'PENDING') {
       const messageRequest = item.messageRequest;
       // Current user is the sender, show receiver's info
       const receiverName = messageRequest.receiver?.username || 'Unknown';

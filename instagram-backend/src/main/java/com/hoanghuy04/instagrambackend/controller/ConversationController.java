@@ -11,7 +11,9 @@ import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
+import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import com.hoanghuy04.instagrambackend.service.message.*;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +50,8 @@ public class ConversationController {
     private final MessageMapper messageMapper;
     private final UserService userService;
 
+    private final ConversationRepository conversationRepository;
+
     @GetMapping("/inbox")
     @Operation(summary = "Get inbox items (conversations + sent message requests)")
     public ResponseEntity<ApiResponse<PageResponse<InboxItemDTO>>> getInbox(
@@ -83,6 +87,16 @@ public class ConversationController {
                 conversationId, userId, pageable
         );
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/direct/by-user/{peerId}")
+    @Operation(summary = "Resolve DIRECT conversation by peer; 200 nếu có, 404 nếu chưa")
+    public ResponseEntity<ApiResponse<String>> resolveDirect(
+            @PathVariable String peerId,
+            @RequestParam String userId) {     // X-User-ID interceptor vẫn gắn, nhưng mình cho phép query param rõ ràng
+        String key = conversationService.directKeyOf(userId, peerId);
+        Conversation found = conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key).orElse(null);
+        return ResponseEntity.ok(ApiResponse.success(found != null ? found.getId() : null));
     }
 
     @PostMapping("/group")

@@ -11,6 +11,7 @@ import { userAPI, postAPI } from '@services/api';
 import { UserProfile, Post } from '@types';
 import { showAlert } from '@utils/helpers';
 import { Ionicons } from '@expo/vector-icons';
+import { messageAPI } from '../../services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_SIZE = (SCREEN_WIDTH - 4) / 3;
@@ -76,9 +77,17 @@ export default function UserProfileScreen() {
     }
   };
 
-  const handleMessage = () => {
+  const handleMessage = async () => {
     // Navigate directly to conversation using the user's ID as conversationId
-    router.push(`/messages/${id}`);
+    const convId = await messageAPI.resolveDirectByPeer(id);
+    if (convId) {
+      router.push({ pathname: '/messages/[conversationId]', params: { conversationId: convId } });
+    } else {
+      router.push({
+        pathname: '/messages/[conversationId]',
+        params: { conversationId: id, isNewConversation: 'true', direction: 'sent', senderId: currentUser.id, receiverId: id },
+      });
+    }
   };
 
   if (isLoading || !profile) {
