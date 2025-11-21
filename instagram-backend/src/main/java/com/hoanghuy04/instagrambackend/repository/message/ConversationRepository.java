@@ -38,9 +38,22 @@ public interface ConversationRepository extends MongoRepository<Conversation, St
      */
     @Query("{'type': ?0, 'participants.userId': {$all: ?1, $size: ?2}}")
     Optional<Conversation> findByTypeAndParticipants(
-        ConversationType type, 
+        ConversationType type,
         List<String> participants,
         int size
+    );
+
+    /**
+     * Find a direct conversation by its normalized participant list.
+     *
+     * @param type the conversation type (DIRECT)
+     * @param participantsNormalized sorted list of participant ids (size=2)
+     * @return Optional conversation if found
+     */
+    @Query("{'type': ?0, 'participantsNormalized': ?1}")
+    Optional<Conversation> findByTypeAndParticipantsNormalized(
+        ConversationType type,
+        List<String> participantsNormalized
     );
     
     /**

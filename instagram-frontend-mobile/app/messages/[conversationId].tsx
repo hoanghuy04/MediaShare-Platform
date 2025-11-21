@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -10,6 +10,10 @@ import {
   Image,
   StatusBar,
   SafeAreaView,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  ImageBackground,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +25,41 @@ import { MessageInput } from '../../components/messages/MessageInput';
 import { TypingIndicator } from '../../components/messages/TypingIndicator';
 import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { Avatar } from '../../components/common/Avatar';
 import { messageAPI, userAPI, messageRequestAPI } from '../../services/api';
-import { Message } from '../../types';
+import { Conversation, Message, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
+import { MutualUserPicker, MutualUserOption } from '../../components/messages/MutualUserPicker';
+import { GroupInfoSheet } from '../../components/messages/GroupInfoSheet';
+
+const hexToRgba = (hex?: string, alpha = 1) => {
+  if (!hex) return `rgba(0,0,0,${alpha})`;
+  const s = hex.replace('#', '');
+  if (s.length !== 6) return `rgba(0,0,0,${alpha})`;
+  const n = parseInt(s, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
+};
 
 export default function ConversationScreen() {
-  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
+  const params = useLocalSearchParams<{
+    conversationId?: string | string[];
+    isNewConversation?: string | string[];
+    requestId?: string | string[];
+    direction?: string | string[];
+    senderId?: string | string[];
+    receiverId?: string | string[];
+  }>();
+  const normalizeParam = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v);
+
+  const routeConversationId = normalizeParam(params.conversationId) || '';
+  const routePendingFlag = normalizeParam(params.isNewConversation);
+  const routeRequestId = normalizeParam(params.requestId);
+  const direction = normalizeParam(params.direction);
+  const routeSenderId = normalizeParam(params.senderId);
+  const routeReceiverId = normalizeParam(params.receiverId);
+  const wantsPendingRoute = routePendingFlag === 'true';
+
   const router = useRouter();
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -40,452 +73,461 @@ export default function ConversationScreen() {
     onTyping,
     isConnected,
     connectionStatus,
-    onConnectionStatusChange,
   } = useWebSocket();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [otherUser, setOtherUser] = useState<any>(null);
-  const [actualConversationId, setActualConversationId] = useState<string>(conversationId);
-  const [isNewConversation, setIsNewConversation] = useState(false); // Track if this is a new conversation (no existing conversation)
-  const [isTyping, setIsTyping] = useState(false);
+  const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
+  const [peerUserId, setPeerUserId] = useState<string | null>(wantsPendingRoute ? routeConversationId : null);
+  const [actualConversationId, setActualConversationId] = useState<string | null>(wantsPendingRoute ? null : routeConversationId);
+  const [isNewConversation, setIsNewConversation] = useState(wantsPendingRoute);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [localConnectionStatus, setLocalConnectionStatus] = useState<
-    'connected' | 'connecting' | 'disconnected' | 'reconnecting'
-  >('disconnected');
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [conversationDetails, setConversationDetails] = useState<Conversation | null>(null);
+  const [isGroupInfoVisible, setGroupInfoVisible] = useState(false);
+  const [isAddMembersVisible, setAddMembersVisible] = useState(false);
+  const [pendingMembers, setPendingMembers] = useState<Record<string, MutualUserOption>>({});
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  const [showDevelopmentModal, setShowDevelopmentModal] = useState(false);
-  const [developmentTitle, setDevelopmentTitle] = useState('');
-  const [developmentMessage, setDevelopmentMessage] = useState('');
+  const flatListRef = useRef<FlatList<Message>>(null);
 
-  useEffect(() => {
-    loadMessages();
-  }, [conversationId]);
+  const isGroupConversation = conversationDetails?.type === 'GROUP';
+  const participantMap = useMemo(() => {
+    const map = new Map<string, Conversation['participants'][number]>();
+    conversationDetails?.participants?.forEach(p => map.set(p.userId, p));
+    return map;
+  }, [conversationDetails]);
 
-  // Monitor connection status
-  useEffect(() => {
-    setLocalConnectionStatus(connectionStatus);
-  }, [connectionStatus]);
+  const typingDisplayNames = useMemo(
+    () => typingUsers.map(id => participantMap.get(id)?.username).filter(Boolean) as string[],
+    [participantMap, typingUsers]
+  );
 
-  // Set up WebSocket listeners
-  useEffect(() => {
-    // Listen for incoming messages
-    const handleWebSocketMessage = (message: any) => {
-      console.log('Received WebSocket message:', message);
-      // Check if message is for this conversation (use otherUser.id if available, fallback to conversationId)
-      const otherUserId = otherUser?.id || conversationId;
-      if (
-        message.type === 'CHAT' &&
-        (message.senderId === otherUserId || message.receiverId === otherUserId)
-      ) {
-        // Convert WebSocket message to Message type
-        // Safety check: ensure we have sender info
-        if (!message.senderId) {
-          console.warn('WebSocket message missing senderId:', message);
-          return;
-        }
-        
-        const newMessage: Message = {
-          id: message.id || '',
-          sender: {
-            id: message.senderId,
-            username: message.senderUsername || '',
-            avatar: message.senderProfileImage,
-            isVerified: false,
-          },
-          content: message.content || '',
-          mediaUrl: message.mediaUrl,
-          readBy: message.status === 'READ' ? [user?.id || ''] : [],
-          createdAt: message.timestamp,
-          isDeleted: false,
-        };
+  const recentMedia = useMemo(
+    () => messages.filter(m => !!m.mediaUrl).slice(-6).reverse(),
+    [messages]
+  );
 
-        setMessages(prev => {
-          // Check if message already exists
-          const exists = prev.some(msg => msg.id === message.id);
-          if (exists) return prev;
+  const existingMemberIds = useMemo(
+    () => conversationDetails?.participants?.map(m => m.userId) ?? [],
+    [conversationDetails]
+  );
 
-          // If it's a message from current user, replace optimistic message
-          if (message.senderId === user?.id) {
-            return prev.map(msg => (msg.id.startsWith('temp-') ? newMessage : msg));
-          }
-
-          // Add new message from other user
-          return [...prev, newMessage];
-        });
-
-        // Mark message as read if it's from the other user and not sent by current user
-        if (message.senderId === otherUserId && message.id && message.senderId !== user?.id) {
-          sendReadReceipt(message.id, message.senderId);
-        }
-      }
+  // Palette tổng hợp: ưu tiên themeColor của conversation
+  const chatPalette = useMemo(() => {
+    const accent = conversationDetails?.themeColor || theme.chat.bubbleOut;
+    return {
+      bubbleIn: theme.chat.bubbleIn,
+      bubbleOut: accent,
+      bubbleText: theme.chat.bubbleText,
+      headerBg: conversationDetails?.themeColor ? hexToRgba(accent, 0.92) : theme.chat.headerBg,
+      headerText: theme.chat.headerText,
+      tint: conversationDetails?.themeColor || theme.chat.tint,
+      fabBg: theme.chat.fabBg,
     };
+  }, [conversationDetails?.themeColor, theme]);
 
-    // Listen for read receipts
-    const handleReadReceipt = (messageId: string, senderId: string) => {
-      const otherUserId = otherUser?.id || conversationId;
-      if (senderId === otherUserId) {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === messageId ? { ...msg, readBy: [...msg.readBy, senderId] } : msg
-          )
-        );
-      }
+  const bubblePalette = useMemo(
+    () => ({ bubbleIn: chatPalette.bubbleIn, bubbleOut: chatPalette.bubbleOut, bubbleText: chatPalette.bubbleText }),
+    [chatPalette]
+  );
+
+  const wallpaperOverlay = useMemo(() => hexToRgba(chatPalette.tint, 0.34), [chatPalette.tint]);
+
+  const scrollToBottom = useCallback(() => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+    setShowScrollToBottom(false);
+  }, []);
+
+  const handleListScroll = useCallback(e => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distance = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    setShowScrollToBottom(distance > 280);
+  }, []);
+
+  // ------- data helpers -------
+  const ensureMessageSender = useCallback((m: Message): Message => {
+    if ((m as any).sender?.id || !user) return m;
+    return {
+      ...m,
+      sender: { id: user.id, username: user.username, avatar: user.profile?.avatar, isVerified: !!user.isVerified },
     };
+  }, [user]);
 
-    // Listen for typing indicators
-    const handleTyping = (isTyping: boolean, userId: string) => {
-      const otherUserId = otherUser?.id || conversationId;
-      if (userId === otherUserId) {
-        setTypingUsers(prev => {
-          if (isTyping) {
-            return prev.includes(userId) ? prev : [...prev, userId];
-          } else {
-            return prev.filter(id => id !== userId);
-          }
-        });
-      }
-    };
+  const sortAsc = useCallback((list: Message[]) =>
+    [...list].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()), []);
 
-    onMessage(handleWebSocketMessage);
-    onReadReceipt(handleReadReceipt);
-    onTyping(handleTyping);
-  }, [conversationId, otherUser, user?.id, onMessage, onReadReceipt, onTyping, sendReadReceipt]);
-
-  const showDevelopmentNotice = (title: string, message: string) => {
-    setDevelopmentTitle(title);
-    setDevelopmentMessage(message);
-    setShowDevelopmentModal(true);
-  };
-
-  const loadMessages = async () => {
+  // ------- load pending/existing -------
+  const loadPendingThread = useCallback(async (targetId: string) => {
+    if (!targetId || !user?.id) { setIsLoading(false); return; }
+    setIsLoading(true);
     try {
-      // conversationId might be the other user's ID or actual conversation ID
-      // First, try to get or create direct conversation if conversationId looks like a userId
-      let actualConversationId = conversationId;
-      let isNewConv = false; // Track if this is a new conversation locally
-      
-      try {
-        // Try to get conversation as-is first
-        const conversation = await messageAPI.getConversation(conversationId);
-        actualConversationId = conversation.id;
-        
-        // Set other user from participants
-        if (conversation.participants && conversation.participants.length > 0) {
-          const otherUserFromConv = conversation.participants.find(p => p.userId !== user?.id);
-          if (otherUserFromConv) {
-            setOtherUser({
-              id: otherUserFromConv.userId,
-              username: otherUserFromConv.username,
-              email: '',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              profile: { avatar: otherUserFromConv.avatar },
-            });
-          }
-        }
-      } catch (error: any) {
-        // If conversation not found (404), this is a new conversation
-        // The conversationId is actually the other user's ID
-        if (error.response?.status === 404) {
-          console.log('Conversation not found. This is a new conversation with user:', conversationId);
-          
-          // Mark this as a new conversation (no existing conversation)
-          isNewConv = true;
-          setIsNewConversation(true);
-          
-          // Load the other user's profile
-          try {
-            const userProfile = await userAPI.getUserProfile(conversationId);
-            setOtherUser(userProfile);
-            console.log('Loaded other user profile:', userProfile);
-            
-            // No actual conversation ID yet - will be created when first message is sent
-            // Keep conversationId as is (it's the userId)
-            actualConversationId = conversationId;
-          } catch (userError) {
-            console.error('Failed to fetch user profile:', userError);
-            showAlert('Error', 'Unable to load user information. Please try again.');
-            router.back();
-            return;
-          }
-        } else {
-          throw error;
-        }
+      setIsNewConversation(true); setActualConversationId(null); setPeerUserId(targetId); setConversationDetails(null);
+      if (!otherUser || otherUser.id !== targetId) {
+        const profile = await userAPI.getUserProfile(targetId);
+        setOtherUser(profile);
       }
-      
-      // Save the actual conversation ID to state
-      setActualConversationId(actualConversationId);
-      
-      // If this is a new conversation, try to load pending messages
-      if (isNewConv) {
-        try {
-          // Try to load pending messages from message request
-          const pendingMessages = await messageRequestAPI.getPendingMessages(user?.id || '', conversationId);
-          
-          if (pendingMessages && pendingMessages.length > 0) {
-            console.log(`Loaded ${pendingMessages.length} pending messages`);
-            setMessages(pendingMessages);
-          } else {
-            console.log('No pending messages found');
-            setMessages([]); // Empty messages for new conversation
-          }
-        } catch (error) {
-          console.error('Error loading pending messages:', error);
-          setMessages([]); // Empty messages on error
+      let pendingMessages: Message[];
+      if (routeRequestId) {
+        pendingMessages = await messageRequestAPI.getPendingMessagesByRequestId(routeRequestId);
+      } else {
+        let senderId = routeSenderId, receiverId = routeReceiverId;
+        if (!senderId || !receiverId) {
+          if (direction === 'received') { senderId = targetId; receiverId = user.id; }
+          else { senderId = user.id; receiverId = targetId; }
         }
-        
-        setIsLoading(false);
-        return;
+        pendingMessages = await messageRequestAPI.getPendingMessages(senderId!, receiverId!);
       }
-      
-      // Now load messages with the actual conversation ID
-      const response = await messageAPI.getMessages(actualConversationId);
-      setMessages(response.content.reverse() || []);
-
-      // Mark all messages from other user as read via WebSocket
-      if (response.content.length > 0) {
-        const unreadMessages = response.content.filter(
-          msg => msg.sender.id !== user?.id && !msg.readBy.includes(user?.id || '')
-        );
-
-        // Send read receipts for unread messages via WebSocket
-        if (isConnected && unreadMessages.length > 0) {
-          console.log(`Sending read receipts for ${unreadMessages.length} unread messages`);
-          unreadMessages.forEach(msg => {
-            sendReadReceipt(msg.id, msg.sender.id);
-          });
-        } else if (unreadMessages.length > 0) {
-          console.log(
-            'WebSocket not connected, read receipts will be sent when connection is restored'
-          );
-        }
-        
-        // Extract other user from messages if not already set
-        if (!otherUser && response.content.length > 0) {
-          // If we have messages but no otherUser set, try to infer from the first message
-          // where the sender is not the current user
-          const messageFromOther = response.content.find(msg => msg.sender.id !== user?.id);
-          if (messageFromOther) {
-            // We have the sender as UserSummary, need to fetch full profile for consistency
-            try {
-              const userProfile = await userAPI.getUserProfile(messageFromOther.sender.id);
-              setOtherUser(userProfile);
-            } catch (error) {
-              console.error('Failed to fetch other user profile:', error);
-            }
-          }
-        }
-      }
-    } catch (error: any) {
-      console.error('Error loading messages:', error);
-      // Don't show error alert, just show empty conversation
+      setMessages(sortAsc(pendingMessages.map(ensureMessageSender)));
+    } catch (e) {
+      console.error('loadPendingThread', e);
       setMessages([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    } finally { setIsLoading(false); }
+  }, [direction, ensureMessageSender, otherUser, routeReceiverId, routeRequestId, routeSenderId, sortAsc, user]);
 
+  const loadExistingThread = useCallback(async (convId: string) => {
+    if (!convId) { setIsLoading(false); return; }
+    setIsLoading(true);
+    try {
+      const conversation = await messageAPI.getConversation(convId);
+      setActualConversationId(conversation.id);
+      setIsNewConversation(false);
+      setConversationDetails(conversation);
+
+      if (conversation.type === 'DIRECT' && conversation.participants?.length) {
+        const other = conversation.participants.find(p => p.userId !== user?.id) || conversation.participants[0];
+        if (other) {
+          setPeerUserId(other.userId);
+          setOtherUser(prev => (prev?.id === other.userId ? prev : {
+            id: other.userId,
+            username: other.username,
+            email: '',
+            profile: { avatar: other.avatar },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isVerified: other.isVerified,
+          }));
+        }
+      } else { setPeerUserId(null); setOtherUser(null); }
+
+      const res = await messageAPI.getMessages(conversation.id);
+      const ordered = (res.content || []).map(ensureMessageSender);
+      setMessages(sortAsc(ordered));
+
+      if (res.content?.length) {
+        const unread = res.content.filter(m => m.sender.id !== user?.id && !m.readBy.includes(user?.id || ''));
+        if (unread.length) unread.forEach(m => sendReadReceipt(m.id, m.sender.id));
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 404) { await loadPendingThread(convId); return; }
+      console.error('loadExistingThread', err);
+      setMessages([]);
+    } finally { setIsLoading(false); }
+  }, [ensureMessageSender, loadPendingThread, sendReadReceipt, sortAsc, user]);
+
+  const transitionToConversation = useCallback((nextId: string) => {
+    if (!nextId) return;
+    setIsNewConversation(false);
+    setActualConversationId(nextId);
+    router.replace({ pathname: '/messages/[conversationId]', params: { conversationId: nextId } });
+    loadExistingThread(nextId);
+  }, [loadExistingThread, router]);
+
+  // ------- websocket -------
+  useEffect(() => {
+    const onMsg = (packet: any) => {
+      const peerId = otherUser?.id || peerUserId || routeConversationId;
+      const matchesPeer = peerId && (packet.senderId === peerId || packet.receiverId === peerId);
+      const matchesConv = !!packet.conversationId && !!actualConversationId && packet.conversationId === actualConversationId;
+      if (packet.type !== 'CHAT' || (!matchesPeer && !matchesConv)) return;
+      if (!packet.senderId) return;
+
+      const incoming: Message = {
+        id: packet.id || '',
+        sender: { id: packet.senderId, username: packet.senderUsername || '', avatar: packet.senderProfileImage, isVerified: false },
+        conversationId: packet.conversationId,
+        content: packet.content || '',
+        mediaUrl: packet.mediaUrl,
+        readBy: packet.status === 'READ' ? [user?.id || ''] : [],
+        createdAt: packet.timestamp,
+        isDeleted: false,
+      };
+
+      setMessages(prev => {
+        if (prev.some(m => m.id === incoming.id)) return prev;
+        if (packet.senderId === user?.id) {
+          const replaced = prev.map(m => (m.id.startsWith('temp-') ? incoming : m));
+          return sortAsc(replaced);
+        }
+        return sortAsc([...prev, incoming]);
+      });
+
+      if (isNewConversation && packet.conversationId) transitionToConversation(packet.conversationId);
+      const peer = otherUser?.id || peerUserId || routeConversationId;
+      if (!isNewConversation && peer && packet.senderId === peer && packet.id && packet.senderId !== user?.id) {
+        sendReadReceipt(packet.id, packet.senderId);
+      }
+    };
+
+    const onRr = (messageId: string, senderId: string) => {
+      const peer = otherUser?.id || peerUserId || routeConversationId;
+      if (!peer || senderId !== peer) return;
+      setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, readBy: [...m.readBy, senderId] } : m)));
+    };
+
+    const onTp = (isTyping: boolean, uid: string) => {
+      const peer = otherUser?.id || peerUserId || routeConversationId;
+      if (!peer || uid !== peer) return;
+      setTypingUsers(prev => (isTyping ? (prev.includes(uid) ? prev : [...prev, uid]) : prev.filter(id => id !== uid)));
+    };
+
+    onMessage(onMsg);
+    onReadReceipt(onRr);
+    onTyping(onTp);
+  }, [
+    actualConversationId, isNewConversation, onMessage, onReadReceipt, onTyping,
+    otherUser, peerUserId, routeConversationId, sendReadReceipt, transitionToConversation, user?.id
+  ]);
+
+  useEffect(() => {
+    if (!routeConversationId) { setIsLoading(false); return; }
+    if (wantsPendingRoute) loadPendingThread(routeConversationId);
+    else loadExistingThread(routeConversationId);
+  }, [routeConversationId, wantsPendingRoute, loadExistingThread, loadPendingThread]);
+
+  // ------- send message -------
   const handleSendMessage = async (content: string) => {
-    if (!otherUser) {
-      console.error('Cannot send message: other user not loaded');
-      showAlert('Error', 'Unable to send message. Please try again.');
-      return;
-    }
+    const targetUserId = otherUser?.id || peerUserId || routeConversationId;
+    if (!targetUserId) { showAlert('Error', 'Unable to determine recipient.'); return; }
 
     try {
-      // Create optimistic message immediately
-      const optimisticMessage: Message = {
+      const optimistic: Message = {
         id: `temp-${Date.now()}`,
-        sender: {
-          id: user?.id || '',
-          username: user?.username || '',
-          avatar: user?.profile?.avatar,
-          isVerified: user?.verified || false,
-        },
+        sender: { id: user?.id || '', username: user?.username || '', avatar: user?.profile?.avatar, isVerified: !!user?.isVerified },
         content,
         readBy: [],
         createdAt: new Date().toISOString(),
         isDeleted: false,
       };
+      setMessages(prev => sortAsc([...prev, optimistic]));
 
-      // Add optimistic message immediately
-      console.log('Adding optimistic message:', optimisticMessage);
-      setMessages(prev => [...prev, optimisticMessage]);
-
-      // If this is a new conversation (no existing conversation), send via direct message endpoint
-      // This will create a message request (if users are not connected)
       if (isNewConversation) {
-        console.log('Sending message to new conversation (creates message request if not connected)');
-        try {
-          const newMessage = await messageAPI.sendDirectMessage(
-            otherUser.id,
-            content
-          );
-          
-          console.log('Received message from API:', newMessage);
-
-          // Safety check: ensure message has sender
-          if (!newMessage.sender) {
-            console.error('API returned message without sender:', newMessage);
-            // Keep optimistic message if API response is invalid
+        const newMsg = await messageAPI.sendDirectMessage(targetUserId, content);
+        if (!newMsg.sender) return; // giữ nguyên optimistic nếu BE lỗi
+        setMessages(prev => sortAsc(prev.map(m => (m.id === optimistic.id ? ensureMessageSender(newMsg) : m))));
+        if (newMsg.conversationId) transitionToConversation(newMsg.conversationId);
+      } else {
+        if (isConnected && peerUserId) {
+          sendWebSocketMessage(peerUserId, content);
+        } else {
+          if (!actualConversationId) {
+            setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+            showAlert('Error', 'Conversation is still syncing. Please try again.');
             return;
           }
-
-          // Replace optimistic message with real message
-          setMessages(prev =>
-            prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
-          );
-
-          // If backend returned a conversationId, update and mark as no longer new
-          if (newMessage.conversationId) {
-            console.log('Conversation created:', newMessage.conversationId);
-            setActualConversationId(newMessage.conversationId);
-            setIsNewConversation(false);
-          } else {
-            console.log('Message sent as request (no conversation created yet)');
-            // Show info that message is sent as request (needs acceptance)
-            showAlert(
-              'Message Sent',
-              'Your message has been sent. The recipient will need to accept your message request before you can continue chatting.'
-            );
-          }
-        } catch (apiError: any) {
-          // Remove optimistic message if API call fails
-          setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
-          throw apiError;
-        }
-      } else {
-        // Existing conversation - use normal flow
-        if (isConnected) {
-          // Send via WebSocket for real-time delivery to the other user
-          console.log('Sending WebSocket message to user:', otherUser.id);
-          sendWebSocketMessage(otherUser.id, content);
-        } else {
-          // Fallback to REST API if WebSocket is not connected
-          console.log('WebSocket not connected, using REST API with conversation:', actualConversationId);
-          try {
-            const newMessage = await messageAPI.sendMessage(actualConversationId, content);
-            console.log('Received message from API:', newMessage);
-
-            // Safety check: ensure message has sender
-            if (!newMessage.sender) {
-              console.error('API returned message without sender:', newMessage);
-              // Keep optimistic message
-              return;
-            }
-
-            // Replace optimistic message with real message
-            setMessages(prev =>
-              prev.map(msg => (msg.id === optimisticMessage.id ? newMessage : msg))
-            );
-          } catch (apiError) {
-            // Remove optimistic message if API call fails
-            setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
-            throw apiError;
-          }
+          const newMsg = await messageAPI.sendMessage(actualConversationId, content);
+          if (!newMsg.sender) return;
+          setMessages(prev => sortAsc(prev.map(m => (m.id === optimistic.id ? ensureMessageSender(newMsg) : m))));
         }
       }
-    } catch (error: any) {
-      showAlert('Error', error.message || 'Failed to send message');
+    } catch (e: any) {
+      setMessages(prev => prev.filter(m => !m.id.startsWith('temp-')));
+      showAlert('Error', e?.message || 'Failed to send message');
     }
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    // Safety check: ensure sender exists
+  // ------- cluster flags -------
+  const CLUSTER_MS = 2 * 60 * 1000;
+  const getClusterFlags = useCallback((index: number) => {
+    const cur = messages[index], prev = messages[index - 1], next = messages[index + 1];
+    const samePrev = !!prev && prev.sender?.id === cur?.sender?.id &&
+      new Date(cur.createdAt).getTime() - new Date(prev.createdAt).getTime() <= CLUSTER_MS;
+    const sameNext = !!next && next.sender?.id === cur?.sender?.id &&
+      new Date(next.createdAt).getTime() - new Date(cur.createdAt).getTime() <= CLUSTER_MS;
+    return { isClusterStart: !samePrev, isClusterEnd: !sameNext, isClusterMiddle: samePrev && sameNext };
+  }, [messages]);
+
+  const handleScrollToMessage = useCallback((id: string) => {
+    const idx = messages.findIndex(m => m.id === id);
+    if (idx >= 0) flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+  }, [messages]);
+
+  // ------- renders -------
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     if (!item.sender) {
-      console.warn('Message missing sender:', item);
-      return null;
+      return (
+        <View style={styles.systemMessageContainer}>
+          <Text style={[styles.systemMessageText, { color: theme.colors.textSecondary }]}>{item.content}</Text>
+        </View>
+      );
     }
-    return <ChatMessage message={item} isOwn={item.sender.id === user?.id} />;
+    const isOwn = item.sender.id === user?.id;
+    const { isClusterStart, isClusterEnd, isClusterMiddle } = getClusterFlags(index);
+    const showAvatar = !isOwn && isClusterEnd;
+    const hasPeerSeen = isOwn && peerUserId && item.readBy?.some(id => id === peerUserId);
+
+    return (
+      <View>
+        <ChatMessage
+          message={item}
+          isOwn={isOwn}
+          isClusterStart={isClusterStart}
+          isClusterMiddle={isClusterMiddle}
+          isClusterEnd={isClusterEnd}
+          showAvatar={showAvatar}
+          avatarUrl={item.sender.avatar}
+          replyTo={item.replyTo}
+          onPressReply={handleScrollToMessage}
+          palette={bubblePalette}
+        />
+        {hasPeerSeen && (
+          <Text style={[styles.readReceiptLabel, { color: theme.colors.textSecondary }]}>Đã xem</Text>
+        )}
+      </View>
+    );
   };
 
-  const renderHeader = () => (
-    <SafeAreaView style={[styles.header, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
-      <View style={styles.headerContent}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
+  const header = (() => {
+    const title = isGroupConversation
+      ? conversationDetails?.name || 'Nhóm chat'
+      : otherUser?.username || conversationDetails?.name || 'Cuộc trò chuyện';
+    const subtitle = isGroupConversation
+      ? `${conversationDetails?.participants?.length || 0} thành viên`
+      : connectionStatus === 'connected' ? 'Đang hoạt động' : 'Ngoại tuyến';
+    const avatarSrc = isGroupConversation ? conversationDetails?.avatar : otherUser?.profile?.avatar;
 
-        <TouchableOpacity
-          style={styles.userInfo}
-          onPress={() =>
-            router.push(`/messages/conversation-settings?conversationId=${conversationId}`)
-          }
-        >
-          <Image
-            source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/40' }}
-            style={styles.avatar}
-          />
-          <View style={styles.userDetails}>
-            <Text style={[styles.userName, { color: theme.colors.text }]}>
-              {otherUser?.profile?.firstName || otherUser?.username || 'User'}
-            </Text>
-            <Text style={[styles.userHandle, { color: theme.colors.textSecondary }]}>
-              @{otherUser?.username || 'user'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.headerActions}>
+    return (
+      <SafeAreaView style={[styles.header, { backgroundColor: 'transparent' }]}>
+        <StatusBar barStyle="light-content" />
+        <View style={[styles.headerContent, { backgroundColor: hexToRgba(chatPalette.headerBg, 0.92) }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color={chatPalette.headerText} />
+          </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.headerInfo}
             onPress={() =>
-              showDevelopmentNotice('Tạo nhóm', 'Tính năng thêm bạn đang được phát triển.')
+              router.push({
+                pathname: '/messages/conversation-settings',
+                params: { userId: otherUser?.id || peerUserId || '', conversationId: actualConversationId || routeConversationId || '' },
+              })
             }
           >
-            <Ionicons name="person-add" size={20} color={theme.colors.text} />
+            <Avatar uri={avatarSrc} name={title} size={40} />
+            <View style={styles.headerTextGroup}>
+              <View style={styles.headerTitleRow}>
+                <Text style={[styles.userName, { color: chatPalette.headerText }]} numberOfLines={1}>{title}</Text>
+                {!isGroupConversation && (
+                  <View style={[styles.onlineDot, { backgroundColor: connectionStatus === 'connected' ? '#34D399' : '#94A3B8' }]} />
+                )}
+              </View>
+              <Text style={[styles.userHandle, { color: chatPalette.headerText, opacity: 0.9 }]}>{subtitle}</Text>
+            </View>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => showDevelopmentNotice('Gọi', 'Tính năng gọi đang được phát triển.')}
-          >
-            <Ionicons name="call" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => showDevelopmentNotice('Video', 'Tính năng video đang được phát triển.')}
-          >
-            <Ionicons name="videocam" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </SafeAreaView>
-  );
 
-  const renderContactInfo = () => (
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.actionButton}><Ionicons name="call-outline" size={20} color={chatPalette.headerText} /></TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton}><Ionicons name="videocam-outline" size={20} color={chatPalette.headerText} /></TouchableOpacity>
+            <TouchableOpacity
+  style={styles.actionButton}
+  onPress={() => {
+    const isGroup = conversationDetails?.type === 'GROUP';
+    if (isGroup) {
+      // Nhóm: mở settings theo conversation
+      router.push({
+        pathname: '/messages/conversation-settings',
+        params: {
+          conversationId: actualConversationId || routeConversationId || '',
+        },
+      });
+    } else {
+      // Direct / Pending: mở settings theo user
+      router.push({
+        pathname: '/messages/conversation-settings',
+        params: {
+          userId: otherUser?.id || peerUserId || '',
+        },
+      });
+    }
+  }}
+  onLongPress={() => setGroupInfoVisible(true)} // tuỳ chọn: giữ long-press để mở sheet cũ
+>
+  <Ionicons name="information-circle-outline" size={22} color={chatPalette.headerText} />
+</TouchableOpacity>
+
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  })();
+
+  const contactIntro = (
     <View style={styles.contactInfo}>
-      <Image
-        source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/100' }}
-        style={styles.largeAvatar}
-      />
-      <Text style={[styles.contactName, { color: theme.colors.text }]}>
-        {otherUser?.profile?.firstName || otherUser?.username || 'User'}
-      </Text>
-      <Text style={[styles.contactHandle, { color: theme.colors.textSecondary }]}>
-        @{otherUser?.username || 'user'}
-      </Text>
-      <TouchableOpacity style={[styles.profileButton, { backgroundColor: theme.colors.border }]}>
-        <Text style={[styles.profileButtonText, { color: theme.colors.text }]}>
-          Xem trang cá nhân
-        </Text>
+      <Image source={{ uri: otherUser?.profile?.avatar || 'https://via.placeholder.com/100' }} style={styles.largeAvatar} />
+      <Text style={[styles.contactName, { color: theme.colors.text }]}>{otherUser?.profile?.firstName || otherUser?.username || 'User'}</Text>
+      <Text style={[styles.contactHandle, { color: theme.colors.textSecondary }]}>@{otherUser?.username || 'user'}</Text>
+      <TouchableOpacity style={[styles.profileButton, { backgroundColor: hexToRgba(theme.colors.border, 0.6) }]}>
+        <Text style={[styles.profileButtonText, { color: theme.colors.text }]}>Xem trang cá nhân</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const renderDateSeparator = () => (
-    <View style={styles.dateSeparator}>
-      <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
-      <Text style={[styles.dateText, { color: theme.colors.textSecondary }]}>04 thg 9, 2024</Text>
-      <View style={[styles.dateLine, { backgroundColor: theme.colors.border }]} />
+  const pendingBanner = (
+    <View style={[styles.pendingBanner, { backgroundColor: hexToRgba(theme.colors.warning, 0.08), borderColor: hexToRgba(theme.colors.warning, 0.5) }]}>
+      <Ionicons name="time-outline" size={18} color={theme.colors.warning || '#FF9500'} />
+      <View style={styles.pendingBannerText}>
+        <Text style={[styles.pendingBannerTitle, { color: theme.colors.text }]}>Tin nhắn đang chờ</Text>
+        <Text style={[styles.pendingBannerSubtitle, { color: theme.colors.textSecondary }]}>Người nhận cần chấp nhận để bắt đầu cuộc trò chuyện.</Text>
+      </View>
     </View>
+  );
+
+  const mediaStrip = recentMedia.length ? (
+    <View style={styles.mediaStripContainer}>
+      <Text style={[styles.mediaStripTitle, { color: theme.colors.text }]}>Ảnh/Video gần đây</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 16 }}>
+        {recentMedia.map(m => (
+          <TouchableOpacity key={m.id} style={styles.mediaPreview} onPress={() => { }}>
+            <Image source={{ uri: m.mediaUrl || undefined }} style={styles.mediaImage} />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  ) : null;
+
+  const dateSeparator = (
+    <View style={styles.dateSeparator}>
+      <View style={[styles.datePill, { backgroundColor: hexToRgba(theme.colors.card, 0.9), borderColor: hexToRgba(theme.colors.border, 0.9) }]}>
+        <Text style={[styles.dateText, { color: theme.colors.textSecondary }]}>04 thg 9, 2024</Text>
+      </View>
+    </View>
+  );
+
+  const canUseRealtime = !isNewConversation && !!actualConversationId;
+  const typingChannelId = canUseRealtime ? actualConversationId : undefined;
+
+  const messageList = (
+    <FlatList
+      ref={flatListRef}
+      data={messages}
+      renderItem={renderMessage}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.messagesList}
+      keyboardShouldPersistTaps="handled"
+      onScroll={handleListScroll}
+      scrollEventThrottle={16}
+      ListHeaderComponent={
+        canUseRealtime && connectionStatus !== 'connected'
+          ? <ConnectionStatus status={connectionStatus} onRetry={() => { }} />
+          : null
+      }
+      ListFooterComponent={<View style={styles.listFooter} />}
+    />
   );
 
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {renderHeader()}
+        {header}
         <LoadingSpinner />
       </View>
     );
@@ -495,138 +537,209 @@ export default function ConversationScreen() {
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.container, { backgroundColor: theme.colors.background }]}
-      keyboardVerticalOffset={0}
     >
-      {renderHeader()}
+      {header}
 
-      {messages.length === 0 && otherUser && renderContactInfo()}
+      {isNewConversation && pendingBanner}
+      {messages.length === 0 && otherUser && !isGroupConversation && contactIntro}
+      {mediaStrip}
+      {messages.length > 0 && dateSeparator}
 
-      {messages.length > 0 && renderDateSeparator()}
+      <View style={styles.messagesWrapper}>
+        {conversationDetails?.wallpaperUrl ? (
+          <ImageBackground source={{ uri: conversationDetails.wallpaperUrl }} style={styles.wallpaperBackground} blurRadius={0}>
+            <View style={[styles.wallpaperOverlay, { backgroundColor: wallpaperOverlay }]} />
+            {messageList}
+          </ImageBackground>
+        ) : (
+          messageList
+        )}
 
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.messagesList}
-        inverted={false}
-        ListHeaderComponent={
-          connectionStatus !== 'connected' ? (
-            <ConnectionStatus
-              status={connectionStatus}
-              onRetry={() => {
-                console.log('Retrying connection...');
-              }}
-            />
-          ) : null
-        }
-        ListFooterComponent={
-          typingUsers.length > 0 ? (
-            <TypingIndicator isVisible={typingUsers.length > 0} multipleUsers={typingUsers} />
-          ) : null
-        }
-      />
+        {showScrollToBottom && (
+          <TouchableOpacity style={[styles.scrollFab, { backgroundColor: chatPalette.fabBg }]} onPress={scrollToBottom}>
+            <Ionicons name="chevron-down" size={22} color={theme.colors.text} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {typingDisplayNames.length > 0 && (
+        <View style={styles.typingDock}>
+          <TypingIndicator isVisible multipleUsers={typingDisplayNames} />
+        </View>
+      )}
+
       <MessageInput
         onSend={handleSendMessage}
-        onTyping={() => sendTyping(conversationId)}
-        onStopTyping={() => sendStopTyping(conversationId)}
+        onTyping={typingChannelId ? () => sendTyping(typingChannelId) : undefined}
+        onStopTyping={typingChannelId ? () => sendStopTyping(typingChannelId) : undefined}
+        placeholder={isNewConversation ? 'Tin nhắn sẽ được gửi dưới dạng yêu cầu' : 'Nhắn tin...'}
+        themeColor={chatPalette.bubbleOut}
       />
+
+      <GroupInfoSheet
+        visible={isGroupInfoVisible}
+        conversation={conversationDetails || undefined}
+        currentUserId={user?.id || ''}
+        onClose={() => setGroupInfoVisible(false)}
+        onAddMembers={() => { setPendingMembers({}); setAddMembersVisible(true); setGroupInfoVisible(false); }}
+        onLeaveGroup={async () => {
+          if (!actualConversationId || !user?.id) return;
+          try { await messageAPI.leaveGroup(actualConversationId, user.id); showAlert('Thông báo', 'Bạn đã rời nhóm'); router.replace('/messages'); }
+          catch (e: any) { showAlert('Lỗi', e?.response?.data?.message || 'Không thể rời nhóm'); }
+        }}
+      />
+
+      {/* Add members modal */}
+      <Modal visible={isAddMembersVisible} animationType="slide" onRequestClose={() => setAddMembersVisible(false)}>
+        <SafeAreaView style={[styles.addMembersModal, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.addMembersHeader}>
+            <TouchableOpacity onPress={() => setAddMembersVisible(false)}><Ionicons name="close" size={22} color={theme.colors.text} /></TouchableOpacity>
+            <Text style={[styles.addMembersTitle, { color: theme.colors.text }]}>Thêm thành viên</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          <MutualUserPicker
+            currentUserId={user?.id || ''}
+            selectedUsers={pendingMembers}
+            onSelectedChange={setPendingMembers}
+            excludeUserIds={existingMemberIds}
+            emptyMessage="Chỉ hiện những người theo dõi nhau"
+          />
+
+          <View style={styles.addMembersActions}>
+            <TouchableOpacity
+              style={[styles.addMembersSecondaryBtn, { borderColor: theme.colors.border || '#e0e0e0' }]}
+              onPress={() => setAddMembersVisible(false)}
+            >
+              <Text style={[styles.addMembersSecondaryText, { color: theme.colors.text }]}>Huỷ</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.addMembersPrimaryBtn,
+                { backgroundColor: theme.colors.primary, opacity: Object.keys(pendingMembers).length === 0 || isAddingMembers ? 0.4 : 1 },
+              ]}
+              onPress={async () => {
+                if (!actualConversationId || !user?.id) return;
+                const userIds = Object.keys(pendingMembers);
+                if (!userIds.length) return showAlert('Thông báo', 'Vui lòng chọn ít nhất một thành viên');
+                try {
+                  setIsAddingMembers(true);
+                  await messageAPI.addGroupMembers(actualConversationId, user.id, userIds);
+                  showAlert('Thành công', 'Đã thêm thành viên mới');
+                  setAddMembersVisible(false);
+                  setPendingMembers({});
+                  await loadExistingThread(actualConversationId);
+                } catch (e: any) {
+                  showAlert('Lỗi', e?.response?.data?.message || 'Không thể thêm thành viên');
+                } finally { setIsAddingMembers(false); }
+              }}
+              disabled={Object.keys(pendingMembers).length === 0 || isAddingMembers}
+            >
+              {isAddingMembers ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.addMembersPrimaryText}>Thêm</Text>}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
+  container: { flex: 1 },
+
+  // Header: bar mờ, card-like
+  header: { zIndex: 5 },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+      android: { elevation: 3 },
+    }),
   },
-  backButton: {
-    marginRight: 12,
-    padding: 4,
+  backButton: { marginRight: 10, padding: 6, borderRadius: 18 },
+  headerInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  headerTextGroup: { marginLeft: 10, flex: 1 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  userName: { fontSize: 17, fontWeight: '700', flexShrink: 1 },
+  userHandle: { fontSize: 12, marginTop: 2 },
+  onlineDot: { width: 9, height: 9, borderRadius: 5, marginLeft: 6 },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  actionButton: { padding: 8, marginLeft: 6 },
+
+  // Intro & banner
+  contactInfo: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20 },
+  largeAvatar: { width: 96, height: 96, borderRadius: 48, marginBottom: 14 },
+  contactName: { fontSize: 22, fontWeight: '600', marginBottom: 4 },
+  contactHandle: { fontSize: 14, marginBottom: 18 },
+  profileButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 18 },
+  profileButtonText: { fontSize: 15, fontWeight: '600' },
+
+  pendingBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginTop: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: 12, borderWidth: 1,
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  pendingBannerText: { marginLeft: 12, flex: 1 },
+  pendingBannerTitle: { fontSize: 14, fontWeight: '700' },
+  pendingBannerSubtitle: { fontSize: 12, marginTop: 2 },
+
+  // Date separator pill
+  dateSeparator: { alignItems: 'center', marginTop: 6, marginBottom: 2 },
+  datePill: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+  dateText: { fontSize: 12, fontWeight: '600' },
+
+  // Message list & background
+  messagesWrapper: { flex: 1, position: 'relative' },
+  wallpaperBackground: { flex: 1 },
+  wallpaperOverlay: { ...StyleSheet.absoluteFillObject },
+  messagesList: { paddingRight: 6, paddingLeft: 36, paddingTop: 8, paddingBottom: 64 },
+  listFooter: { height: 40 },
+
+  // Floating “scroll to bottom”
+  scrollFab: {
+    position: 'absolute', right: 16, bottom: 20,
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+      android: { elevation: 6 },
+    }),
   },
-  userDetails: {
-    flex: 1,
+
+  typingDock: { paddingHorizontal: 16, paddingVertical: 4 },
+
+  // System message
+  systemMessageContainer: { alignItems: 'center', marginVertical: 6, paddingHorizontal: 16 },
+  systemMessageText: { fontSize: 12, textAlign: 'center' },
+
+  // Media strip
+  mediaStripContainer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  mediaStripTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  mediaPreview: {
+    width: 84, height: 84, borderRadius: 12, overflow: 'hidden', marginRight: 10, backgroundColor: '#EEE',
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
+  mediaImage: { width: '100%', height: '100%' },
+
+  // Add members modal
+  addMembersModal: { flex: 1 },
+  addMembersHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  userHandle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  contactInfo: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  largeAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-  },
-  contactName: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  contactHandle: {
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  profileButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
-  profileButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  dateSeparator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-    paddingHorizontal: 20,
-  },
-  dateLine: {
-    flex: 1,
-    height: 1,
-  },
-  dateText: {
-    fontSize: 14,
-    marginHorizontal: 16,
-  },
-  messagesList: {
-    paddingVertical: 16,
-    flexGrow: 1,
-  },
+  addMembersTitle: { fontSize: 16, fontWeight: '700' },
+  addMembersActions: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  addMembersPrimaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10 },
+  addMembersPrimaryText: { color: 'white', fontWeight: '700', fontSize: 15 },
+  addMembersSecondaryBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1 },
+  addMembersSecondaryText: { fontWeight: '700', fontSize: 15 },
 });

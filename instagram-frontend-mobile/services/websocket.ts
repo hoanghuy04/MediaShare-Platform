@@ -9,6 +9,7 @@ export interface ChatMessage {
   senderUsername?: string;
   senderProfileImage?: string;
   receiverId: string;
+  conversationId?: string;
   content?: string;
   mediaUrl?: string;
   timestamp: string;
@@ -44,7 +45,8 @@ class WebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectInterval = 3000;
   private isReconnecting = false;
-  private connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' = 'disconnected';
+  private connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting' =
+    'disconnected';
   private messageQueue: ChatMessage[] = [];
   private typingUsers: Set<string> = new Set();
 
@@ -59,14 +61,14 @@ class WebSocketService {
       url: config.url,
       userId: config.userId,
       username: config.username,
-      token: config.token ? 'Present' : 'Missing'
+      token: config.token ? 'Present' : 'Missing',
     });
 
     try {
       // Create SockJS connection with token in URL (SockJS doesn't support custom headers in handshake)
       const urlWithToken = `${config.url}?token=${encodeURIComponent(config.token)}`;
       const socket = new SockJS(urlWithToken);
-      
+
       // Create STOMP client with proper headers
       this.client = new Client({
         webSocketFactory: () => socket,
@@ -89,7 +91,6 @@ class WebSocketService {
 
       // Activate the client
       this.client.activate();
-
     } catch (error) {
       console.error('WebSocket connection error:', error);
       this.callbacks.onError?.('Failed to connect to WebSocket');
@@ -104,28 +105,28 @@ class WebSocketService {
     this.connectionState = 'connected';
     this.reconnectAttempts = 0;
     this.isReconnecting = false;
-    
+
     // Subscribe to user-specific message queue
     this.subscribeToMessages();
-    
+
     // Subscribe to typing indicators
     this.subscribeToTyping();
-    
+
     // Subscribe to read receipts
     this.subscribeToReadReceipts();
-    
+
     // Subscribe to user presence
     this.subscribeToPresence();
-    
+
     // Subscribe to errors
     this.subscribeToErrors();
-    
+
     // Notify user joined
     this.sendUserJoin();
-    
+
     // Process queued messages
     this.processMessageQueue();
-    
+
     this.callbacks.onConnected?.();
     if (this.isReconnecting) {
       this.callbacks.onReconnected?.();
@@ -135,25 +136,25 @@ class WebSocketService {
   /**
    * Handle connection errors
    */
-private onError(error: any): void {
-  console.error('WebSocket error:', error);
-  this.connectionState = 'disconnected';
-  this.callbacks.onError?.(error.message || 'WebSocket connection error');
-}
+  private onError(error: any): void {
+    console.error('WebSocket error:', error);
+    this.connectionState = 'disconnected';
+    this.callbacks.onError?.(error.message || 'WebSocket connection error');
+  }
 
   /**
    * Handle disconnection
    */
   private onDisconnect(): void {
     this.callbacks.onDisconnected?.();
-    
+
     // Attempt to reconnect
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       this.connectionState = 'reconnecting';
       this.isReconnecting = true;
       this.callbacks.onReconnecting?.();
-      
+
       setTimeout(() => {
         this.reconnect();
       }, this.reconnectInterval);
@@ -184,23 +185,20 @@ private onError(error: any): void {
     const subscriptionDestination = `/user/${this.config.userId}/queue/messages`;
     console.log('Subscribing to messages:', subscriptionDestination);
 
-    const subscription = this.client.subscribe(
-      subscriptionDestination,
-      (message: IMessage) => {
-        try {
-          console.log('Received message:', message.body);
-          const chatMessage: ChatMessage = JSON.parse(message.body);
-          
-          // Update message status
-          this.updateMessageStatus(chatMessage);
-          
-          // Call the message callback
-          this.callbacks.onMessage?.(chatMessage);
-        } catch (error) {
-          console.error('Error parsing message:', error);
-        }
+    const subscription = this.client.subscribe(subscriptionDestination, (message: IMessage) => {
+      try {
+        console.log('Received message:', message.body);
+        const chatMessage: ChatMessage = JSON.parse(message.body);
+
+        // Update message status
+        this.updateMessageStatus(chatMessage);
+
+        // Call the message callback
+        this.callbacks.onMessage?.(chatMessage);
+      } catch (error) {
+        console.error('Error parsing message:', error);
       }
-    );
+    });
 
     this.subscriptions.set('messages', subscription);
   }
@@ -405,7 +403,7 @@ private onError(error: any): void {
    */
   disconnect(): void {
     // Unsubscribe from all topics
-    this.subscriptions.forEach((subscription) => {
+    this.subscriptions.forEach(subscription => {
       subscription.unsubscribe();
     });
     this.subscriptions.clear();

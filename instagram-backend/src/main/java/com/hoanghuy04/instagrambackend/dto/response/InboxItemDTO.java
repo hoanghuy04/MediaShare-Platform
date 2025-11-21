@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.dto.response;
 
+import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,13 +40,5 @@ public class InboxItemDTO {
      * Timestamp for sorting (conversation.updatedAt or messageRequest.createdAt)
      */
     private LocalDateTime timestamp;
-    
-    /**
-     * Enum for inbox item types
-     */
-    public enum InboxItemType {
-        CONVERSATION,
-        MESSAGE_REQUEST
-    }
 }
 

@@ -65,7 +65,7 @@ export const postService = {
       if (error.response?.status === 404) {
         // Fallback to explore posts if search endpoint doesn't exist
         console.log('Search posts endpoint not found, using explore posts as fallback');
-        return await postAPI.getExplorePosts(page, limit);
+        return await postService.getExplorePosts(page, limit);
       }
       throw error;
     }
@@ -82,7 +82,7 @@ export const postService = {
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.log('Search reels endpoint not found, using explore posts as fallback');
-        const exploreResponse = await postAPI.getExplorePosts(page, limit);
+        const exploreResponse = await postService.getExplorePosts(page, limit);
         // Filter for video posts (reels)
         const videoPosts = exploreResponse.content.filter(post =>
           post.media.some(media => media.type === 'VIDEO' || media.type === 'video')

@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import { postAPI } from '../../services/api';
+import { postService } from '../../services/post.service';
 import { showAlert } from '../../utils/helpers';
 import { Post } from '../../types';
 
@@ -33,7 +33,7 @@ export default function ExploreScreen() {
     loadMore,
     refresh,
   } = useInfiniteScroll({
-    fetchFunc: postAPI.getExplorePosts,
+    fetchFunc: postService.getExplorePosts,
     limit: 30,
     onError: error => showAlert('Error', error.message),
   });

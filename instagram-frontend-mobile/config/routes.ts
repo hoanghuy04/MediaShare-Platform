@@ -37,6 +37,8 @@ export const API_ENDPOINTS = {
   UNFOLLOW: (id: string) => `/api/users/${id}/follow`, // DELETE method
   FOLLOWERS: (id: string) => `/api/users/${id}/followers`,
   FOLLOWING: (id: string) => `/api/users/${id}/following`,
+  FOLLOWING_SUMMARY: (id: string) => `/api/users/${id}/following-summary`,
+  MUTUAL_FOLLOWS: (id: string) => `/api/users/${id}/mutual-follows`,
   USER_STATS: (id: string) => `/api/users/${id}/stats`,
   IS_FOLLOWING: (id: string) => `/api/users/${id}/is-following`,
 
@@ -64,6 +66,7 @@ export const API_ENDPOINTS = {
   INBOX: '/api/conversations/inbox',
   CONVERSATION_DETAIL: (id: string) => `/api/conversations/${id}`,
   CONVERSATION_MESSAGES: (id: string) => `/api/conversations/${id}/messages`,
+  UPDATE_CONVERSATION: (conversationId: string) => `/api/conversations/${conversationId}`,
   SEND_DIRECT_MESSAGE: '/api/conversations/direct/messages',
   SEND_MESSAGE: (conversationId: string) => `/api/conversations/${conversationId}/messages`,
   MARK_MESSAGE_READ: (messageId: string) => `/api/conversations/messages/${messageId}/read`,
@@ -80,10 +83,9 @@ export const API_ENDPOINTS = {
   // Message Requests
   MESSAGE_REQUESTS: '/api/message-requests',
   MESSAGE_REQUESTS_COUNT: '/api/message-requests/count',
+  MESSAGE_REQUESTS_INBOX: '/api/message-requests/inbox',
   MESSAGE_REQUESTS_PENDING_MESSAGES: '/api/message-requests/pending-messages',
-  ACCEPT_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/accept`,
-  REJECT_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/reject`,
-  IGNORE_MESSAGE_REQUEST: (id: string) => `/api/message-requests/${id}/ignore`,
+  MESSAGE_REQUESTS_PENDING_MESSAGES_BY_ID: (requestId: string) => `/api/message-requests/${requestId}/pending-messages`,
 
   // Notifications
   NOTIFICATIONS: '/api/notifications',

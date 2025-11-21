@@ -1,15 +1,13 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
-import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
+import com.hoanghuy04.instagrambackend.dto.response.*;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
+import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -19,6 +17,7 @@ import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
+import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -30,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -60,6 +58,8 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     MessageMapper messageMapper;
     MessageRequestMapper messageRequestMapper;
+
+    FileService fileService;
     
     @Transactional
     @Override
@@ -110,40 +110,102 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         User sender = userService.getUserEntityById(senderId);
         User receiver = userService.getUserEntityById(receiverId);
         
-        boolean areConnected = areUsersConnected(senderId, receiverId);
-        
-        if (areConnected) {
-            Conversation conversation = conversationService.getOrCreateDirectConversation(senderId, receiverId);
+        Optional<Conversation> existingConversation = conversationService.getExistingDirectConversation(senderId, receiverId);
+        if (existingConversation.isPresent()) {
+            return sendMessageToConversation(existingConversation.get().getId(), senderId, content, mediaUrl);
+        }
+
+        boolean mutualFollow = isMutualFollow(senderId, receiverId);
+        if (mutualFollow) {
+            Conversation conversation = conversationService.createDirectConversation(senderId, receiverId);
             return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
-        } else {
-            Optional<MessageRequest> incomingRequest = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
-                receiverId, senderId, RequestStatus.PENDING
-            );
+        }
+
+        Optional<MessageRequest> incomingRequest = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+            receiverId, senderId, RequestStatus.PENDING
+        );
+
+        if (incomingRequest.isPresent()) {
+            MessageRequest request = incomingRequest.get();
+            log.info("Auto-accepting pending request {} when {} replies to {}", request.getId(), senderId, receiverId);
             
-            if (incomingRequest.isPresent()) {
-                log.info("Auto-accepting message request from {} to {}", receiverId, senderId);
-                
-                MessageRequest request = incomingRequest.get();
-                messageRequestService.acceptRequest(request.getId(), senderId);
-                
-                Conversation conversation = conversationService.getOrCreateDirectConversation(senderId, receiverId);
-                return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
+            // Update request status
+            request.setStatus(RequestStatus.ACCEPTED);
+            request.setRespondedAt(LocalDateTime.now());
+            
+            // Create or get existing conversation
+            Conversation conversation = conversationService
+                .getExistingDirectConversation(senderId, receiverId)
+                .orElseGet(() -> conversationService.createDirectConversation(senderId, receiverId));
+            
+            // Migrate all pending messages (sender↔receiver, conversation == null) into conversation
+            // Query both directions: sender→receiver and receiver→sender
+            List<Message> pendingMessages1 = messageRepository.findBySenderAndReceiverOrderByCreatedAtDesc(sender, receiver);
+            List<Message> pendingMessages2 = messageRepository.findBySenderAndReceiverOrderByCreatedAtDesc(receiver, sender);
+            
+            // Combine and filter messages with conversation == null
+            List<Message> allPendingMessages = new ArrayList<>();
+            allPendingMessages.addAll(pendingMessages1);
+            allPendingMessages.addAll(pendingMessages2);
+            
+            List<Message> messagesToMigrate = allPendingMessages.stream()
+                .filter(msg -> msg.getConversation() == null)
+                .collect(Collectors.toList());
+            
+            Message lastMigratedMessage = null;
+            for (Message msg : messagesToMigrate) {
+                msg.setConversation(conversation);
+                messageRepository.save(msg);
+                lastMigratedMessage = msg;
+                log.debug("Migrated message {} to conversation {}", msg.getId(), conversation.getId());
             }
             
-            Message message = Message.builder()
-                .conversation(null)
-                .sender(sender)
-                .receiver(receiver)
-                .content(content)
-                .mediaUrl(mediaUrl)
-                .build();
+            if (!messagesToMigrate.isEmpty()) {
+                log.info("Migrated {} pending messages to conversation {}", messagesToMigrate.size(), conversation.getId());
+            }
             
-            message = messageRepository.save(message);
-            messageRequestService.createMessageRequest(senderId, receiverId, message);
+            // Link pending messages from request.pendingMessageIds (if any)
+            if (request.getPendingMessageIds() != null && !request.getPendingMessageIds().isEmpty()) {
+                List<Message> requestMessages = messageRepository.findByIdIn(request.getPendingMessageIds());
+                for (Message msg : requestMessages) {
+                    if (msg.getConversation() == null) {
+                        msg.setConversation(conversation);
+                        messageRepository.save(msg);
+                        lastMigratedMessage = msg;
+                    }
+                }
+            }
             
-            log.info("Message sent via request: {}", message.getId());
-            return message;
+            // Update conversation.lastMessage after migration (or after sending new reply)
+            // We'll update it after sending the reply message below
+            
+            // Clear request.pendingMessageIds and save request
+            request.setPendingMessageIds(new ArrayList<>());
+            messageRequestRepository.save(request);
+            
+            // Send the reply message to conversation
+            Message replyMessage = sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
+            
+            // Update conversation.lastMessage (the reply message is now the last)
+            conversationService.updateLastMessage(conversation.getId(), replyMessage);
+            
+            log.info("Auto-accepted request {} and migrated messages to conversation {}", request.getId(), conversation.getId());
+            return replyMessage;
         }
+
+        Message message = Message.builder()
+            .conversation(null)
+            .sender(sender)
+            .receiver(receiver)
+            .content(content)
+            .mediaUrl(mediaUrl)
+            .build();
+
+        message = messageRepository.save(message);
+        messageRequestService.createMessageRequest(senderId, receiverId, message);
+
+        log.info("Message sent via request: {}", message.getId());
+        return message;
     }
     
     @Transactional(readOnly = true)
@@ -163,7 +225,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             );
         
         List<MessageDTO> messageDTOs = messages.stream()
-            .map((Message message) -> messageMapper.toMessageDTO(message, userId))
+            .map((Message message) -> messageMapper.toMessageDTO(message))
             .collect(Collectors.toList());
         
         List<Message> allMessages = messageRepository
@@ -300,30 +362,15 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     @Transactional(readOnly = true)
     @Override
     public boolean areUsersConnected(String userId1, String userId2) {
-        boolean user1FollowsUser2 = followRepository.existsByFollowerIdAndFollowingId(userId1, userId2);
-        boolean user2FollowsUser1 = followRepository.existsByFollowerIdAndFollowingId(userId2, userId1);
-        boolean followingEachOther = user1FollowsUser2 && user2FollowsUser1;
-        
-        if (followingEachOther) {
+        boolean mutualFollow = isMutualFollow(userId1, userId2);
+        if (mutualFollow) {
             return true;
         }
-        
-        List<String> participants = new ArrayList<>();
-        participants.add(userId1);
-        participants.add(userId2);
-        Collections.sort(participants);
-        
-        Optional<Conversation> existingConversation = conversationRepository.findByTypeAndParticipants(
-            ConversationType.DIRECT, participants, 2
-        );
-        
-        boolean hasConversation = existingConversation.isPresent();
-        
+        boolean hasConversation = conversationService.getExistingDirectConversation(userId1, userId2).isPresent();
         if (hasConversation) {
             log.debug("Users {} and {} have existing conversation - considered connected", userId1, userId2);
         }
-        
-        return followingEachOther || hasConversation;
+        return hasConversation;
     }
     
     private void autoMarkMessagesAsReadOnReply(String conversationId, String userId) {
@@ -360,6 +407,12 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         return messageRepository.findById(messageId)
             .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
     }
+
+    private boolean isMutualFollow(String userId1, String userId2) {
+        boolean user1FollowsUser2 = followRepository.existsByFollowerIdAndFollowingId(userId1, userId2);
+        boolean user2FollowsUser1 = followRepository.existsByFollowerIdAndFollowingId(userId2, userId1);
+        return user1FollowsUser2 && user2FollowsUser1;
+    }
     
     @Transactional(readOnly = true)
     @Override
@@ -372,9 +425,13 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         // 1. Get all conversations
         List<Conversation> conversations = conversationService.getUserConversations(userId);
         for (Conversation conv : conversations) {
-            ConversationDTO convDTO = messageMapper.toConversationDTO(conv, userId);
+            MediaFileResponse mediaFileResponse = fileService.getMediaFileResponse(conv.getAvatar());
+            if (mediaFileResponse != null) {
+                conv.setAvatar(mediaFileResponse.getUrl());
+            }
+            ConversationDTO convDTO = messageMapper.toConversationDTO(conv);
             InboxItemDTO item = InboxItemDTO.builder()
-                .type(InboxItemDTO.InboxItemType.CONVERSATION)
+                .type(InboxItemType.CONVERSATION)
                 .conversation(convDTO)
                 .timestamp(conv.getUpdatedAt())
                 .build();
@@ -389,11 +446,9 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         
         for (MessageRequest req : sentRequests) {
             MessageRequestDTO reqDTO = messageRequestMapper.toMessageRequestDTO(req);
-            // Manually enrich sender and receiver (MapStruct doesn't auto-call @AfterMapping)
-            messageRequestMapper.enrichMessageRequest(reqDTO, req);
-            
+
             InboxItemDTO item = InboxItemDTO.builder()
-                .type(InboxItemDTO.InboxItemType.MESSAGE_REQUEST)
+                .type(InboxItemType.MESSAGE_REQUEST)
                 .messageRequest(reqDTO)
                 .timestamp(req.getCreatedAt())
                 .build();
@@ -441,14 +496,20 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     @Transactional(readOnly = true)
     @Override
     public ConversationDTO getConversationAsDTO(String conversationId, String userId) {
-        log.debug("Getting conversation details: {} for user: {}", conversationId, userId);
-        
         if (!conversationService.isParticipant(conversationId, userId)) {
             throw new BadRequestException("You are not a participant in this conversation");
         }
-        
         Conversation conversation = conversationService.getConversationById(conversationId);
-        return messageMapper.toConversationDTO(conversation, userId);
+        ConversationDTO dto = messageMapper.toConversationDTO(conversation);
+
+        // ✅ enrich avatarUrl
+        if (conversation.getAvatar() != null) {
+            try {
+                var media = fileService.getMediaFileResponse(conversation.getAvatar());
+                dto.setAvatar(media.getUrl());
+            } catch (Exception ignored) { dto.setAvatar(null); }
+        }
+        return dto;
     }
     
     @Transactional
@@ -456,22 +517,24 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     public ConversationDTO createGroupAndConvertToDTO(
             String creatorId,
             List<String> participantIds,
-            String groupName,
-            String avatar) {
+            String groupName) {
         Conversation conversation = conversationService.createGroupConversation(
-            creatorId, participantIds, groupName, avatar
+            creatorId, participantIds, groupName
         );
-        return messageMapper.toConversationDTO(conversation, creatorId);
+        return messageMapper.toConversationDTO(conversation);
     }
-    
+
     @Transactional
     @Override
     public ConversationDTO updateGroupAndConvertToDTO(
             String conversationId,
             String name,
             String avatar,
-            String userId) {
-        Conversation conversation = conversationService.updateGroupInfo(conversationId, name, avatar);
-        return messageMapper.toConversationDTO(conversation, userId);
+            String userId
+    ) {
+        // Ủy quyền cho conversationService xử lý quyền + resolve avatar
+        Conversation conversation = conversationService.updateGroupInfo(conversationId, name, avatar, userId);
+        return messageMapper.toConversationDTO(conversation);
     }
+
 }

@@ -1,10 +1,11 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
 import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -147,15 +148,13 @@ public interface ConversationMessageService {
      * @param creatorId the creator user ID
      * @param participantIds list of participant IDs
      * @param groupName the group name
-     * @param avatar the group avatar URL
      * @return ConversationDTO
      */
     @Transactional
     ConversationDTO createGroupAndConvertToDTO(
             String creatorId,
             List<String> participantIds,
-            String groupName,
-            String avatar);
+            String groupName);
 
     /**
      * Update group info and return as DTO.
@@ -171,5 +170,7 @@ public interface ConversationMessageService {
             String conversationId,
             String name,
             String avatar,
-            String userId);
+            String userId
+    );
+
 }

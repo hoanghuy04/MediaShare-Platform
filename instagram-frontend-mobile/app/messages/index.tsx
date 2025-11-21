@@ -21,7 +21,7 @@ import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { messageAPI, userAPI } from '../../services/api';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
-import { UserProfile, Conversation, Message, InboxItem } from '../../types';
+import { UserProfile, Conversation, Message, InboxItem, UserSummary } from '../../types';
 import {
   getConversationName,
   getConversationAvatar,
@@ -37,10 +37,14 @@ export default function MessagesScreen() {
   const { onMessage, onTyping, onReadReceipt } = useWebSocket();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [conversationMessages, setConversationMessages] = useState<{ [conversationId: string]: Message[] }>({});
+  const [conversationMessages, setConversationMessages] = useState<{
+    [conversationId: string]: Message[];
+  }>({});
   const [unreadCounts, setUnreadCounts] = useState<{ [conversationId: string]: number }>({});
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: boolean }>({});
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [followingStrip, setFollowingStrip] = useState<UserSummary[]>([]);
+  const [isLoadingFollowing, setIsLoadingFollowing] = useState(false);
   const typingTimeouts = useRef<{ [conversationId: string]: number }>({});
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasInitiallyLoaded = useRef(false);
@@ -65,7 +69,6 @@ export default function MessagesScreen() {
       refresh();
     }, 300);
   }, [refresh]);
-  
 
   useEffect(() => {
     // Only load on initial mount
@@ -84,6 +87,25 @@ export default function MessagesScreen() {
       console.error('Error loading pending requests count:', error);
     }
   };
+
+  const loadFollowingStrip = React.useCallback(async () => {
+    if (!currentUser?.id) {
+      return;
+    }
+    try {
+      setIsLoadingFollowing(true);
+      const data = await userAPI.getFollowingSummary(currentUser.id, { page: 0, size: 20 });
+      setFollowingStrip(data || []);
+    } catch (error) {
+      console.warn('loadFollowingStrip error', error);
+    } finally {
+      setIsLoadingFollowing(false);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    loadFollowingStrip();
+  }, [loadFollowingStrip]);
 
   // Set up WebSocket listener for real-time message updates
   useEffect(() => {
@@ -168,6 +190,20 @@ export default function MessagesScreen() {
     router.push(`/messages/${conversationId}`);
   };
 
+  const handlePressFollowingUser = (userId: string) => {
+    if (!currentUser?.id) return;
+    router.push({
+      pathname: '/messages/[conversationId]',
+      params: {
+        conversationId: userId,
+        isNewConversation: 'true',
+        direction: 'sent',
+        senderId: currentUser.id,
+        receiverId: userId,
+      },
+    });
+  };
+
   const handleLongPress = (conversation: Conversation) => {
     // TODO: Show options (delete, mute, etc.)
     console.log('Long press on conversation:', conversation.id);
@@ -192,7 +228,7 @@ export default function MessagesScreen() {
   );
 
   const renderSearchBar = () => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.searchContainer}
       onPress={() => router.push('/messages/message-search')}
       activeOpacity={0.7}
@@ -209,35 +245,68 @@ export default function MessagesScreen() {
   );
 
   const renderNotesSection = () => (
-    <TouchableOpacity 
-      style={styles.notesSection}
-      onPress={() => router.push('/messages/notes')}
-      activeOpacity={0.7}
-    >
-      <View style={styles.notesContent}>
-        {/* Speech bubble with "Chia sẻ ghi chú" */}
-        <View style={styles.speechBubble}>
-          <Text style={[styles.speechBubbleText, { color: theme.colors.text }]}>Ghi chú</Text>
-          <View style={styles.speechBubblePointer} />
-        </View>
+    <View style={styles.noteArea}>
+      {/* <View style={styles.noteChipRow}>
+        <TouchableOpacity
+          style={styles.noteChip}
+          onPress={() => router.push('/messages/notes')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.noteChipText}>Ghi chú</Text>
+        </TouchableOpacity>
+      </View> */}
 
-        {/* Main note bubble */}
-        <View style={styles.noteBubble}>
-          <View style={styles.noteEmoji}>
-            <Avatar 
-              uri={currentUser?.profile?.avatar} 
-              name={currentUser?.username} 
-              size={60} 
-            />
-          </View>
-        </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.followingRow}
+      >
+        <TouchableOpacity style={styles.followingItem} onPress={() => router.push('/messages/notes')}>
+          <Avatar
+            uri={currentUser?.profile?.avatar}
+            name={currentUser?.username}
+            size={70}
+            style={styles.followingAvatar}
+          />
+          <Text
+            style={[styles.followingName, { color: theme.colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            Ghi chú của bạn
+          </Text>
+        </TouchableOpacity>
 
-        {/* "Ghi chú của bạn" text */}
-        <Text style={[styles.noteSubtext, { color: theme.colors.textSecondary }]}>
-          Ghi chú của bạn
-        </Text>
-      </View>
-    </TouchableOpacity>
+        {isLoadingFollowing
+          ? Array.from({ length: 8 }).map((_, index) => (
+            <View key={`skeleton-${index}`} style={styles.followingItem}>
+              <View style={styles.followingSkeletonAvatar} />
+              <View style={styles.followingSkeletonText} />
+            </View>
+          ))
+          : followingStrip.map(item => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.followingItem}
+              onPress={() => handlePressFollowingUser(item.id)}
+              activeOpacity={0.75}
+            >
+              <Avatar
+                uri={item.avatar}
+                name={item.username}
+                size={70}
+                style={styles.followingAvatar}
+              />
+              <Text
+                style={[styles.followingName, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {item.username}
+              </Text>
+            </TouchableOpacity>
+          ))}
+      </ScrollView>
+    </View>
   );
 
   const renderTabs = () => (
@@ -246,7 +315,7 @@ export default function MessagesScreen() {
       <Text style={styles.headerTitle}>Tin nhắn </Text>
 
       {/* Nút "Tin nhắn đang chờ" bên phải */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.pendingButton}
         onPress={() => router.push('/messages/pending-messages')}
       >
@@ -265,7 +334,7 @@ export default function MessagesScreen() {
   // Render inbox item (conversation or message request)
   const renderInboxItem = ({ item }: { item: InboxItem }) => {
     console.log('item', item);
-    
+
     if (!currentUser) return null;
 
     // Handle conversation type
@@ -319,32 +388,32 @@ export default function MessagesScreen() {
               </View>
               {lastMessage?.timestamp && (
                 <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
-                {formatMessageTime(lastMessage.timestamp)}
-              </Text>
-            )}
-          </View>
-          <Text
-            style={[
-              styles.messageText,
-              {
-                fontWeight: isUnread ? '600' : '400',
-                color: isUnread || isTyping ? theme.colors.text : theme.colors.textSecondary,
-                fontStyle: isTyping ? 'italic' : 'normal',
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {displayText}
-          </Text>
-        </View>
-        {isUnread && !isTyping && (
-          <View style={styles.unreadContainer}>
-            <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.unreadText}>{unreadCount}</Text>
+                  {formatMessageTime(lastMessage.timestamp)}
+                </Text>
+              )}
             </View>
+            <Text
+              style={[
+                styles.messageText,
+                {
+                  fontWeight: isUnread ? '600' : '400',
+                  color: isUnread || isTyping ? theme.colors.text : theme.colors.textSecondary,
+                  fontStyle: isTyping ? 'italic' : 'normal',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {displayText}
+            </Text>
           </View>
-        )}
-      </TouchableOpacity>
+          {isUnread && !isTyping && (
+            <View style={styles.unreadContainer}>
+              <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.unreadText}>{unreadCount}</Text>
+              </View>
+            </View>
+          )}
+        </TouchableOpacity>
       );
     }
 
@@ -361,8 +430,22 @@ export default function MessagesScreen() {
         <TouchableOpacity
           style={styles.messageItem}
           onPress={() => {
-            // Navigate to conversation with the receiver
-            router.push(`/messages/${messageRequest.receiver.id}`);
+            // In MessagesScreen, currentUser is sender, receiver is other
+            const currentUserId = currentUser?.id;
+            if (!currentUserId || !messageRequest.sender?.id || !messageRequest.receiver?.id) {
+              return;
+            }
+            router.push({
+              pathname: '/messages/[conversationId]',
+              params: {
+                conversationId: messageRequest.receiver.id,
+                isNewConversation: 'true',
+                requestId: messageRequest.id,
+                direction: 'sent', // currentUser is sender
+                senderId: messageRequest.sender.id, // BE-safe
+                receiverId: messageRequest.receiver.id, // BE-safe
+              },
+            });
           }}
         >
           <Avatar uri={receiverAvatar} name={receiverName} size={50} />
@@ -418,7 +501,11 @@ export default function MessagesScreen() {
         <FlatList<InboxItem>
           data={inboxItems || []}
           renderItem={renderInboxItem}
-          keyExtractor={(item) => item.type === 'CONVERSATION' ? item.conversation?.id || '' : item.messageRequest?.id || ''}
+          keyExtractor={item =>
+            item.type === 'CONVERSATION'
+              ? item.conversation?.id || ''
+              : item.messageRequest?.id || ''
+          }
           showsVerticalScrollIndicator={false}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
@@ -510,76 +597,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     flex: 1,
   },
-  notesSection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    alignItems: 'flex-start',
+  noteArea: {
+    width: '100%',
   },
-  notesContent: {
-    alignItems: 'center',
-  },
-  speechBubble: {
-    backgroundColor: 'white',
-    borderRadius: 20,
+  noteChipRow: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginBottom: 8,
-    position: 'relative',
+    paddingTop: 8,
+  },
+  noteChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    elevation: 1,
+  },
+  noteChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  followingRow: {
+    paddingLeft: 16,
+    paddingRight: 16,
+    marginTop: 8,
+    paddingBottom: 8,
+  },
+  followingItem: {
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  followingAvatar: {
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
     shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
-  speechBubbleText: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  speechBubblePointer: {
-    position: 'absolute',
-    bottom: -6,
-    left: '50%',
-    marginLeft: -6,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: 'white',
-  },
-  noteBubble: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  noteEmoji: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  emoji: {
-    fontSize: 16,
-  },
-  noteText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  noteSubtext: {
+  followingName: {
+    marginTop: 6,
     fontSize: 12,
-    marginTop: 4,
+    lineHeight: 14,
     textAlign: 'center',
+    width: '100%',
+  },
+  followingSkeletonAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#E5E5EA',
+  },
+  followingSkeletonText: {
+    width: 42,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#F0F0F0',
+    marginTop: 6,
   },
   locationStatus: {
     flexDirection: 'row',

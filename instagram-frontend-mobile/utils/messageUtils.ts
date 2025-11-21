@@ -167,3 +167,10 @@ export const sortConversationsByRecent = (
   });
 };
 
+export const parsePresetIdFromUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  // ví dụ url: http://.../api/static/avatars/p7.png -> lấy 'p7'
+  const m = url.match(/\/avatars\/(p\d+)\.png$/);
+  return m?.[1] ?? null;
+};
+

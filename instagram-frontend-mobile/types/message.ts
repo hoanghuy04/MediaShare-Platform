@@ -35,20 +35,32 @@ export interface Conversation {
   name?: string; // Group name
   avatar?: string; // Group avatar
   participants: ConversationMember[]; // Changed from UserSummary[] to ConversationMember[]
+  admins?: string[];
   lastMessage?: LastMessage;
   createdAt: string;
+  wallpaperUrl?: string;
+  themeColor?: string;
   // Note: unreadCount removed - calculate on frontend from messages
+}
+
+export type MessageKind = 'TEXT' | 'STICKER' | 'IMAGE' | 'AUDIO' | 'SYSTEM';
+
+export interface MessageRef {
+  id: string;
+  content?: string;
+  sender?: UserSummary;
 }
 
 // Message DTO (matches backend MessageDTO)
 export interface Message {
   id: string;
   conversationId?: string;
-  sender: UserSummary;
+  sender?: UserSummary;
   content: string;
   mediaUrl?: string;
   readBy: string[]; // Changed from isRead: boolean
-  replyTo?: Message; // For threading
+  replyTo?: MessageRef; // For threading
+  type?: MessageKind;
   createdAt: string;
   isDeleted: boolean;
 }

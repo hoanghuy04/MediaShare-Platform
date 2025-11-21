@@ -1,16 +1,18 @@
 package com.hoanghuy04.instagrambackend.controller;
 
-import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.service.message.MessageRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,7 +29,6 @@ import java.util.List;
 public class MessageRequestController {
     
     private final MessageRequestService messageRequestService;
-    private final MessageMapper messageMapper;
     
     /**
      * Get all pending message requests for a user.
@@ -66,66 +67,25 @@ public class MessageRequestController {
     }
     
     /**
-     * Accept a message request.
+     * Get pending inbox items (received requests only) for a user.
+     * Used for the "Pending Messages" tab - shows requests that others sent to the user.
      *
-     * @param requestId the request ID to accept
-     * @param userId the user ID accepting the request
-     * @return The created conversation
+     * @param userId the user ID (receiver)
+     * @param pageable pagination information
+     * @return PageResponse of InboxItemDTO
      */
-    @PostMapping("/{requestId}/accept")
-    @Operation(summary = "Accept a message request")
-    public ResponseEntity<ApiResponse<ConversationDTO>> acceptRequest(
-            @PathVariable String requestId,
-            @RequestParam String userId) {
+    @GetMapping("/inbox")
+    @Operation(summary = "Get pending inbox items (received requests only)")
+    public ResponseEntity<ApiResponse<PageResponse<InboxItemDTO>>> getPendingInboxItems(
+            @RequestParam String userId,
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         
-        log.info("Accept message request {} by user {}", requestId, userId);
-        Conversation conversation = messageRequestService.acceptRequest(requestId, userId);
+        log.info("Get pending inbox items for user {} (page: {}, size: {})", 
+            userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        // Convert to DTO
-        ConversationDTO conversationDTO = messageMapper.toConversationDTO(conversation, userId);
-        
+        PageResponse<InboxItemDTO> pageResponse = messageRequestService.getPendingInboxItems(userId, pageable);
         return ResponseEntity.ok(
-            ApiResponse.success("Message request accepted successfully", conversationDTO)
-        );
-    }
-    
-    /**
-     * Reject a message request.
-     *
-     * @param requestId the request ID to reject
-     * @param userId the user ID rejecting the request
-     * @return Success response
-     */
-    @PostMapping("/{requestId}/reject")
-    @Operation(summary = "Reject a message request")
-    public ResponseEntity<ApiResponse<Void>> rejectRequest(
-            @PathVariable String requestId,
-            @RequestParam String userId) {
-        
-        log.info("Reject message request {} by user {}", requestId, userId);
-        messageRequestService.rejectRequest(requestId, userId);
-        return ResponseEntity.ok(
-            ApiResponse.success("Message request rejected successfully", null)
-        );
-    }
-    
-    /**
-     * Ignore a message request.
-     *
-     * @param requestId the request ID to ignore
-     * @param userId the user ID ignoring the request
-     * @return Success response
-     */
-    @PostMapping("/{requestId}/ignore")
-    @Operation(summary = "Ignore a message request")
-    public ResponseEntity<ApiResponse<Void>> ignoreRequest(
-            @PathVariable String requestId,
-            @RequestParam String userId) {
-        
-        log.info("Ignore message request {} by user {}", requestId, userId);
-        messageRequestService.ignoreRequest(requestId, userId);
-        return ResponseEntity.ok(
-            ApiResponse.success("Message request ignored successfully", null)
+            ApiResponse.success("Pending inbox items retrieved successfully", pageResponse)
         );
     }
     
@@ -145,6 +105,28 @@ public class MessageRequestController {
         
         log.info("Get pending messages from {} to {}", senderId, receiverId);
         List<MessageDTO> messages = messageRequestService.getPendingMessages(senderId, receiverId);
+        return ResponseEntity.ok(
+            ApiResponse.success("Pending messages loaded successfully", messages)
+        );
+    }
+    
+    /**
+     * Get all pending messages for a message request by request ID.
+     * BE automatically reads senderId/receiverId from the MessageRequest.
+     * This is more stable than passing senderId/receiverId separately.
+     *
+     * @param requestId the message request ID
+     * @param userId the user ID viewing the messages (for context and authorization)
+     * @return List of pending messages
+     */
+    @GetMapping("/{requestId}/pending-messages")
+    @Operation(summary = "Get pending messages for a message request by request ID")
+    public ResponseEntity<ApiResponse<List<MessageDTO>>> getPendingMessagesByRequestId(
+            @PathVariable String requestId,
+            @RequestParam String userId) {
+        
+        log.info("Get pending messages for request {} by user {}", requestId, userId);
+        List<MessageDTO> messages = messageRequestService.getPendingMessagesByRequestId(requestId, userId);
         return ResponseEntity.ok(
             ApiResponse.success("Pending messages loaded successfully", messages)
         );

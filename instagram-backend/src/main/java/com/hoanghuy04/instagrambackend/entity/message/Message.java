@@ -1,6 +1,6 @@
-package com.hoanghuy04.instagrambackend.entity;
+package com.hoanghuy04.instagrambackend.entity.message;
 
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
+import com.hoanghuy04.instagrambackend.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

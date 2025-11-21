@@ -1,6 +1,6 @@
 package com.hoanghuy04.instagrambackend.repository;
 
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

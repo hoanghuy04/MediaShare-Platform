@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.request.UpdateUserRequest;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
 import com.hoanghuy04.instagrambackend.entity.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -67,13 +68,25 @@ public interface UserService {
     List<UserResponse> getUserFollowers(String userId);
 
     /**
-     * Get users that the user is following.
+     * Get users that the user is following (detailed response).
      *
      * @param userId the user ID
      * @return List of UserResponse
      */
     @Transactional(readOnly = true)
     List<UserResponse> getUserFollowing(String userId);
+
+    /**
+     * Get a lightweight summary of users that the user is following.
+     *
+     * @param userId the user ID
+     * @param query optional search keyword (username/firstName/lastName)
+     * @param page zero-based page index
+     * @param size number of records per page (1..100)
+     * @return List of UserSummaryDTO
+     */
+    @Transactional(readOnly = true)
+    List<UserSummaryDTO> getUserFollowingSummary(String userId, String query, int page, int size);
 
     /**
      * Search users by query.
@@ -110,4 +123,16 @@ public interface UserService {
      * @return UserResponse DTO
      */
     UserResponse convertToUserResponse(User user);
+
+    /**
+     * Get mutual follows for a user (users that both follow each other).
+     *
+     * @param userId the user ID
+     * @param query the search query (optional, filters by username, firstName, lastName)
+     * @param page the page number (0-indexed)
+     * @param size the page size
+     * @return List of UserSummaryDTO representing mutual follows
+     */
+    @Transactional(readOnly = true)
+    List<UserSummaryDTO> getMutualFollows(String userId, String query, int page, int size);
 }

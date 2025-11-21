@@ -47,6 +47,11 @@ public class ConversationDTO {
     private List<ConversationMemberDTO> participants;
     
     /**
+     * List of admin user IDs (only for group conversations)
+     */
+    private List<String> admins;
+
+    /**
      * Information about the last message
      */
     private LastMessageDTO lastMessage;

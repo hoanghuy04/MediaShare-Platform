@@ -5,6 +5,7 @@ import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -117,17 +118,39 @@ public class UserController {
     }
     
     /**
-     * Get user following.
+     * Get user following list (detailed).
      *
      * @param id the user ID
      * @return ResponseEntity with List of UserResponse
      */
     @GetMapping("/{id}/following")
-    @Operation(summary = "Get user following")
+    @Operation(summary = "Get user following (detailed)")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getUserFollowing(@PathVariable String id) {
         log.info("Get following request received for user: {}", id);
         
         List<UserResponse> response = userService.getUserFollowing(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+    
+    /**
+     * Get user following summary (lightweight).
+     *
+     * @param id user ID
+     * @param query optional search keyword
+     * @param page page number
+     * @param size page size
+     * @return ResponseEntity with List of UserSummaryDTO
+     */
+    @GetMapping("/{id}/following-summary")
+    @Operation(summary = "Get user following summary")
+    public ResponseEntity<ApiResponse<List<UserSummaryDTO>>> getUserFollowingSummary(
+            @PathVariable String id,
+            @RequestParam(required = false, defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        
+        log.info("Get following summary request received for user: {} with query: {}", id, query);
+        List<UserSummaryDTO> response = userService.getUserFollowingSummary(id, query, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -162,6 +185,30 @@ public class UserController {
         
         UserStatsResponse response = userService.getUserStats(id);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+    
+    /**
+     * Get mutual follows for a user (users that both follow each other).
+     *
+     * @param userId the user ID
+     * @param query the search query (optional, filters by username, firstName, lastName)
+     * @param page the page number (0-indexed, default: 0)
+     * @param size the page size (default: 20)
+     * @return ResponseEntity with List of UserResponse
+     */
+    @GetMapping("/{userId}/mutual-follows")
+    @Operation(summary = "Get mutual follows for a user")
+    public ResponseEntity<ApiResponse<List<UserSummaryDTO>>> getMutualFollows(
+            @PathVariable String userId,
+            @RequestParam(required = false, defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        
+        log.info("Get mutual follows for user {} with query: {}", userId, query);
+        List<UserSummaryDTO> mutuals = userService.getMutualFollows(userId, query, page, size);
+        return ResponseEntity.ok(
+            ApiResponse.success("Mutual follows retrieved successfully", mutuals)
+        );
     }
 }
 
