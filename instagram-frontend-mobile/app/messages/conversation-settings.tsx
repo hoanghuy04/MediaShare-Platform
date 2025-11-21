@@ -1,23 +1,18 @@
-// conversation-setting.tsx
+// app/messages/conversation-setting.tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  View,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  StatusBar,
-  SafeAreaView,
-  ScrollView,
-  Modal,
-  Platform,
+  View, StyleSheet, Text, TouchableOpacity, StatusBar, SafeAreaView,
+  ScrollView, Modal, Platform, TextInput, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { Avatar } from '../../components/common/Avatar';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { messageAPI, userAPI } from '../../services/api';
+import { fileService } from '../../services/file.service';
 import { Conversation, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
 
@@ -33,16 +28,15 @@ export default function ConversationSettingsScreen() {
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const isGroup = useMemo(() => conversation?.type === 'GROUP', [conversation?.type]);
 
-  // ----- Dropdown menu state -----
+  // Dropdown (menu Lựa chọn)
   const menuButtonRef = useRef<TouchableOpacity | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 120, right: 12 });
-
   const openMenu = () => {
-    // đo toạ độ của nút "Lựa chọn" để đặt menu ngay bên dưới
     menuButtonRef.current?.measureInWindow?.((_x, y, _w, h) => {
       setMenuPos({ top: y + h + 8, right: 12 });
       setMenuVisible(true);
@@ -50,7 +44,17 @@ export default function ConversationSettingsScreen() {
   };
   const closeMenu = () => setMenuVisible(false);
 
-  // -------- data loaders --------
+  // Action sheet chỉnh sửa nhóm (Đổi tên / Đổi avatar)
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+
+  // Modal đổi tên
+  const [renameVisible, setRenameVisible] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+
+  // Action sheet đổi avatar
+  const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
+
+  // ----- load data -----
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -92,16 +96,72 @@ export default function ConversationSettingsScreen() {
     loadData();
   }, [loadData]);
 
-  // -------- header --------
+  const refreshConversation = useCallback(async () => {
+    if (!routeConversationId) return;
+    const conv = await messageAPI.getConversation(routeConversationId);
+    setConversation(conv);
+  }, [routeConversationId]);
+
+  // ----- LEAVE GROUP -----
+  const handleLeaveGroup = useCallback(() => {
+    if (!conversation?.id || !currentUser?.id) return;
+
+    Alert.alert(
+      'Rời khỏi nhóm',
+      'Bạn có chắc muốn rời khỏi nhóm này?',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Rời nhóm',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await messageAPI.leaveGroup(conversation.id, currentUser.id);
+              showAlert('Thành công', 'Bạn đã rời nhóm');
+              router.back();
+            } catch (e: any) {
+              showAlert('Lỗi', e?.response?.data?.message || 'Không thể rời nhóm');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  }, [conversation?.id, currentUser?.id, router]);
+
+  // ----- Header -----
   const Header = (
     <View style={styles.header}>
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
       </TouchableOpacity>
+
+      <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+        Cài đặt cuộc trò chuyện
+      </Text>
+
+      {/* Nút thêm thành viên (chỉ hiện khi là group) */}
+      {isGroup ? (
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => {
+            if (!routeConversationId) return;
+            router.push({
+              pathname: '/messages/group-members',
+              params: { conversationId: routeConversationId, mode: 'add' },
+            });
+          }}
+        >
+          <Ionicons name="person-add-outline" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+      ) : (
+        // giữ layout: nếu không phải group thì render 1 View trống để cân đối
+        <View style={styles.headerBtn} />
+      )}
     </View>
   );
 
-  // -------- top section --------
+  // ----- Top section -----
   const TopSection = (() => {
     if (!isGroup) {
       return (
@@ -118,62 +178,72 @@ export default function ConversationSettingsScreen() {
             onPress={() => otherUser?.id && router.push(`/users/${otherUser.id}`)}
           >
             <Text style={[styles.linkAction, { color: theme.colors.primary }]}>
-              Đổi tên và hình ảnh
+              Xem trang cá nhân
             </Text>
           </TouchableOpacity>
         </View>
       );
     }
+
     return (
       <View style={styles.profileSection}>
-        <Avatar uri={conversation?.avatar} name={conversation?.name || 'Nhóm chat'} size={100} />
+        <Avatar uri={(conversation as any)?.avatar} name={conversation?.name || 'Nhóm chat'} size={100} />
         <Text style={[styles.titleName, { color: theme.colors.text }]}>
           {conversation?.name || 'Nhóm chat'}
         </Text>
-        <TouchableOpacity onPress={() => showAlert('Thông báo', 'Tính năng đang phát triển.')}>
-          <Text style={[styles.linkAction, { color: theme.colors.primary }]}>
-            Đổi tên và hình ảnh
-          </Text>
-        </TouchableOpacity>
+        {/* Không còn nút "Đổi tên và hình ảnh" */}
       </View>
     );
   })();
 
-  // -------- setting row component --------
+  // ----- Setting row -----
   const SettingRow = ({
     left,
     title,
     subtitle,
     onPress,
+    danger = false,
+    showChevron = true,
   }: {
     left: React.ReactNode;
     title: string;
     subtitle?: string;
     onPress?: () => void;
+    danger?: boolean;
+    showChevron?: boolean;
   }) => (
     <TouchableOpacity style={styles.settingItem} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.settingIcon}>{left}</View>
       <View style={styles.settingContent}>
-        <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{title}</Text>
+        <Text
+          style={[
+            styles.settingTitle,
+            { color: danger ? '#ef4444' : theme.colors.text },
+          ]}
+        >
+          {title}
+        </Text>
         {!!subtitle && (
-          <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
+          <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>
+            {subtitle}
+          </Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+      {showChevron && (
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+      )}
     </TouchableOpacity>
   );
 
+
   const ThemeRow = (
     <SettingRow
-      left={<View style={[styles.themeDot, { backgroundColor: conversation?.theme?.tint || '#8B5CF6' }]} />}
+      left={<View style={[styles.themeDot, { backgroundColor: (conversation as any)?.theme?.tint || '#8B5CF6' }]} />}
       title="Chủ đề"
-      subtitle={conversation?.theme?.themeKey ? conversation.theme.themeKey : 'Mặc định'}
+      subtitle={(conversation as any)?.theme?.themeKey ? (conversation as any).theme.themeKey : 'Mặc định'}
       onPress={() => {
         if (!routeConversationId) return;
-        router.push({
-          pathname: '/messages/theme-picker',
-          params: { conversationId: routeConversationId },
-        });
+        router.push({ pathname: '/messages/theme-picker', params: { conversationId: routeConversationId } });
       }}
     />
   );
@@ -185,10 +255,7 @@ export default function ConversationSettingsScreen() {
       subtitle={`${conversation?.participants?.length || 0} thành viên`}
       onPress={() => {
         if (!routeConversationId) return;
-        router.push({
-          pathname: '/messages/group-members',
-          params: { conversationId: routeConversationId },
-        });
+        router.push({ pathname: '/messages/group-members', params: { conversationId: routeConversationId } });
       }}
     />
   ) : null;
@@ -200,37 +267,19 @@ export default function ConversationSettingsScreen() {
       onPress={() => showAlert('Thông báo', 'Tính năng đang phát triển.')}
     />
   );
-
-  const MuteRow = (
-    <SettingRow
-      left={<Ionicons name="notifications-off-outline" size={22} color={theme.colors.text} />}
-      title="Tắt thông báo"
-      onPress={() => showAlert('Thông báo', 'Tính năng đang phát triển.')}
-    />
-  );
-
-  const SearchRow = (
-    <SettingRow
-      left={<Ionicons name="search-outline" size={22} color={theme.colors.text} />}
-      title="Tìm kiếm"
-      onPress={() => showAlert('Thông báo', 'Tính năng đang phát triển.')}
-    />
-  );
-
-  const CreateGroupFromDirectRow = !isGroup ? (
-    <SettingRow
-      left={<Ionicons name="people-outline" size={24} color={theme.colors.text} />}
-      title="Tạo nhóm chat mới"
+  const CreateGroupFromDirectRow = !isGroup ?
+    (<SettingRow
+      left={<Ionicons name="people-outline" size={24}
+        color={theme.colors.text} />} title="Tạo nhóm chat mới"
       onPress={() => {
         router.push({
-          pathname: '/messages/create-group',
-          params: otherUser?.id ? { seedUserId: otherUser.id } : {},
+          pathname: '/messages/create-group', params: otherUser?.id
+            ? { seedUserId: otherUser.id } : {},
         });
-      }}
-    />
-  ) : null;
+      }} />)
+    : null;
 
-  // -------- Quick actions --------
+  // ----- Quick actions -----
   const ViewProfileQuick = !isGroup ? (
     <TouchableOpacity
       style={styles.quickActionItem}
@@ -244,7 +293,10 @@ export default function ConversationSettingsScreen() {
   ) : (
     <TouchableOpacity
       style={styles.quickActionItem}
-      onPress={() => showAlert('Thông báo', 'Màn sửa thông tin nhóm đang phát triển.')}
+      onPress={() => {
+        setRenameValue(conversation?.name || '');
+        setActionSheetVisible(true);
+      }}
     >
       <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.primary }]}>
         <Ionicons name="pencil-outline" size={20} color="white" />
@@ -268,7 +320,8 @@ export default function ConversationSettingsScreen() {
         </View>
         <Text style={[styles.quickActionText, { color: theme.colors.text }]}>Tắt thông báo</Text>
       </TouchableOpacity>
-      {/* Nút Lựa chọn để mở menu dropdown */}
+
+      {/* Nút menu chung */}
       <TouchableOpacity ref={menuButtonRef} style={styles.quickActionItem} onPress={openMenu}>
         <View style={[styles.quickActionIcon, { backgroundColor: theme.colors.primary }]}>
           <Ionicons name="ellipsis-horizontal-outline" size={20} color="white" />
@@ -278,103 +331,220 @@ export default function ConversationSettingsScreen() {
     </View>
   );
 
-  // -------- Menu item component --------
-  const MenuItem = ({
-    icon,
-    label,
-    danger,
-    onPress,
-  }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    label: string;
-    danger?: boolean;
-    onPress: () => void;
-  }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.85}>
-      <Ionicons
-        name={icon}
-        size={20}
-        color={danger ? '#ef4444' : theme.colors.text}
-        style={{ marginRight: 10 }}
-      />
-      <Text style={[styles.menuItemText, { color: danger ? '#ef4444' : theme.colors.text }]}>{label}</Text>
-    </TouchableOpacity>
-  );
+  // ----- Handlers: Rename -----
+  const handleRenameSave = useCallback(async () => {
+    if (!routeConversationId) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      Alert.alert('Lưu ý', 'Tên nhóm không được để trống.');
+      return;
+    }
+    try {
+      setSaving(true);
+      await messageAPI.updateConversation(routeConversationId, { name: trimmed });
+      await refreshConversation();
+      setRenameVisible(false);
+      setActionSheetVisible(false);
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể đổi tên nhóm');
+    } finally {
+      setSaving(false);
+    }
+  }, [routeConversationId, renameValue, refreshConversation]);
 
-  // -------- Dropdown menu --------
+  // ----- Handlers: Avatar -----
+  const doUploadAndSetAvatar = useCallback(async (localUri: string) => {
+    if (!routeConversationId) return;
+    const form = new FormData();
+    const fileName = localUri.split('/').pop() || `avatar_${Date.now()}.jpg`;
+    const mime = 'image/jpeg';
+
+    form.append('file', {
+      uri: Platform.select({ ios: localUri.replace('file://', ''), android: localUri }) as string,
+      name: fileName,
+      type: mime,
+    } as any);
+
+    setSaving(true);
+    try {
+      const uploaded = await fileService.uploadFile(form, 'PROFILE'); // trả MediaFileResponse
+      await messageAPI.updateConversation(routeConversationId, { avatar: uploaded.id });
+      await refreshConversation();
+      setAvatarSheetVisible(false);
+      setActionSheetVisible(false);
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể đổi ảnh nhóm');
+    } finally {
+      setSaving(false);
+    }
+  }, [routeConversationId, refreshConversation]);
+
+  const handleAvatarRemove = useCallback(async () => {
+    if (!routeConversationId) return;
+    try {
+      setSaving(true);
+      await messageAPI.updateConversation(routeConversationId, { avatar: '__REMOVE__' });
+      await refreshConversation();
+      setAvatarSheetVisible(false);
+      setActionSheetVisible(false);
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể gỡ ảnh nhóm');
+    } finally {
+      setSaving(false);
+    }
+  }, [routeConversationId, refreshConversation]);
+
+  const pickFromLibrary = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Quyền truy cập', 'Vui lòng cho phép truy cập Thư viện ảnh.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (!res.canceled) {
+      await doUploadAndSetAvatar(res.assets[0].uri);
+    }
+  }, [doUploadAndSetAvatar]);
+
+  const takePhoto = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Quyền truy cập', 'Vui lòng cho phép dùng Camera.');
+      return;
+    }
+    const res = await ImagePicker.launchCameraAsync({
+      quality: 0.9,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (!res.canceled) {
+      await doUploadAndSetAvatar(res.assets[0].uri);
+    }
+  }, [doUploadAndSetAvatar]);
+
+  // ----- Menu Lựa chọn (dropdown) -----
   const Menu = (
     <Modal transparent visible={menuVisible} animationType="fade" onRequestClose={closeMenu}>
       <View style={styles.menuOverlay}>
-        {/* chạm nền để đóng */}
         <TouchableOpacity style={StyleSheet.absoluteFillObject as any} onPress={closeMenu} />
         <View style={[styles.menuCard, { top: menuPos.top, right: menuPos.right }]}>
           {isGroup ? (
             <>
-              <MenuItem
-                icon="exit-outline"
-                label="Rời khỏi nhóm"
-                danger
-                onPress={async () => {
-                  closeMenu();
-                  try {
-                    if (!conversation?.id || !currentUser?.id) return;
-                    await messageAPI.leaveGroup(conversation.id, currentUser.id);
-                    showAlert('Thành công', 'Bạn đã rời nhóm');
-                    router.back();
-                  } catch (e: any) {
-                    showAlert('Lỗi', e?.response?.data?.message || 'Không thể rời nhóm');
-                  }
-                }}
-              />
-              <MenuItem
-                icon="eye-off-outline"
-                label="Ẩn"
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={() => {
                   closeMenu();
-                  showAlert('Thông báo', 'Tính năng đang phát triển');
+                  handleLeaveGroup();
                 }}
-              />
-              <MenuItem
-                icon="shield-half-outline"
-                label="Hạn chế"
-                onPress={() => {
-                  closeMenu();
-                  showAlert('Thông báo', 'Tính năng đang phát triển');
-                }}
-              />
+              >
+                <Ionicons name="exit-outline" size={20} color="#ef4444" style={{ marginRight: 10 }} />
+                <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Rời khỏi nhóm</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showAlert('Thông báo', 'Tính năng đang phát triển'); }}>
+                <Ionicons name="eye-off-outline" size={20} color={theme.colors.text} style={{ marginRight: 10 }} />
+                <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Ẩn</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showAlert('Thông báo', 'Tính năng đang phát triển'); }}>
+                <Ionicons name="shield-half-outline" size={20} color={theme.colors.text} style={{ marginRight: 10 }} />
+                <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Hạn chế</Text>
+              </TouchableOpacity>
             </>
           ) : (
-            // DIRECT: Hạn chế trước
-            <MenuItem
-              icon="shield-half-outline"
-              label="Hạn chế"
-              onPress={() => {
-                closeMenu();
-                showAlert('Thông báo', 'Tính năng đang phát triển');
-              }}
-            />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showAlert('Thông báo', 'Tính năng đang phát triển'); }}>
+              <Ionicons name="shield-half-outline" size={20} color={theme.colors.text} style={{ marginRight: 10 }} />
+              <Text style={[styles.menuItemText, { color: theme.colors.text }]}>Hạn chế</Text>
+            </TouchableOpacity>
           )}
 
-          {/* Chung cho cả 2 */}
-          <MenuItem
-            icon="close-circle-outline"
-            label="Chặn"
-            danger
-            onPress={() => {
-              closeMenu();
-              showAlert('Thông báo', 'Tính năng đang phát triển');
-            }}
-          />
-          <MenuItem
-            icon="alert-circle-outline"
-            label="Báo cáo"
-            danger
-            onPress={() => {
-              closeMenu();
-              showAlert('Thông báo', 'Tính năng đang phát triển');
-            }}
-          />
+          <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showAlert('Thông báo', 'Tính năng đang phát triển'); }}>
+            <Ionicons name="close-circle-outline" size={20} color="#ef4444" style={{ marginRight: 10 }} />
+            <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Chặn</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={() => { closeMenu(); showAlert('Thông báo', 'Tính năng đang phát triển'); }}>
+            <Ionicons name="alert-circle-outline" size={20} color="#ef4444" style={{ marginRight: 10 }} />
+            <Text style={[styles.menuItemText, { color: '#ef4444' }]}>Báo cáo</Text>
+          </TouchableOpacity>
         </View>
+      </View>
+    </Modal>
+  );
+
+  // ----- Action sheet 2 lựa chọn (Đổi tên / Đổi avatar) -----
+  const EditActionSheet = (
+    <Modal transparent visible={actionSheetVisible} animationType="fade" onRequestClose={() => setActionSheetVisible(false)}>
+      <TouchableOpacity style={styles.sheetOverlay} onPress={() => setActionSheetVisible(false)} />
+      <View style={styles.sheetCard}>
+        <TouchableOpacity style={styles.sheetItem} onPress={() => { setActionSheetVisible(false); setRenameVisible(true); }}>
+          <Text style={styles.sheetItemText}>Đổi tên</Text>
+        </TouchableOpacity>
+        <View style={styles.sheetDivider} />
+        <TouchableOpacity style={styles.sheetItem} onPress={() => { setActionSheetVisible(false); setAvatarSheetVisible(true); }}>
+          <Text style={styles.sheetItemText}>Đổi avatar</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+
+  // ----- Rename modal -----
+  const RenameModal = (
+    <Modal transparent visible={renameVisible} animationType="fade" onRequestClose={() => setRenameVisible(false)}>
+      <View style={styles.centerOverlay}>
+        <View style={styles.renameCard}>
+          <Text style={styles.renameHeader}>Chỉnh sửa tên nhóm</Text>
+          <View style={styles.renameInputWrap}>
+            <TextInput
+              value={renameValue}
+              onChangeText={setRenameValue}
+              placeholder="Nhập tên nhóm"
+              style={styles.renameInput}
+            />
+          </View>
+
+          <View style={styles.renameFooter}>
+            <TouchableOpacity onPress={() => setRenameValue('')}>
+              <Text style={[styles.renameLeft, { color: '#ef4444' }]}>Gỡ</Text>
+            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row' }}>
+              <TouchableOpacity style={{ marginRight: 18 }} onPress={() => setRenameVisible(false)}>
+                <Text style={{ fontWeight: '600' }}>Huỷ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity disabled={saving} onPress={handleRenameSave}>
+                <Text style={{ color: '#0A84FF', fontWeight: '700' }}>{saving ? 'Đang lưu…' : 'Lưu'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // ----- Avatar action sheet (Gỡ / Chụp ảnh / Chọn ảnh) -----
+  const AvatarSheet = (
+    <Modal transparent visible={avatarSheetVisible} animationType="fade" onRequestClose={() => setAvatarSheetVisible(false)}>
+      <TouchableOpacity style={styles.sheetOverlay} onPress={() => setAvatarSheetVisible(false)} />
+      <View style={styles.sheetCard}>
+        <TouchableOpacity style={styles.sheetItem} onPress={handleAvatarRemove}>
+          <Text style={[styles.sheetItemText, { color: '#ef4444' }]}>{saving ? 'Đang gỡ…' : 'Gỡ'}</Text>
+        </TouchableOpacity>
+        <View style={styles.sheetDivider} />
+        <TouchableOpacity style={styles.sheetItem} onPress={takePhoto}>
+          <Text style={styles.sheetItemText}>Chụp ảnh</Text>
+        </TouchableOpacity>
+        <View style={styles.sheetDivider} />
+        <TouchableOpacity style={styles.sheetItem} onPress={pickFromLibrary}>
+          <Text style={styles.sheetItemText}>Chọn ảnh</Text>
+        </TouchableOpacity>
       </View>
     </Modal>
   );
@@ -407,14 +577,28 @@ export default function ConversationSettingsScreen() {
             {ThemeRow}
             {MembersRow}
             {PrivacyRow}
-            {MuteRow}
-            {SearchRow}
             {CreateGroupFromDirectRow}
           </View>
+
+          {/* Nút "Rời khỏi nhóm" dưới cùng (chỉ hiện khi là group) */}
+          {isGroup ? (
+            <View style={{ paddingTop: 8 }}>
+              <SettingRow
+                left={<Ionicons name="exit-outline" size={24} color="#ef4444" />}
+                title="Rời khỏi nhóm"
+                onPress={handleLeaveGroup}
+                danger
+              // nếu muốn không có chevron thì set showChevron={false}
+              // showChevron={false}
+              />
+            </View>
+          ) : null}
         </ScrollView>
 
-        {/* Dropdown menu */}
         {Menu}
+        {EditActionSheet}
+        {RenameModal}
+        {AvatarSheet}
       </SafeAreaView>
     </View>
   );
@@ -425,28 +609,23 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#e0e0e0',
   },
-  backButton: { padding: 4 },
+  headerBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700' },
 
   content: { flex: 1 },
 
-  profileSection: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20 },
+  profileSection: { alignItems: 'center', paddingTop: 36, paddingBottom: 16, paddingHorizontal: 20 },
   titleName: { fontSize: 24, fontWeight: '600', marginTop: 12, textAlign: 'center' },
   linkAction: { marginTop: 6, fontSize: 14, fontWeight: '600' },
 
   quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexDirection: 'row', justifyContent: 'space-around',
+    paddingHorizontal: 20, paddingVertical: 20,
+    borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
   },
   quickActionItem: { alignItems: 'center', flex: 1 },
   quickActionIcon: {
@@ -472,28 +651,53 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Dropdown
-  menuOverlay: {
-    flex: 1,
-  },
+  menuOverlay: { flex: 1 },
   menuCard: {
-    position: 'absolute',
-    borderRadius: 12,
-    paddingVertical: 6,
-    minWidth: 230,
-    backgroundColor: 'white',
+    position: 'absolute', borderRadius: 12, paddingVertical: 6, minWidth: 230, backgroundColor: 'white',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
       android: { elevation: 10 },
     }),
   },
-  menuItem: {
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14 },
+  menuItemText: { fontSize: 15, fontWeight: '700' },
+
+  // Action sheet 2 lựa chọn
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.2)' },
+  sheetCard: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, borderTopLeftRadius: 14, borderTopRightRadius: 14,
+    backgroundColor: 'white', paddingVertical: 8,
+  },
+  sheetItem: { paddingVertical: 16, paddingHorizontal: 20 },
+  sheetItemText: { fontSize: 16, fontWeight: '600' },
+  sheetDivider: { height: 1, backgroundColor: '#eee' },
+
+  // Rename modal
+  centerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', justifyContent: 'center', alignItems: 'center' },
+  renameCard: { width: '86%', backgroundColor: 'white', borderRadius: 14, paddingTop: 14, paddingBottom: 8 },
+  renameHeader: { fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
+  renameInputWrap: { paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  renameInput: { fontSize: 16, paddingVertical: 8 },
+  renameFooter: {
+    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  renameLeft: { fontWeight: '700' },
+
+  // Leave group row (bottom)
+  leaveRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fff1f2',
+    borderRadius: 12,
+    paddingVertical: 14,
   },
-  menuItemText: {
+  leaveText: {
     fontSize: 15,
     fontWeight: '700',
+    color: '#ef4444',
   },
 });

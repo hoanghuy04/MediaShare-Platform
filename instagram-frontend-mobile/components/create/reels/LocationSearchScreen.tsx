@@ -63,14 +63,12 @@ export function LocationSearchScreen({ onClose, onSelectLocation }: LocationSear
     return `${distanceKm.toFixed(1).replace('.', ',')} km`;
   }
 
-  function buildAddressString(geo: Location.LocationGeocodedLocation) {
-    const parts = [
-      geo.street,
-      geo.subregion || geo.district,
-      geo.city || geo.region || geo.subregion,
-    ]
+  function buildAddressString(geo: Location.LocationGeocodedAddress) {
+    const street = [geo.streetNumber, geo.street].filter(Boolean).join(' ').trim();
+    const parts = [street, geo.subregion || geo.district, geo.city || geo.region]
       .filter(Boolean)
-      .map(s => String(s).trim());
+      .map(s => String(s).trim())
+      .filter(s => s.length > 0);
 
     const deduped: string[] = [];
     for (const p of parts) {
@@ -154,9 +152,7 @@ export function LocationSearchScreen({ onClose, onSelectLocation }: LocationSear
               });
             }
           }
-        } catch (err) {
-          console.log('reverseGeocode error @', i, err);
-        }
+        } catch (err) {}
       }
 
       collected.sort((a, b) => {

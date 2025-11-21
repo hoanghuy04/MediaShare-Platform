@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
 import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
+import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -98,7 +99,7 @@ public abstract class MessageRequestMapper {
             : req.getCreatedAt();
         
         return InboxItemDTO.builder()
-            .type(InboxItemDTO.InboxItemType.MESSAGE_REQUEST)
+            .type(InboxItemType.MESSAGE_REQUEST)
             .messageRequest(reqDTO)
             .timestamp(timestamp)
             .build();

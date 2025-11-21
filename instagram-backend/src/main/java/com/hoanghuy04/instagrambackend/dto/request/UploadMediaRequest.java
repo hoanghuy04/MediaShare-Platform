@@ -1,31 +1,24 @@
 package com.hoanghuy04.instagrambackend.dto.request;
 
+import com.hoanghuy04.instagrambackend.enums.MediaUsage;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO for updating group conversation information.
+ * DTO for uploading media file.
  * 
  * @author Instagram Backend Team
- * @version 2.0.0
+ * @version 1.0.0
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateGroupRequest {
+public class UploadMediaRequest {
     
-    /**
-     * New group name (optional)
-     */
-    private String name;
-    
-    /**
-     * New group avatar URL (optional)
-     */
-    private String avatar;
+    @NotNull(message = "Media usage is required")
+    private MediaUsage usage;
 }
-
-

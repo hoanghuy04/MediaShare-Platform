@@ -66,19 +66,20 @@ export const API_ENDPOINTS = {
   INBOX: '/api/conversations/inbox',
   CONVERSATION_DETAIL: (id: string) => `/api/conversations/${id}`,
   CONVERSATION_MESSAGES: (id: string) => `/api/conversations/${id}/messages`,
+  UPDATE_CONVERSATION: (conversationId: string) => `/api/conversations/${conversationId}`,
   SEND_DIRECT_MESSAGE: '/api/conversations/direct/messages',
   SEND_MESSAGE: (conversationId: string) => `/api/conversations/${conversationId}/messages`,
   MARK_MESSAGE_READ: (messageId: string) => `/api/conversations/messages/${messageId}/read`,
   DELETE_MESSAGE: (messageId: string) => `/api/conversations/messages/${messageId}`,
   DELETE_CONVERSATION: (conversationId: string) => `/api/conversations/${conversationId}`,
-  
+
   // Group Chat
   CREATE_GROUP: '/api/conversations/group',
   UPDATE_GROUP: (id: string) => `/api/conversations/${id}`,
   ADD_MEMBERS: (id: string) => `/api/conversations/${id}/members`,
   REMOVE_MEMBER: (id: string, userId: string) => `/api/conversations/${id}/members/${userId}`,
   LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
-  
+
   // Message Requests
   MESSAGE_REQUESTS: '/api/message-requests',
   MESSAGE_REQUESTS_COUNT: '/api/message-requests/count',
@@ -93,9 +94,9 @@ export const API_ENDPOINTS = {
   UNREAD_COUNT: '/api/notifications/unread-count',
 
   // Upload
-  UPLOAD: '/api/upload',
-  UPLOAD_PROFILE_IMAGE: '/api/upload/profile',
-  UPLOAD_POST_MEDIA: '/api/upload/post',
-  UPLOAD_POST_MEDIA_BATCH: '/api/upload/post/batch',
-  DELETE_FILE: (fileId: string) => `/api/upload/${fileId}`,
+  UPLOAD: '/api/files',
+  UPLOAD_PROFILE_IMAGE: '/api/files/upload/profile-image',
+  UPLOAD_POST_MEDIA: '/api/files/upload/post-media',
+  UPLOAD_POST_MEDIA_BATCH: '/api/files/upload/post-media/batch',
+  DELETE_FILE: (fileId: string) => `/api/files/upload/${fileId}`,
 } as const;

@@ -1,15 +1,13 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
-import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
+import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
+import com.hoanghuy04.instagrambackend.dto.response.*;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
+import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -19,6 +17,7 @@ import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
+import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -59,6 +58,8 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     MessageMapper messageMapper;
     MessageRequestMapper messageRequestMapper;
+
+    FileService fileService;
     
     @Transactional
     @Override
@@ -224,7 +225,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             );
         
         List<MessageDTO> messageDTOs = messages.stream()
-            .map((Message message) -> messageMapper.toMessageDTO(message, userId))
+            .map((Message message) -> messageMapper.toMessageDTO(message))
             .collect(Collectors.toList());
         
         List<Message> allMessages = messageRepository
@@ -424,9 +425,13 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         // 1. Get all conversations
         List<Conversation> conversations = conversationService.getUserConversations(userId);
         for (Conversation conv : conversations) {
-            ConversationDTO convDTO = messageMapper.toConversationDTO(conv, userId);
+            MediaFileResponse mediaFileResponse = fileService.getMediaFileResponse(conv.getAvatar());
+            if (mediaFileResponse != null) {
+                conv.setAvatar(mediaFileResponse.getUrl());
+            }
+            ConversationDTO convDTO = messageMapper.toConversationDTO(conv);
             InboxItemDTO item = InboxItemDTO.builder()
-                .type(InboxItemDTO.InboxItemType.CONVERSATION)
+                .type(InboxItemType.CONVERSATION)
                 .conversation(convDTO)
                 .timestamp(conv.getUpdatedAt())
                 .build();
@@ -441,11 +446,9 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         
         for (MessageRequest req : sentRequests) {
             MessageRequestDTO reqDTO = messageRequestMapper.toMessageRequestDTO(req);
-            // Manually enrich sender and receiver (MapStruct doesn't auto-call @AfterMapping)
-//            messageRequestMapper.enrichMessageRequest(reqDTO, req);
-            
+
             InboxItemDTO item = InboxItemDTO.builder()
-                .type(InboxItemDTO.InboxItemType.MESSAGE_REQUEST)
+                .type(InboxItemType.MESSAGE_REQUEST)
                 .messageRequest(reqDTO)
                 .timestamp(req.getCreatedAt())
                 .build();
@@ -493,14 +496,20 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     @Transactional(readOnly = true)
     @Override
     public ConversationDTO getConversationAsDTO(String conversationId, String userId) {
-        log.debug("Getting conversation details: {} for user: {}", conversationId, userId);
-        
         if (!conversationService.isParticipant(conversationId, userId)) {
             throw new BadRequestException("You are not a participant in this conversation");
         }
-        
         Conversation conversation = conversationService.getConversationById(conversationId);
-        return messageMapper.toConversationDTO(conversation, userId);
+        ConversationDTO dto = messageMapper.toConversationDTO(conversation);
+
+        // ✅ enrich avatarUrl
+        if (conversation.getAvatar() != null) {
+            try {
+                var media = fileService.getMediaFileResponse(conversation.getAvatar());
+                dto.setAvatar(media.getUrl());
+            } catch (Exception ignored) { dto.setAvatar(null); }
+        }
+        return dto;
     }
     
     @Transactional
@@ -508,22 +517,24 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     public ConversationDTO createGroupAndConvertToDTO(
             String creatorId,
             List<String> participantIds,
-            String groupName,
-            String avatar) {
+            String groupName) {
         Conversation conversation = conversationService.createGroupConversation(
-            creatorId, participantIds, groupName, avatar
+            creatorId, participantIds, groupName
         );
-        return messageMapper.toConversationDTO(conversation, creatorId);
+        return messageMapper.toConversationDTO(conversation);
     }
-    
+
     @Transactional
     @Override
     public ConversationDTO updateGroupAndConvertToDTO(
             String conversationId,
             String name,
             String avatar,
-            String userId) {
-        Conversation conversation = conversationService.updateGroupInfo(conversationId, name, avatar);
-        return messageMapper.toConversationDTO(conversation, userId);
+            String userId
+    ) {
+        // Ủy quyền cho conversationService xử lý quyền + resolve avatar
+        Conversation conversation = conversationService.updateGroupInfo(conversationId, name, avatar, userId);
+        return messageMapper.toConversationDTO(conversation);
     }
+
 }

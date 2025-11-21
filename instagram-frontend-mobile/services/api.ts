@@ -7,7 +7,6 @@ import {
   UserProfile,
   UpdateProfileRequest,
   Post,
-  CreatePostRequest,
   Comment,
   CreateCommentRequest,
   Conversation,
@@ -20,6 +19,7 @@ import {
   UserSummary,
 } from '../types';
 import apiConfig from '../config/apiConfig';
+import { CreatePostRequest } from '../types/post.type';
 
 // Auth API
 export const authAPI = {
@@ -185,105 +185,6 @@ export const userAPI = {
   },
 };
 
-// Post API
-export const postAPI = {
-  getFeed: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.FEED, {
-      params: { page, limit },
-    });
-    return response.data.data;
-  },
-
-  getExplorePosts: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.EXPLORE, {
-      params: { page, limit },
-    });
-    return response.data.data;
-  },
-
-  getPost: async (postId: string): Promise<Post> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.POST_DETAIL(postId));
-    return response.data.data;
-  },
-
-  getUserPosts: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.USER_POSTS(userId), {
-      params: { page, limit },
-    });
-    return response.data.data;
-  },
-
-  createPost: async (data: CreatePostRequest): Promise<Post> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.CREATE_POST, data);
-    return response.data.data;
-  },
-
-  updatePost: async (postId: string, caption: string): Promise<Post> => {
-    const response = await axiosInstance.put(API_ENDPOINTS.UPDATE_POST(postId), { caption });
-    return response.data.data;
-  },
-
-  deletePost: async (postId: string): Promise<void> => {
-    await axiosInstance.delete(API_ENDPOINTS.DELETE_POST(postId));
-  },
-
-  likePost: async (postId: string): Promise<void> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.LIKE_POST(postId), null, {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
-    });
-    return response.data.data;
-  },
-
-  unlikePost: async (postId: string): Promise<void> => {
-    const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_POST(postId), {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
-    });
-    return response.data.data;
-  },
-
-  searchPosts: async (query: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
-    try {
-      // Try to use dedicated search endpoint if available
-      const response = await axiosInstance.get('/api/posts/search', {
-        params: { query, page, limit },
-      });
-      return response.data.data;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        // Fallback to explore posts if search endpoint doesn't exist
-        console.log('Search posts endpoint not found, using explore posts as fallback');
-        return await postAPI.getExplorePosts(page, limit);
-      }
-      throw error;
-    }
-  },
-
-  searchReels: async (query: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
-    try {
-      // Try to use dedicated search endpoint if available
-      // const response = await axiosInstance.get('/api/posts/search/reels', {
-      const response = await axiosInstance.get('/api/posts/search', {
-        params: { query, page, limit },
-      });
-      return response.data.data;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        console.log('Search reels endpoint not found, using explore posts as fallback');
-        const exploreResponse = await postAPI.getExplorePosts(page, limit);
-        // Filter for video posts (reels)
-        const videoPosts = exploreResponse.content.filter(post =>
-          post.media.some(media => media.type === 'VIDEO' || media.type === 'video')
-        );
-        return {
-          ...exploreResponse,
-          content: videoPosts,
-        };
-      }
-      throw error;
-    }
-  },
-};
-
 // Comment API
 export const commentAPI = {
   getComments: async (
@@ -318,14 +219,14 @@ export const commentAPI = {
 
   likeComment: async (commentId: string): Promise<void> => {
     const response = await axiosInstance.post(API_ENDPOINTS.LIKE_COMMENT(commentId), null, {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
     });
     return response.data.data;
   },
 
   unlikeComment: async (commentId: string): Promise<void> => {
     const response = await axiosInstance.delete(API_ENDPOINTS.UNLIKE_COMMENT(commentId), {
-      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] }
+      params: { userId: axiosInstance.defaults.headers.common['X-User-ID'] },
     });
     return response.data.data;
   },
@@ -353,6 +254,8 @@ export const messageAPI = {
     const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATION_DETAIL(conversationId), {
       params: { userId },
     });
+    console.log("_______________Conversation LOAD FROM API IN CONVERSATION SETTING SCREEN__________:", response.data.data);
+
     return response.data.data;
   },
 
@@ -436,11 +339,17 @@ export const messageAPI = {
   },
 
   // Update group info
-  updateGroup: async (conversationId: string, name: string, avatar?: string): Promise<Conversation> => {
+  updateConversation: async (
+    conversationId: string,
+    data: {
+      name?: string;
+      avatar?: string; // fileId hoặc '__REMOVE__'
+    }
+  ): Promise<Conversation> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.put(
-      API_ENDPOINTS.UPDATE_GROUP(conversationId),
-      { name, avatar },
+      API_ENDPOINTS.UPDATE_CONVERSATION(conversationId),
+      data,
       { params: { userId } }
     );
     return response.data.data;

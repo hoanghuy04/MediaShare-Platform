@@ -252,7 +252,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         
         // Map to DTOs
         List<MessageDTO> messageDTOs = messages.stream()
-            .map(message -> messageMapper.toMessageDTO(message, senderId))
+            .map(message -> messageMapper.toMessageDTO(message))
             .collect(Collectors.toList());
         
         log.info("Successfully mapped {} pending messages to DTOs", messageDTOs.size());

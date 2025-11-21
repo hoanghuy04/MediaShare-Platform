@@ -11,6 +11,9 @@ import {
   Modal,
   Keyboard,
   ScrollView,
+  FlatList,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
@@ -34,7 +37,7 @@ export interface MessageInputProps {
 }
 
 /* --------------------------------- */
-/* Emoji Panel (lightweight, Fabric-safe) */
+/* Emoji Panel (FlatList grid đều)   */
 /* --------------------------------- */
 const EmojiPanel: React.FC<{
   visible: boolean;
@@ -43,32 +46,47 @@ const EmojiPanel: React.FC<{
 }> = ({ visible, onClose, onPick }) => {
   const [active, setActive] = useState<EmojiCategory>('smileys');
   const [recents, setRecents] = useState<string[]>([]);
+  const [panelWidth, setPanelWidth] = useState<number>(0);
   const { theme } = useTheme();
 
+  // cấu hình grid
+  const COLS = EMOJI_DEFAULTS.gridColumns;    // ví dụ: 8
+  const GRID_H_PAD = SIZES.md;                 // padding ngang container
+  const GAP = 8;                               // khoảng cách giữa các cột
+
+  const itemSize = useMemo(() => {
+    if (!panelWidth) return 40;
+    const usable = panelWidth - GRID_H_PAD * 2;
+    const totalGaps = (COLS - 1) * GAP;
+    return Math.floor((usable - totalGaps) / COLS);
+  }, [panelWidth]);
+
   const categories: EmojiCategory[] = useMemo(
-    () => (recents.length ? (['smileys'] as EmojiCategory[]).concat(EMOJI_CATEGORIES_ORDER.slice(1)) : EMOJI_CATEGORIES_ORDER),
+    () =>
+      recents.length
+        ? (['smileys'] as EmojiCategory[]).concat(EMOJI_CATEGORIES_ORDER.slice(1))
+        : EMOJI_CATEGORIES_ORDER,
     [recents.length]
   );
 
   const list = useMemo(() => {
-    if (active === 'smileys' && recents.length) return recents; // ưu tiên hiển thị recents khi có
+    if (active === 'smileys' && recents.length) return recents;
     return EMOJI[active] || [];
   }, [active, recents]);
 
   const handlePick = (e: string) => {
-    // cập nhật recents (in-memory)
-    setRecents(prev => {
-      const next = [e, ...prev.filter(x => x !== e)].slice(0, EMOJI_RECENTS_MAX);
-      return next;
-    });
+    setRecents(prev => [e, ...prev.filter(x => x !== e)].slice(0, EMOJI_RECENTS_MAX));
     onPick(e);
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.emojiOverlay}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.emojiPanel, { backgroundColor: theme.colors.surface }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFillObject as StyleProp<ViewStyle>} onPress={onClose} />
+        <View
+          style={[styles.emojiPanel, { backgroundColor: theme.colors.surface }]}
+          onLayout={e => setPanelWidth(e.nativeEvent.layout.width)}
+        >
           {/* Header */}
           <View style={styles.emojiHeader}>
             <Text style={[styles.emojiTitle, { color: theme.colors.text }]} allowFontScaling={false}>
@@ -79,23 +97,17 @@ const EmojiPanel: React.FC<{
             </TouchableOpacity>
           </View>
 
-          {/* Category Tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.catRow}
-          >
+          {/* Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
             {categories.map(cat => {
               const selected = cat === active;
               return (
                 <TouchableOpacity
-                  key={cat}
+                  key={`cat-${cat}`}
                   onPress={() => setActive(cat)}
                   style={[
                     styles.catPill,
-                    {
-                      backgroundColor: selected ? theme.colors.primary : theme.colors.border,
-                    },
+                    { backgroundColor: selected ? theme.colors.primary : theme.colors.border },
                   ]}
                 >
                   <Text
@@ -112,24 +124,35 @@ const EmojiPanel: React.FC<{
             })}
           </ScrollView>
 
-          {/* Grid */}
-          <ScrollView contentContainerStyle={styles.emojiGrid}>
-            {list.map((emoji) => (
+          {/* Grid (đều hai bên) */}
+          <FlatList
+            data={list}
+            keyExtractor={(_item, index) => `emoji-${active}-${index}`} // dùng index để tránh trùng key
+            numColumns={COLS}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: GRID_H_PAD, paddingBottom: SIZES.md }}
+            columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: GAP }}
+            renderItem={({ item }) => (
               <TouchableOpacity
-                key={`${active}-${emoji}`}
-                style={styles.emojiBtn}
+                style={{
+                  width: itemSize,
+                  height: itemSize,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: SIZES.radiusMd,
+                }}
                 activeOpacity={0.7}
-                onPress={() => handlePick(emoji)}
+                onPress={() => handlePick(item)}
               >
                 <Text
                   style={{ fontSize: EMOJI_DEFAULTS.emojiSize, textAlign: 'center' }}
                   allowFontScaling={EMOJI_DEFAULTS.allowFontScaling}
                 >
-                  {emoji}
+                  {item}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            )}
+          />
         </View>
       </View>
     </Modal>
@@ -137,7 +160,7 @@ const EmojiPanel: React.FC<{
 };
 
 /* --------------------------------- */
-/* MessageInput */
+/* MessageInput                       */
 /* --------------------------------- */
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
@@ -157,11 +180,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (isRecording) {
-      timer = setInterval(() => setRecordSeconds((p) => p + 1), 1000);
+      timer = setInterval(() => setRecordSeconds(p => p + 1), 1000);
     } else {
       setRecordSeconds(0);
     }
-    return () => timer && clearInterval(timer);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [isRecording]);
 
   // cleanup typing debounce
@@ -214,7 +239,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
-  const toggleRecording = () => setIsRecording((p) => !p);
+  const toggleRecording = () => setIsRecording(p => !p);
 
   const openEmoji = () => {
     Keyboard.dismiss();
@@ -222,9 +247,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   const onPickEmoji = (e: string) => {
-    // nối vào cursor cuối (đơn giản)
-    const next = `${message}${e}`;
-    setMessage(next);
+    setMessage(prev => `${prev}${e}`);
     onTyping?.();
     scheduleStopTyping();
   };
@@ -267,12 +290,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onPress={handleSend}
         disabled={!message.trim()}
         style={[
-            styles.sendButton,
-            {
-              backgroundColor: message.trim()
-                ? themeColor || theme.chat.bubbleOut
-                : theme.colors.border,
-            },
+          styles.sendButton,
+          {
+            backgroundColor: message.trim()
+              ? themeColor || theme.chat.bubbleOut
+              : theme.colors.border,
+          },
         ]}
       >
         <Ionicons
@@ -292,20 +315,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Emoji modal */}
-      <EmojiPanel
-        visible={showEmoji}
-        onClose={() => setShowEmoji(false)}
-        onPick={onPickEmoji}
-      />
+      <EmojiPanel visible={showEmoji} onClose={() => setShowEmoji(false)} onPick={onPickEmoji} />
     </View>
   );
 };
 
 /* --------------------------------- */
-/* Styles */
+/* Styles                             */
 /* --------------------------------- */
-const GRID_BTN_SIZE = 40;
-
 const styles = StyleSheet.create({
   wrapper: {
     flexDirection: 'row',
@@ -313,7 +330,6 @@ const styles = StyleSheet.create({
     padding: SIZES.md,
     gap: SIZES.sm,
   },
-
   attachButton: {
     width: 38,
     height: 38,
@@ -321,7 +337,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   inputContainer: {
     flex: 1,
     borderRadius: SIZES.radiusLg,
@@ -330,7 +345,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-
   input: {
     flex: 1,
     fontSize: SIZES.fontMd,
@@ -338,18 +352,15 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
   },
-
   inputActions: {
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: SIZES.xs + 2,
   },
-
   iconButton: {
     padding: 4,
     marginLeft: 4,
   },
-
   sendButton: {
     width: 42,
     height: 42,
@@ -357,7 +368,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   recordingBadge: {
     position: 'absolute',
     top: -18,
@@ -369,7 +379,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
-
   recordingText: { color: '#fff', fontSize: 12, marginLeft: 4 },
 
   /* Emoji modal */
@@ -377,14 +386,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-
   emojiPanel: {
-    maxHeight: EMOJI_DEFAULTS.panelMaxHeight,
+    height: EMOJI_DEFAULTS.panelHeight,
     borderTopLeftRadius: SIZES.radiusLg,
     borderTopRightRadius: SIZES.radiusLg,
     overflow: 'hidden',
   },
-
   emojiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -392,43 +399,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.sm + 4,
     paddingVertical: SIZES.sm,
   },
-
   emojiTitle: {
     fontSize: SIZES.fontSm + 2,
     fontWeight: '700',
   },
-
   catRow: {
     paddingHorizontal: SIZES.sm + 4,
     paddingBottom: SIZES.sm,
     gap: SIZES.xs,
+    height: 36,
+    marginBottom: 12
   },
-
   catPill: {
     paddingHorizontal: SIZES.md,
     paddingVertical: 6,
     borderRadius: SIZES.radiusFull,
     marginRight: SIZES.xs,
   },
-
   catText: {
     fontSize: SIZES.fontSm,
     fontWeight: '600',
   },
-
-  emojiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: SIZES.md,
-    paddingBottom: SIZES.md,
-  },
-
-  emojiBtn: {
-    width: GRID_BTN_SIZE,
-    height: GRID_BTN_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: 4,
-    borderRadius: SIZES.radiusMd,
-  },
 });
+
+export default MessageInput;

@@ -7,7 +7,7 @@ import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
 import { Header } from '@components/common/Header';
 import { ProfileHeader } from '@components/profile/ProfileHeader';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
-import { postAPI } from '@services/api';
+import { postService } from '../../services/post.service';
 import { showAlert } from '@utils/helpers';
 import { Post } from '@types';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +26,7 @@ export default function ProfileScreen() {
     loadMore,
     refresh,
   } = useInfiniteScroll({
-    fetchFunc: (page, limit) => postAPI.getUserPosts(user?.id || '', page, limit),
+    fetchFunc: (page, limit) => postService.getUserPosts(user?.id || '', page, limit),
     limit: 30,
     onError: error => showAlert('Error', error.message),
   });

@@ -176,10 +176,10 @@ export const EMOJI: Record<EmojiCategoryKey, string[]> = {
 
 /** Gợi ý cấu hình mặc định cho Emoji Picker nội bộ của app */
 export const EMOJI_DEFAULTS = {
-  panelMaxHeight: 380,   // chiều cao modal/panel emoji
-  gridColumns: 8,        // số cột fallback grid
-  emojiSize: 28,         // kích thước emoji (Text) an toàn với Fabric
+  panelHeight: 250,     
+  gridColumns: 8,
+  emojiSize: 28,
   allowFontScaling: false as const,
 };
 
-export const EMOJI_RECENTS_MAX = 50; // nếu bạn muốn lưu emoji gần đây
+export const EMOJI_RECENTS_MAX = 50;

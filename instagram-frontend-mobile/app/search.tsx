@@ -19,7 +19,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useDebounce } from '../hooks/useDebounce';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
-import { postAPI, userAPI } from '../services/api';
+import { userAPI } from '../services/api';
+import { postService } from '../services/post.service';
 import { showAlert } from '../utils/helpers';
 import { UserProfile, Post } from '../types';
 import { Avatar } from '../components/common/Avatar';
@@ -111,10 +112,10 @@ export default function SearchScreen() {
       const usersResponse = await userAPI.searchUsers(query, 0, 5);
       
       // Search posts (with fallback)
-      const postsResponse = await postAPI.searchPosts(query, 0, 20);
+      const postsResponse = await postService.searchPosts(query, 0, 20);
       
       // Search reels (with fallback)
-      const reelsResponse = await postAPI.searchReels(query, 0, 20);
+      const reelsResponse = await postService.searchReels(query, 0, 20);
 
       setSearchResults({
         users: usersResponse.content || [],
@@ -133,7 +134,7 @@ export default function SearchScreen() {
         
         // Fallback to explore content
         try {
-          const exploreResponse = await postAPI.getExplorePosts(0, 20);
+          const exploreResponse = await postService.getExplorePosts(0, 20);
           setSearchResults({
             users: [],
             posts: exploreResponse.content || [],

@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
+import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
 import org.springframework.stereotype.Service;
@@ -45,15 +46,13 @@ public interface ConversationService {
      * @param creatorId the user ID who creates the group
      * @param participantIds list of participant user IDs
      * @param groupName the name of the group
-     * @param avatar the avatar URL of the group
      * @return Conversation entity
      */
     @Transactional
     Conversation createGroupConversation(
             String creatorId,
             List<String> participantIds,
-            String groupName,
-            String avatar
+            String groupName
     );
 
     /**
@@ -84,17 +83,6 @@ public interface ConversationService {
      */
     @Transactional
     void leaveGroup(String conversationId, String userId);
-
-    /**
-     * Update group information.
-     *
-     * @param conversationId the conversation ID
-     * @param name the new group name
-     * @param avatar the new avatar URL
-     * @return updated Conversation entity
-     */
-    @Transactional
-    Conversation updateGroupInfo(String conversationId, String name, String avatar);
 
     /**
      * Get all conversations for a user (excluding deleted conversations).
@@ -132,4 +120,12 @@ public interface ConversationService {
      */
     @Transactional(readOnly = true)
     Conversation getConversationById(String conversationId);
+
+    Conversation updateGroupInfo(
+            String conversationId,
+            String name,
+            String avatarFileId,
+            String updatedByUserId
+    );
+
 }

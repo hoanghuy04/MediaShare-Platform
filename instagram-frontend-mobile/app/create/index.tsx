@@ -1,14 +1,18 @@
 import { CreateTabbedFlow } from '@/components/create/CreateTabbedFlow';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 
 export default function CreatePage() {
   const router = useRouter();
-  
+
   const handlePostCreated = () => {
-    // Trigger refresh feed by navigating to feed and back
-    // This will cause the feed to refresh
-    console.log('Post created, should refresh feed');
+    router.replace('/(tabs)/feed');
   };
 
-  return <CreateTabbedFlow onPostCreated={handlePostCreated} />;
+  return (
+    <>
+      <StatusBar hidden />
+      <CreateTabbedFlow onPostCreated={handlePostCreated} />
+    </>
+  );
 }

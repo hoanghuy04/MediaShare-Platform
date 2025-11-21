@@ -1,5 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Video, ResizeMode } from 'expo-av';
@@ -20,7 +28,7 @@ interface PostCardProps {
   onShare?: (postId: string) => void;
   onBookmark?: (postId: string) => void;
   onFollow?: (userId: string) => void;
-  disableNavigation?: boolean; // Add prop to disable navigation
+  disableNavigation?: boolean;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
@@ -84,14 +92,14 @@ export const PostCard: React.FC<PostCardProps> = ({
       // Optimistic update
       const newLikedState = !isLiked;
       setIsLiked(newLikedState);
-      setLikesCount(prev => newLikedState ? prev + 1 : prev - 1);
-      
+      setLikesCount(prev => (newLikedState ? prev + 1 : prev - 1));
+
       // Call API
       await onLike?.(post.id);
     } catch (error) {
       // Revert on error
       setIsLiked(!isLiked);
-      setLikesCount(prev => isLiked ? prev + 1 : prev - 1);
+      setLikesCount(prev => (isLiked ? prev + 1 : prev - 1));
       console.error('Error liking post:', error);
     }
   };
@@ -113,7 +121,8 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
-  const isVideo = (media: any) => media?.type === 'video' || media?.type === 'VIDEO';
+  const isVideo = (media: any) =>
+    media?.type === 'video' || media?.type === 'VIDEO' || media?.url?.endsWith('.mp4');
 
   const renderMedia = (media: any, index: number) => {
     if (isVideo(media)) {
@@ -122,11 +131,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         // Fallback to image when video format is not supported or fails to load
         return (
           <View style={styles.mediaContainer}>
-            <Image
-              source={{ uri: media.url }}
-              style={styles.media}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: media.url }} style={styles.media} resizeMode="cover" />
             <View style={styles.videoErrorOverlay}>
               <Ionicons name="play-circle-outline" size={60} color="rgba(255,255,255,0.8)" />
               <Text style={styles.videoErrorText}>
@@ -148,7 +153,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             isLooping={false}
             isMuted={isMuted}
             onPlaybackStatusUpdate={handleVideoStatusUpdate}
-            onError={(error) => {
+            onError={error => {
               console.error('Video load error:', error);
               console.error('Video URL:', media.url);
               setVideoError(true);
@@ -160,15 +165,8 @@ export const PostCard: React.FC<PostCardProps> = ({
           />
           {/* Video Play/Pause Overlay */}
           <View style={styles.videoOverlay}>
-            <TouchableOpacity
-              style={styles.playButton}
-              onPress={handleVideoPress}
-            >
-              <Ionicons
-                name={isVideoPlaying ? 'pause' : 'play'}
-                size={40}
-                color="white"
-              />
+            <TouchableOpacity style={styles.playButton} onPress={handleVideoPress}>
+              <Ionicons name={isVideoPlaying ? 'pause' : 'play'} size={40} color="white" />
             </TouchableOpacity>
           </View>
           {/* Mute Button */}
@@ -178,11 +176,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <View style={styles.muteIconContainer}>
-              <Ionicons
-                name={isMuted ? 'volume-mute' : 'volume-high'}
-                size={16}
-                color="white"
-              />
+              <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={16} color="white" />
             </View>
           </TouchableOpacity>
         </View>
@@ -193,15 +187,11 @@ export const PostCard: React.FC<PostCardProps> = ({
           source={{ uri: media.url }}
           style={styles.media}
           resizeMode="cover"
-          onError={(error) => {
+          onError={error => {
             console.error('Image load error:', error.nativeEvent.error);
-            console.error('Image URL:', media.url);
-            console.error('Image URL type:', typeof media.url);
-            console.error('Image URL starts with http:', media.url?.startsWith('http'));
             setImageLoadError(true);
           }}
           onLoad={() => {
-            console.log('Image loaded successfully:', media.url);
             setImageLoadError(false);
           }}
         />
@@ -235,63 +225,63 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Media */}
       {post.media && post.media.length > 0 && (
-            <View style={styles.mediaContainer}>
-              {post.media.length === 1 ? (
-                // Single media
-        <TouchableOpacity onPress={handlePostPress} activeOpacity={0.95}>
-                  <View style={styles.singleMediaContainer}>
-                    {renderMedia(post.media[0], 0)}
-                    {imageLoadError && !isVideo(post.media[0]) && (
-                      <View style={styles.imageErrorContainer}>
-                        <Ionicons name="image-outline" size={48} color="#999" />
-                        <Text style={styles.imageErrorText}>Không thể tải hình ảnh</Text>
-                        <Text style={styles.imageErrorUrl}>{post.media[0].url}</Text>
-                      </View>
-                    )}
+        <View style={styles.mediaContainer}>
+          {post.media.length === 1 ? (
+            // Single media
+            <TouchableOpacity onPress={handlePostPress} activeOpacity={0.95}>
+              <View style={styles.singleMediaContainer}>
+                {renderMedia(post.media[0], 0)}
+                {imageLoadError && !isVideo(post.media[0]) && (
+                  <View style={styles.imageErrorContainer}>
+                    <Ionicons name="image-outline" size={48} color="#999" />
+                    <Text style={styles.imageErrorText}>Không thể tải hình ảnh</Text>
+                    <Text style={styles.imageErrorUrl}>{post.media[0].url}</Text>
                   </View>
-                </TouchableOpacity>
-              ) : (
-                // Multiple media carousel
-                <View style={styles.carouselContainer}>
-                  <ScrollView
-                    ref={scrollViewRef}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onScroll={handleMediaScroll}
-                    onScrollBeginDrag={handleScrollBeginDrag}
-                    onScrollEndDrag={handleScrollEndDrag}
-                    onMomentumScrollEnd={handleScrollEndDrag}
-                    scrollEventThrottle={16}
-                    style={styles.carouselScroll}
+                )}
+              </View>
+            </TouchableOpacity>
+          ) : (
+            // Multiple media carousel
+            <View style={styles.carouselContainer}>
+              <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleMediaScroll}
+                onScrollBeginDrag={handleScrollBeginDrag}
+                onScrollEndDrag={handleScrollEndDrag}
+                onMomentumScrollEnd={handleScrollEndDrag}
+                scrollEventThrottle={16}
+                style={styles.carouselScroll}
+              >
+                {post.media.map((media, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={handleCarouselPress}
+                    activeOpacity={0.95}
+                    style={styles.carouselItem}
                   >
-                    {post.media.map((media, index) => (
-              <TouchableOpacity
-                        key={index} 
-                        onPress={handleCarouselPress} 
-                        activeOpacity={0.95}
-                        style={styles.carouselItem}
-                      >
-                        {renderMedia(media, index)}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  
-                  {/* Media indicators */}
-                  <View style={styles.mediaIndicators}>
-                    {post.media.map((_, index) => (
-                      <View
-                        key={index}
-                        style={[
-                          styles.indicator,
-                          index === currentMediaIndex && styles.activeIndicator,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                </View>
-            )}
-          </View>
+                    {renderMedia(media, index)}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Media indicators */}
+              <View style={styles.mediaIndicators}>
+                {post.media.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.indicator,
+                      index === currentMediaIndex && styles.activeIndicator,
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
       )}
 
       {/* Actions Row */}
@@ -533,44 +523,44 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-      imageErrorUrl: {
-        color: '#ccc',
-        fontSize: 10,
-        marginTop: 4,
-        textAlign: 'center',
-      },
-      videoOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.3)',
-      },
-      playButton: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        justifyContent: 'center',
-        alignItems: 'center',
-      },
-      videoErrorOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      },
-      videoErrorText: {
-        color: 'white',
-        fontSize: 14,
-        marginTop: 8,
-        textAlign: 'center',
-      },
-    });
+  imageErrorUrl: {
+    color: '#ccc',
+    fontSize: 10,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  playButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoErrorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  videoErrorText: {
+    color: 'white',
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+});

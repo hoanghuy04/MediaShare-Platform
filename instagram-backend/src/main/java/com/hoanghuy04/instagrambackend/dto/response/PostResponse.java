@@ -1,6 +1,6 @@
 package com.hoanghuy04.instagrambackend.dto.response;
 
-import com.hoanghuy04.instagrambackend.entity.Media;
+import com.hoanghuy04.instagrambackend.enums.PostType;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -25,7 +25,9 @@ public class PostResponse {
     
     private String caption;
     
-    private List<Media> media;
+    private PostType type;
+    
+    private List<MediaFileResponse> media;
     
     private Integer likesCount;
     

@@ -1,41 +1,14 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FlashMode } from 'expo-camera';
 
 type TopOverlayProps = {
-  recordState: 'idle' | 'recording' | 'postrecord';
-  flash: FlashMode;
-  lastClipUri: string | null;
+  torch: boolean;
   onToggleFlash: () => void;
-  onAvatarPress: () => void;
   onClose?: () => void;
 };
 
-export function TopOverlay({
-  recordState,
-  flash,
-  lastClipUri,
-  onToggleFlash,
-  onAvatarPress,
-  onClose,
-}: TopOverlayProps) {
-  if (recordState === 'recording') {
-    return (
-      <View style={styles.topRowRecordingOnlyRight}>
-        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={styles.avatarBubble}>
-          <View style={styles.avatarBadge}>
-            <Text style={styles.avatarBadgeText}>2</Text>
-          </View>
-          <Image
-            source={lastClipUri ? { uri: lastClipUri } : { uri: 'https://placekitten.com/200/200' }}
-            style={styles.avatarInner}
-          />
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+export function TopOverlay({ torch, onToggleFlash, onClose }: TopOverlayProps) {
   return (
     <View style={styles.topRowWrapper}>
       <View style={styles.topLeft}>
@@ -46,27 +19,7 @@ export function TopOverlay({
 
       <View style={styles.topCenterGroup}>
         <TouchableOpacity onPress={onToggleFlash} style={styles.roundBubbleDark}>
-          <Ionicons name={flash === 'on' ? 'flash' : 'flash-off'} size={20} color="#fff" />
-        </TouchableOpacity>
-
-        <View style={styles.roundBubbleDark}>
-          <Text style={styles.topPillText}>1×</Text>
-        </View>
-
-        <View style={styles.roundBubbleDark}>
-          <Ionicons name="time-outline" size={20} color="#fff" />
-        </View>
-      </View>
-
-      <View style={styles.topRight}>
-        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8} style={styles.avatarBubble}>
-          <View style={styles.avatarBadge}>
-            <Text style={styles.avatarBadgeText}>2</Text>
-          </View>
-          <Image
-            source={lastClipUri ? { uri: lastClipUri } : { uri: 'https://placekitten.com/200/200' }}
-            style={styles.avatarInner}
-          />
+          <Ionicons name={torch ? 'flash' : 'flash-off'} size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>

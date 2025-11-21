@@ -22,20 +22,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Mapper(componentModel = "spring")
 @Slf4j
 public abstract class MessageMapper {
-    
-    @Autowired
-    protected UserRepository userRepository;
-    
-    @Autowired
-    protected MessageRepository messageRepository;
-    
+
     /**
      * Map User entity to UserSummaryDTO.
      *
      * @param user the User entity
      * @return UserSummaryDTO
      */
-    @Mapping(target = "avatar", expression = "java(getAvatar(user))")
     public abstract UserSummaryDTO toUserSummaryDTO(User user);
     
     /**
@@ -43,50 +36,20 @@ public abstract class MessageMapper {
      * Context parameter currentUserId is used to determine if message is deleted by the user.
      *
      * @param message the Message entity
-     * @param currentUserId the current user ID for context
      * @return MessageDTO
      */
-    @Mapping(target = "conversationId", expression = "java(getConversationId(message))")
-    @Mapping(target = "isDeleted", expression = "java(message.getDeletedBy().contains(currentUserId))")
+//    @Mapping(target = "isDeleted", expression = "java(message.getDeletedBy().contains(currentUserId))")
     @Mapping(target = "readBy", expression = "java(new java.util.ArrayList<>(message.getReadBy()))")
-    public abstract MessageDTO toMessageDTO(Message message, @Context String currentUserId);
+    public abstract MessageDTO toMessageDTO(Message message);
 
     /**
      * Map Conversation entity to ConversationDTO.
      * Context parameter currentUserId is used for context-specific operations.
      *
      * @param conversation the Conversation entity
-     * @param currentUserId the current user ID for context
      * @return ConversationDTO
      */
-    public abstract ConversationDTO toConversationDTO(Conversation conversation, @Context String currentUserId);
+    public abstract ConversationDTO toConversationDTO(Conversation conversation);
 
-    /**
-     * Helper method to extract avatar URL from User.
-     * Null-safe extraction of avatar from user profile.
-     *
-     * @param user the User entity
-     * @return avatar URL or null
-     */
-    protected String getAvatar(User user) {
-        if (user == null || user.getProfile() == null) {
-            return null;
-        }
-        return user.getProfile().getAvatar();
-    }
-    
-    /**
-     * Helper method to extract conversation ID from Message.
-     * Null-safe extraction of conversation ID.
-     *
-     * @param message the Message entity
-     * @return conversation ID or null
-     */
-    protected String getConversationId(Message message) {
-        if (message == null || message.getConversation() == null) {
-            return null;
-        }
-        return message.getConversation().getId();
-    }
 }
 
