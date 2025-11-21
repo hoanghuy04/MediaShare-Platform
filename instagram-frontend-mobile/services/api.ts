@@ -247,6 +247,11 @@ export const messageAPI = {
     });
     return response.data.data; // Backend returns ApiResponse<PageResponse<InboxItemDTO>>
   },
+  resolveDirectByPeer: async (peerId: string): Promise<string | null> => {
+    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+    const res = await axiosInstance.get(`/api/conversations/direct/by-user/${peerId}`, { params: { userId }});
+    return res.data?.data ?? null; // String hoặc null
+  },
 
   // Get conversation details
   getConversation: async (conversationId: string): Promise<Conversation> => {
@@ -340,20 +345,20 @@ export const messageAPI = {
 
   // Update group info
   updateConversation: async (
-    conversationId: string,
-    data: {
-      name?: string;
-      avatar?: string; // fileId hoặc '__REMOVE__'
-    }
-  ): Promise<Conversation> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    const response = await axiosInstance.put(
-      API_ENDPOINTS.UPDATE_CONVERSATION(conversationId),
-      data,
-      { params: { userId } }
-    );
-    return response.data.data;
-  },
+  conversationId: string,
+  data: {
+    name?: string;
+    avatar?: string; // fileId hoặc '__REMOVE__'
+  }
+): Promise<Conversation> => {
+  const userId = axiosInstance.defaults.headers.common['X-User-ID'];
+  const response = await axiosInstance.put(
+    API_ENDPOINTS.UPDATE_CONVERSATION(conversationId),
+    data,
+    { params: { userId } }
+  );
+  return response.data.data;
+},
 
   // Add members to group
   addGroupMembers: async (conversationId: string, addedBy: string, userIds: string[]): Promise<void> => {

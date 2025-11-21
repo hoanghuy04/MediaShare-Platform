@@ -263,6 +263,7 @@ export default function ConversationScreen() {
       });
 
       if (isNewConversation && packet.conversationId) transitionToConversation(packet.conversationId);
+      
       const peer = otherUser?.id || peerUserId || routeConversationId;
       if (!isNewConversation && peer && packet.senderId === peer && packet.id && packet.senderId !== user?.id) {
         sendReadReceipt(packet.id, packet.senderId);
@@ -540,7 +541,7 @@ export default function ConversationScreen() {
     >
       {header}
 
-      {isNewConversation && pendingBanner}
+      {wantsPendingRoute && pendingBanner}
       {messages.length === 0 && otherUser && !isGroupConversation && contactIntro}
       {mediaStrip}
       {messages.length > 0 && dateSeparator}
@@ -572,7 +573,7 @@ export default function ConversationScreen() {
         onSend={handleSendMessage}
         onTyping={typingChannelId ? () => sendTyping(typingChannelId) : undefined}
         onStopTyping={typingChannelId ? () => sendStopTyping(typingChannelId) : undefined}
-        placeholder={isNewConversation ? 'Tin nhắn sẽ được gửi dưới dạng yêu cầu' : 'Nhắn tin...'}
+        placeholder={'Nhắn tin...'}
         themeColor={chatPalette.bubbleOut}
       />
 

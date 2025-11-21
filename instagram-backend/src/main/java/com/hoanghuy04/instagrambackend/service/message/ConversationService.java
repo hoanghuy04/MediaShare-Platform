@@ -128,4 +128,6 @@ public interface ConversationService {
             String updatedByUserId
     );
 
+
+    String directKeyOf(String u1, String u2);
 }
