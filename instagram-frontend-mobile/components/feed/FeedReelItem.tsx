@@ -172,7 +172,7 @@ export const FeedReelItem = ({ post, isVisible }: { post: PostResponse; isVisibl
       </View>
 
       <View style={styles.infoSection}>
-        <Text style={styles.likesText}>{post.likesCount.toLocaleString()} lượt thích</Text>
+        <Text style={styles.likesText}>{post.totalLike.toLocaleString()} lượt thích</Text>
         <View style={styles.captionContainer}>{renderCaption()}</View>
         <Text style={styles.dateText}>6 ngày trước</Text>
       </View>

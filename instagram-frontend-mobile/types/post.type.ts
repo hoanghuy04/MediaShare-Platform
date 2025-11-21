@@ -16,11 +16,22 @@ export interface PostResponse {
   caption: string | null;
   type: PostType;
   media: MediaFileResponse[];
-  likesCount: number;
-  commentsCount: number;
+  totalLike: number;
+  totalComment: number;
   tags: string[];
   location: string | null;
   isLikedByCurrentUser: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PostLikeToggleResponse {
+  postId: string;
+  liked: boolean;
+}
+
+export interface PostLikeUserResponse {
+  id: string;
+  username: string;
+  avatarUrl: string;
 }

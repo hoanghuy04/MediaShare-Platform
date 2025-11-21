@@ -46,7 +46,7 @@ export const API_ENDPOINTS = {
   CREATE_POST: '/api/posts',
   UPDATE_POST: (id: string) => `/api/posts/${id}`,
   DELETE_POST: (id: string) => `/api/posts/${id}`,
-  TOGGLE_LIKE_POST: (id: string) => `/api/posts/${id}/like`,
+  TOGGLE_LIKE_POST: (id: string) => `api/posts/${id}/like`,
   USER_POSTS: (userId: string) => `/api/posts/user/${userId}`,
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',

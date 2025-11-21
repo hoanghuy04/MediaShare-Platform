@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.entity;
 
+import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -7,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.DocumentReference;
 
@@ -24,31 +26,23 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "likes")
-@CompoundIndex(name = "user_post_idx", def = "{'user': 1, 'post': 1}", unique = true)
+@CompoundIndex(name = "user_target_idx", def = "{'user': 1, 'targetType': 1, 'targetId': 1}", unique = true)
 public class Like {
-    
-    /**
-     * Unique identifier for the like
-     */
+
     @Id
     private String id;
-    
-    /**
-     * Reference to the user who liked the post
-     */
+
     @DocumentReference
     private User user;
-    
-    /**
-     * Reference to the post that was liked
-     */
-    @DocumentReference
-    private Post post;
-    
-    /**
-     * Timestamp when the like was created
-     */
+
+    @Indexed
+    private LikeTargetType targetType;
+
+    @Indexed
+    private String targetId;
+
     @CreatedDate
     private LocalDateTime createdAt;
+
 }
 

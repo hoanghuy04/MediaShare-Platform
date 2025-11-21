@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.service;
+package com.hoanghuy04.instagrambackend.service.post;
 
 import com.hoanghuy04.instagrambackend.dto.request.CreatePostRequest;
 import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
@@ -12,6 +12,7 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
+import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PostService {
+public class PostServiceImpl implements PostService {
 
     private final PostRepository postRepository;
     private final UserService userService;
@@ -50,6 +50,7 @@ public class PostService {
      * @return PostResponse
      */
     @Transactional
+    @Override
     public PostResponse createPost(CreatePostRequest request) {
         User author = securityUtil.getCurrentUser();
 
@@ -60,8 +61,8 @@ public class PostService {
                 .mediaFileIds(request.getMediaFileIds())
                 .tags(request.getTags())
                 .location(request.getLocation())
-                .likes(new ArrayList<>())
-                .comments(new ArrayList<>())
+                .totalLikes(0)
+                .totalComments(0)
                 .build();
 
         post = postRepository.save(post);
@@ -77,6 +78,7 @@ public class PostService {
      * @return PostResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PostResponse getPost(String postId) {
         log.debug("Getting post by ID: {}", postId);
 
@@ -93,6 +95,7 @@ public class PostService {
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<PostResponse> getAllPosts(Pageable pageable) {
         log.debug("Getting all posts");
 
@@ -110,6 +113,7 @@ public class PostService {
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable) {
         log.debug("Getting posts for user: {}", userId);
 
@@ -126,6 +130,7 @@ public class PostService {
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<PostResponse> getFeedPosts(Pageable pageable) {
         String userId = securityUtil.getCurrentUserId();
         log.debug("Getting feed posts for user: {}", userId);
@@ -149,6 +154,7 @@ public class PostService {
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
 
         Page<PostResponse> page = postRepository.findByType(type, pageable)
@@ -164,6 +170,7 @@ public class PostService {
      * @return PageResponse of PostResponse
      */
     @Transactional(readOnly = true)
+    @Override
     public PageResponse<PostResponse> getExplore(Pageable pageable) {
         log.debug("Getting explore posts");
 
@@ -181,6 +188,7 @@ public class PostService {
      * @return updated PostResponse
      */
     @Transactional
+    @Override
     public PostResponse updatePost(String postId, CreatePostRequest request) {
         String userId = securityUtil.getCurrentUserId();
         log.info("Updating post: {}", postId);
@@ -211,6 +219,7 @@ public class PostService {
      * @param postId the post ID
      */
     @Transactional
+    @Override
     public void deletePost(String postId) {
         String userId = securityUtil.getCurrentUserId();
         log.info("Deleting post: {}", postId);
@@ -234,28 +243,14 @@ public class PostService {
      * @return Post entity
      */
     @Transactional(readOnly = true)
+    @Override
     public Post getPostEntityById(String postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
     }
 
-
-    /**
-     * Convert Post entity to PostResponse DTO with media URLs.
-     *
-     * @param post the Post entity
-     * @return PostResponse
-     */
     private PostResponse convertToPostResponse(Post post) {
         UserResponse authorResponse = userService.convertToUserResponse(post.getAuthor());
-
-        String currentUserId = securityUtil.getCurrentUserId();
-
-        boolean isLikedByCurrentUser = false;
-        if (currentUserId != null && post.getLikes() != null) {
-            isLikedByCurrentUser = post.getLikes().contains(currentUserId);
-        }
-
         List<MediaFileResponse> mediaWithUrls = fileService.getMediaFileResponses(post.getMediaFileIds());
 
         return PostResponse.builder()
@@ -264,14 +259,14 @@ public class PostService {
                 .caption(post.getCaption())
                 .type(post.getType())
                 .media(mediaWithUrls)
-                .likesCount(post.getLikes() != null ? post.getLikes().size() : 0)
-                .commentsCount(post.getComments() != null ? post.getComments().size() : 0)
+                .totalComment(post.getTotalComments())
+                .totalLike(post.getTotalLikes())
                 .tags(post.getTags())
                 .location(post.getLocation())
-                .isLikedByCurrentUser(isLikedByCurrentUser)
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();
     }
+
 }
 

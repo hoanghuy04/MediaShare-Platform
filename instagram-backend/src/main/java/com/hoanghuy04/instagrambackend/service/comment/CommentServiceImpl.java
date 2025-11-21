@@ -4,22 +4,19 @@ import com.hoanghuy04.instagrambackend.dto.request.CreateCommentRequest;
 import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Comment;
-import com.hoanghuy04.instagrambackend.entity.Like;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.repository.CommentRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
-import com.hoanghuy04.instagrambackend.service.PostService;
+import com.hoanghuy04.instagrambackend.service.post.PostServiceImpl;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
-import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,7 +37,7 @@ public class CommentServiceImpl implements CommentService {
     
     private final CommentRepository commentRepository;
     private final UserService userService;
-    private final PostService postService;
+    private final PostServiceImpl postService;
     private final PostRepository postRepository;
 
     private String getCurrentUsername() {
@@ -64,7 +61,7 @@ public class CommentServiceImpl implements CommentService {
         
         comment = commentRepository.save(comment);
         
-        post.getComments().add(comment.getId());
+//        post.getComments().add(comment.getId());
         postRepository.save(post);
         
         log.info("Comment created successfully: {}", comment.getId());
@@ -157,7 +154,7 @@ public class CommentServiceImpl implements CommentService {
                 .post(parentComment.getPost())
                 .author(author)
                 .text(request.getText())
-                .parentCommentId(parentCommentId)
+//                .parentCommentId(parentCommentId)
                 .mention(request.getMention())
                 .build();
 
@@ -171,27 +168,27 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     @Override
     public boolean toggleLikeComment(String commentId) {
-        String username = getCurrentUsername();
-        User user = userService.getUserByName(username);
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
-
-        var existing = comment
-                .getLikes()
-                .stream()
-                .filter(x -> x.equals(user.getId()))
-                .toList();
-
-        if (!existing.isEmpty()) {
-            comment.setLikes(comment.getLikes().stream()
-                    .filter(x -> x != user.getId())
-                    .toList());
-            commentRepository.save(comment);
-            return false;
-        }
-
-        comment.getLikes().add(user.getId());
-        commentRepository.save(comment);
+//        String username = getCurrentUsername();
+//        User user = userService.getUserByName(username);
+//        Comment comment = commentRepository.findById(commentId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+//
+//        var existing = comment
+////                .getLikes()
+//                .stream()
+//                .filter(x -> x.equals(user.getId()))
+//                .toList();
+//
+//        if (!existing.isEmpty()) {
+//            comment.setLikes(comment.getLikes().stream()
+//                    .filter(x -> x != user.getId())
+//                    .toList());
+//            commentRepository.save(comment);
+//            return false;
+//        }
+//
+//        comment.getLikes().add(user.getId());
+//        commentRepository.save(comment);
 
         return true;
     }
@@ -200,9 +197,9 @@ public class CommentServiceImpl implements CommentService {
         String username = getCurrentUsername();
         User user = userService.getUserByName(username);
         boolean isLikedByCurrentUser = false;
-        if (user != null && comment.getLikes() != null) {
-            isLikedByCurrentUser = comment.getLikes().contains(user.getId());
-        }
+//        if (user != null && comment.getLikes() != null) {
+//            isLikedByCurrentUser = comment.getLikes().contains(user.getId());
+//        }
         long repliesCountLong = commentRepository.countByParentCommentId(comment.getId());
         int repliesCount = (int) repliesCountLong;
         return CommentResponse.builder()
@@ -210,7 +207,7 @@ public class CommentServiceImpl implements CommentService {
                 .postId(comment.getPost().getId())
                 .author(userService.convertToUserResponse(comment.getAuthor()))
                 .text(comment.getText())
-                .likesCount(comment.getLikes() != null ? comment.getLikes().size() : 0)
+//                .likesCount(comment.getLikes() != null ? comment.getLikes().size() : 0)
                 .repliesCount(repliesCount)
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())

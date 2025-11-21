@@ -28,7 +28,7 @@ public class InitApp implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
-    private final LikeRepository likeRepository;
+//    private final LikeRepository likeRepository;
     private final FollowRepository followRepository;
     private final NotificationRepository notificationRepository;
     private final PasswordEncoder passwordEncoder;
@@ -66,7 +66,7 @@ public class InitApp implements CommandLineRunner {
         log.info("Clearing existing data...");
         
         notificationRepository.deleteAll();
-        likeRepository.deleteAll();
+//        likeRepository.deleteAll();
         commentRepository.deleteAll();
         followRepository.deleteAll();
         postRepository.deleteAll();

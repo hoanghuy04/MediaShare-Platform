@@ -21,6 +21,7 @@ const AnimatedSlider = Animated.createAnimatedComponent(Slider);
 interface VideoComponentProps {
   data: PostResponse;
   isVisible: boolean;
+  onDoubleTap?: (coords: { x: number; y: number }) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -30,12 +31,13 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
+const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) => {
   const [progress, setProgress] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false); // State mute của user
   const [showMuteIcon, setShowMuteIcon] = useState(false);
+  const singleTapTimer = useRef<any>(null);
 
   const muteIconOpacity = useRef(new Animated.Value(0)).current;
   const animatedProgress = useRef(new Animated.Value(0)).current;
@@ -124,17 +126,31 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
       player.currentTime = newTime;
     }
     setIsSeeking(false);
-    // Video sẽ tự play lại nhờ useEffect
+  };
+
+  const handlePress = (event: any) => {
+    const { locationX, locationY } = event.nativeEvent;
+
+    if (singleTapTimer.current) {
+      clearTimeout(singleTapTimer.current);
+      singleTapTimer.current = null;
+      if (onDoubleTap) {
+        onDoubleTap({ x: locationX, y: locationY });
+      }
+    } else {
+      singleTapTimer.current = setTimeout(() => {
+        toggleMute();
+        singleTapTimer.current = null;
+      }, 300);
+    }
   };
 
   const toggleMute = () => {
     setIsMuted(prev => !prev);
     setShowMuteIcon(true);
 
-    // Reset animation
     muteIconOpacity.setValue(1);
 
-    // Fade out icon
     Animated.timing(muteIconOpacity, {
       toValue: 0,
       duration: 1000,
@@ -155,8 +171,7 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
 
   return (
     <>
-      <Pressable onPress={toggleMute} style={styles.container}>
-        {/* VIDEO CHÍNH */}
+      <Pressable onPress={handlePress} style={styles.container}>
         <VideoView
           player={player}
           style={[styles.videoBase, { height: '100%' }]}
@@ -164,7 +179,6 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
           nativeControls={false}
         />
 
-        {/* MUTE ICON OVERLAY */}
         {showMuteIcon && (
           <View style={styles.muteIconContainer}>
             <Animated.View style={{ opacity: muteIconOpacity, padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 50 }}>
@@ -177,7 +191,6 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
           </View>
         )}
 
-        {/* GRADIENT DƯỚI CHÂN VIDEO */}
         <LinearGradient
           colors={['#00000000', '#00000040', '#00000080']}
           style={styles.controlsContainer}
@@ -185,7 +198,6 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
         />
       </Pressable>
 
-      {/* PREVIEW KHI ĐANG KÉO */}
       {isSeeking && (
         <View style={[styles.previewContainer, { left: leftPos }]}>
           <View style={styles.previewVideoWrapper}>
@@ -195,7 +207,6 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
         </View>
       )}
 
-      {/* SLIDER TUA VIDEO */}
       <View style={styles.sliderContainer}>
         <AnimatedSlider
           style={{ width: '100%', height: 40 }}

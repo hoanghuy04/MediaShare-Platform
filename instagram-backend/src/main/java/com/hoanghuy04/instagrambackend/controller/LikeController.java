@@ -23,23 +23,23 @@ public class LikeController {
 
     private final LikeService likeService;
 
-    @PostMapping("/posts/{postId}/like")
-    public ResponseEntity<ApiResponse<Boolean>> toggleLikePost(@PathVariable String postId) {
-
-        boolean isLiked = likeService.toggleLikePost(postId);
-
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        isLiked ? "Liked" : "Unliked",
-                        isLiked
-                )
-        );
-    }
-
-    @GetMapping("/posts/{postId}/likes")
-    @Operation(summary = "Get post likes")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getPostLikes(@PathVariable String postId) {
-        List<UserResponse> response = likeService.getPostLikes(postId);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
+//    @PostMapping("/posts/{postId}/like")
+//    public ResponseEntity<ApiResponse<Boolean>> toggleLikePost(@PathVariable String postId) {
+//
+//        boolean isLiked = likeService.toggleLikePost(postId);
+//
+//        return ResponseEntity.ok(
+//                ApiResponse.success(
+//                        isLiked ? "Liked" : "Unliked",
+//                        isLiked
+//                )
+//        );
+//    }
+//
+//    @GetMapping("/posts/{postId}/likes")
+//    @Operation(summary = "Get post likes")
+//    public ResponseEntity<ApiResponse<List<UserResponse>>> getPostLikes(@PathVariable String postId) {
+//        List<UserResponse> response = likeService.getPostLikes(postId);
+//        return ResponseEntity.ok(ApiResponse.success(response));
+//    }
 }

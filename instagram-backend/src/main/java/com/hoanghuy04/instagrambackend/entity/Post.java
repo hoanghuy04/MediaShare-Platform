@@ -29,31 +29,31 @@ import java.util.List;
 @AllArgsConstructor
 @Document(collection = "posts")
 public class Post {
-    
+
     @Id
     private String id;
-    
+
     @DocumentReference
     @Indexed
     private User author;
 
     private String caption;
 
-    private PostType type;
+    private PostType type; // FEED | REEL | STORY
+
+    private String location;
 
     @Builder.Default
     private List<String> mediaFileIds = new ArrayList<>();
 
     @Builder.Default
-    private List<String> likes = new ArrayList<>();
-
-    @Builder.Default
-    private List<String> comments = new ArrayList<>();
-
-    @Builder.Default
     private List<String> tags = new ArrayList<>();
 
-    private String location;
+    @Builder.Default
+    private long totalLikes = 0;
+
+    @Builder.Default
+    private long totalComments = 0;
 
     @CreatedDate
     @Indexed

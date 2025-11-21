@@ -2,7 +2,7 @@ import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
 import { PaginatedResponse, Post } from '../types';
-import { CreatePostRequest, PostResponse } from '../types/post.type';
+import { CreatePostRequest, PostResponse, PostLikeToggleResponse } from '../types/post.type';
 
 export const postService = {
   getFeed: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
@@ -78,16 +78,6 @@ export const postService = {
 
   deletePost: async (postId: string): Promise<void> => {
     await axiosInstance.delete(API_ENDPOINTS.DELETE_POST(postId));
-  },
-
-  toggleLikePost: async (postId: string): Promise<boolean> => {
-    try {
-      const response = await axiosInstance.post(API_ENDPOINTS.TOGGLE_LIKE_POST(postId));
-      return response.data.data; // Returns true if liked, false if unliked
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to toggle like';
-      throw new Error(errorMsg);
-    }
   },
 
   searchPosts: async (query: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {

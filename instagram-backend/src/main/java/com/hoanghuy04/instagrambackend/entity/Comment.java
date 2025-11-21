@@ -33,22 +33,20 @@ public class Comment {
     private String id;
 
     @DocumentReference
-    @Indexed
     private Post post;
 
     @DocumentReference
-    @Indexed
     private User author;
 
     private String text;
 
-    @Indexed
-    private String parentCommentId;
-
-    private String mention;
+    @DocumentReference
+    private Comment parentComment;
 
     @Builder.Default
-    private List<String> likes = new ArrayList<>();
+    private long totalLikes = 0;
+
+    private String mention;
 
     @CreatedDate
     private LocalDateTime createdAt;

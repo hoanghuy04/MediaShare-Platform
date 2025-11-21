@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * DTO for post response data.
- * 
+ *
  * @author Instagram Backend Team
  * @version 1.0.0
  */
@@ -18,29 +18,29 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PostResponse {
-    
+
     private String id;
-    
+
     private UserResponse author;
-    
+
     private String caption;
-    
+
     private PostType type;
-    
+
     private List<MediaFileResponse> media;
-    
-    private Integer likesCount;
-    
-    private Integer commentsCount;
-    
+
+    private Long totalLike;
+
+    private Long totalComment;
+
     private List<String> tags;
-    
+
     private String location;
-    
+
     private boolean isLikedByCurrentUser;
-    
+
     private LocalDateTime createdAt;
-    
+
     private LocalDateTime updatedAt;
 }
 
