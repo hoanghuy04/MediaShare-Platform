@@ -86,7 +86,11 @@ export const FeedList: React.FC<FeedListProps> = ({
     return (
       <>
         {isReel ? (
-          <FeedReelItem post={item} isVisible={isVisible} />
+          <FeedReelItem 
+            post={item} 
+            isVisible={isVisible} 
+            onLike={onLike}
+          />
         ) : (
           <PostCard
             post={item}

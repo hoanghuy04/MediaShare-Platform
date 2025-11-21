@@ -142,32 +142,13 @@ public class PostServiceImpl implements PostService {
         String userId = securityUtil.getCurrentUserId();
         log.debug("Getting feed posts for user: {}", userId);
 
-        User user = userService.getUserEntityById(userId);
+        User currentUser = securityUtil.getCurrentUser();
+        Page<Post> postPage = postRepository.findAll(pageable);
 
-        //get All posts and prioritize posts from followed users
-        List<String> followingIds = followRepository.findByFollower(user).stream()
-                .map(follow -> follow.getFollowing().getId())
-                .collect(Collectors.toList());
-        followingIds.add(userId);
-        Page<PostResponse> page = postRepository.findAll(pageable)
-                .map(this::convertToPostResponse);
-        return PageResponse.of(page);
+        return getPostResponsePageResponse(currentUser, postPage);
     }
 
-    /**
-     * Get feed posts for user (posts from followed users).
-     *
-     * @param pageable pagination information
-     * @return PageResponse of PostResponse
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
-
-        Page<Post> postPage = postRepository.findByType(type, pageable);
-
-        User currentUser = securityUtil.getCurrentUser();
-
+    private PageResponse<PostResponse> getPostResponsePageResponse(User currentUser, Page<Post> postPage) {
         Set<String> likedPostIds;
 
         if (currentUser != null && !postPage.isEmpty()) {
@@ -198,6 +179,23 @@ public class PostServiceImpl implements PostService {
         });
 
         return PageResponse.of(dtoPage);
+    }
+
+    /**
+     * Get feed posts for user (posts from followed users).
+     *
+     * @param pageable pagination information
+     * @return PageResponse of PostResponse
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
+
+        Page<Post> postPage = postRepository.findByType(type, pageable);
+
+        User currentUser = securityUtil.getCurrentUser();
+
+        return getPostResponsePageResponse(currentUser, postPage);
     }
 
     /**
