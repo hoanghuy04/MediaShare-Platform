@@ -135,10 +135,12 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
 
 const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
   const [isLiked, setIsLiked] = useState(data.likedByCurrentUser);
+  const [totalLike, setTotalLike] = useState(data.totalLike);
   const [currentHeart, setCurrentHeart] = useState<HeartItem | null>(null);
 
   const handleLike = async (coords?: { x: number; y: number }) => {
     const previousLikedState = isLiked;
+    const previousTotalLike = totalLike;
 
     if (coords) {
       const x = coords.x - 50;
@@ -147,16 +149,19 @@ const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
 
       if (!previousLikedState) {
         setIsLiked(true);
+        setTotalLike(prev => prev + 1);
         try {
           await postLikeService.toggleLikePost(data.id);
         } catch (error) {
           console.error('Failed to like post:', error);
           setIsLiked(false);
+          setTotalLike(previousTotalLike);
         }
       }
     } else {
       const newLikedState = !isLiked;
       setIsLiked(newLikedState);
+      setTotalLike(prev => newLikedState ? prev + 1 : prev - 1);
 
       if (newLikedState) {
         setCurrentHeart({ id: Date.now() });
@@ -167,6 +172,7 @@ const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
       } catch (error) {
         console.error('Failed to toggle like:', error);
         setIsLiked(previousLikedState);
+        setTotalLike(previousTotalLike);
       }
     }
   };
@@ -184,7 +190,7 @@ const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
         />
       )}
 
-      <FeedSideBar data={data} isLiked={isLiked} onLike={() => handleLike()} />
+      <FeedSideBar data={{ ...data, totalLike }} isLiked={isLiked} onLike={() => handleLike()} />
       <FeedFooter data={data} />
     </View>
   );
