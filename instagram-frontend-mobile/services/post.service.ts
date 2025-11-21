@@ -35,7 +35,6 @@ export const postService = {
     });
     const mappedContent = response.data.data.content.map((post: any) => ({
       ...post,
-      isLikedByCurrentUser: post.likedByCurrentUser,
     }));
     return {
       ...response.data.data,

@@ -9,7 +9,7 @@ export const postLikeService = {
             console.log('[postLikeService] Toggling like for post:', postId);
             const response = await axiosInstance.post(API_ENDPOINTS.TOGGLE_LIKE_POST(postId));
             console.log('[postLikeService] Response:', response.data);
-            return response.data;
+            return response.data.data;
         } catch (error: any) {
             console.error('[postLikeService] Error details:', {
                 postId,

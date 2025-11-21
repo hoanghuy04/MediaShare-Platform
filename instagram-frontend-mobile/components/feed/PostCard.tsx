@@ -96,15 +96,12 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const handleLike = async () => {
     try {
-      // Optimistic update
       const newLikedState = !isLiked;
       setIsLiked(newLikedState);
       setLikesCount(prev => (newLikedState ? prev + 1 : prev - 1));
 
-      // Call API
       await onLike?.(post.id);
     } catch (error) {
-      // Revert on error
       setIsLiked(!isLiked);
       setLikesCount(prev => (isLiked ? prev + 1 : prev - 1));
       console.error('Error liking post:', error);

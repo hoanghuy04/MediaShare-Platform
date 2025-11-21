@@ -16,6 +16,7 @@ import { UploadProgressWidget } from '@components/feed/UploadProgressWidget';
 
 import { userAPI } from '@services/api';
 import { postService } from '../../services/post.service';
+import { postLikeService } from '../../services/post-like.service';
 import { showAlert } from '@utils/helpers';
 
 export default function FeedScreen() {
@@ -89,11 +90,9 @@ export default function FeedScreen() {
     }
   }, []);
 
-  // Reload feed when returning from post detail
   useFocusEffect(
     React.useCallback(() => {
       if (hasInitialized.current) {
-        // Silent refresh to sync like/comment changes
         refresh();
       }
     }, [])
@@ -107,38 +106,46 @@ export default function FeedScreen() {
   const handleUploadFinished = () => refresh();
 
   const handleLike = async (id: string) => {
-    try {
-      if (!user?.id) {
-        showAlert('Error', 'Please login to like posts');
-        return;
-      }
-      const post = posts.find(p => p.id === id);
-      const wasLiked = post?.isLikedByCurrentUser;
-      
-      updateItem(id, (item) => ({
-        ...item,
-        isLikedByCurrentUser: !item.isLikedByCurrentUser,
-        likesCount: item.isLikedByCurrentUser ? item.likesCount - 1 : item.likesCount + 1,
-      }));
-
-      const isLiked = await postService.toggleLikePost(id);
-      
-      updateItem(id, (item) => ({
-        ...item,
-        isLikedByCurrentUser: isLiked,
-        likesCount: wasLiked && !isLiked ? item.likesCount : !wasLiked && isLiked ? item.likesCount : item.likesCount,
-      }));
-    } catch (e: any) {
-      console.error('Error liking post:', e);
-      // Revert on error
-      updateItem(id, (item) => ({
-        ...item,
-        isLikedByCurrentUser: !item.isLikedByCurrentUser,
-        likesCount: item.isLikedByCurrentUser ? item.likesCount - 1 : item.likesCount + 1,
-      }));
-      showAlert('Error', e.message);
+  try {
+    if (!user?.id) {
+      showAlert('Error', 'Please login to like posts');
+      return;
     }
-  };
+    
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+    
+    const wasLiked = post.isLikedByCurrentUser;
+    
+    // Optimistic update
+    updateItem(id, (item) => ({
+      ...item,
+      isLikedByCurrentUser: !wasLiked,
+      likesCount: wasLiked ? item.likesCount - 1 : item.likesCount + 1,
+    }));
+
+    // Call API
+    const response = await postLikeService.toggleLikePost(id);
+    
+    // Sync with backend - trust backend response completely
+    updateItem(id, (item) => ({
+      ...item,
+      isLikedByCurrentUser: response.liked,
+    }));
+  } catch (e: any) {
+    console.error('Error liking post:', e);
+    // Rollback on error
+    const post = posts.find(p => p.id === id);
+    if (post) {
+      updateItem(id, (item) => ({
+        ...item,
+        isLikedByCurrentUser: post.isLikedByCurrentUser,
+        likesCount: post.likesCount,
+      }));
+    }
+    showAlert('Error', e.message);
+  }
+};
   const handleComment = (id: string) => router.push(`/posts/${id}`);
   const handleShare = () => showAlert('Share', 'Coming soon');
   const handleBookmark = () => showAlert('Saved', 'Saved to collection');
