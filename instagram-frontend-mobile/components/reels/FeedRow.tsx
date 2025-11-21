@@ -134,7 +134,7 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
 };
 
 const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
-  const [isLiked, setIsLiked] = useState(data.isLikedByCurrentUser);
+  const [isLiked, setIsLiked] = useState(data.likedByCurrentUser);
   const [currentHeart, setCurrentHeart] = useState<HeartItem | null>(null);
 
   const handleLike = async (coords?: { x: number; y: number }) => {

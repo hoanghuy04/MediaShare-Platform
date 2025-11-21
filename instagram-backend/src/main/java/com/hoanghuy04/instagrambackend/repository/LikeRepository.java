@@ -25,5 +25,11 @@ public interface LikeRepository extends MongoRepository<Like, String> {
             String targetId,
             Pageable pageable
     );
+
+    List<Like> findByUserAndTargetTypeAndTargetIdIn(
+            User user,
+            LikeTargetType targetType,
+            List<String> targetIds
+    );
 }
 

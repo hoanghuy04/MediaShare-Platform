@@ -25,7 +25,7 @@ export const postService = {
     const response = await axiosInstance.get<PaginatedResponse<PostResponse>>(API_ENDPOINTS.REELS, {
       params: { page, limit },
     });
-    console.log('Reels response data:', response.data);
+    console.log('Reel nè má', response.data);
     return response.data;
   },
 
