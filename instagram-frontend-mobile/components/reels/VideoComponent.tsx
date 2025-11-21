@@ -1,11 +1,22 @@
-import { StyleSheet, useWindowDimensions, View, Text } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  Text,
+  Animated,
+  Easing,
+  Pressable,
+} from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
+import { Ionicons } from '@expo/vector-icons';
 import { MediaCategory } from '../../types/enum.type';
 import { PostResponse } from '../../types/post.type';
+
+const AnimatedSlider = Animated.createAnimatedComponent(Slider);
 
 interface VideoComponentProps {
   data: PostResponse;
@@ -23,6 +34,11 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
   const [progress, setProgress] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
+  const [isMuted, setIsMuted] = useState(false); // State mute của user
+  const [showMuteIcon, setShowMuteIcon] = useState(false);
+
+  const muteIconOpacity = useRef(new Animated.Value(0)).current;
+  const animatedProgress = useRef(new Animated.Value(0)).current;
 
   const videoFile = data.media.find(m => m.category === MediaCategory.VIDEO);
   const videoUrl = videoFile ? videoFile.url : '';
@@ -34,8 +50,8 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
 
   const player = useVideoPlayer(videoUrl, p => {
     p.loop = true;
-    p.timeUpdateEventInterval = 0.5;
-    p.muted = !isVisible;
+    p.timeUpdateEventInterval = 0.1;
+    p.muted = !isVisible || isMuted;
 
     if (isVisible) {
       p.play();
@@ -44,44 +60,61 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
     }
   });
 
+  // handle visible / seeking / mute
   useEffect(() => {
     if (!player) return;
 
     if (isVisible && !isSeeking) {
       player.play();
-      player.muted = false;
+      player.muted = isMuted;
     } else {
       player.pause();
-      if (!isVisible) {
-        player.muted = true;
-      }
+      if (!isVisible) player.muted = true;
     }
-  }, [isVisible, isSeeking, player]);
+  }, [isVisible, isSeeking, player, isMuted]);
 
+  // update progress khi video chạy
   useEffect(() => {
     if (!player) return;
 
     const subscription = player.addListener('timeUpdate', () => {
       if (!isSeeking && player.duration > 0) {
         const ratio = player.currentTime / player.duration;
-        setProgress(ratio);
+
+        setProgress(prev => {
+          if (Math.abs(ratio - prev) < 0.005) return prev;
+          return ratio;
+        });
+
+        Animated.timing(animatedProgress, {
+          toValue: ratio,
+          duration: 100,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        }).start();
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [player, isSeeking]);
+  }, [player, isSeeking, animatedProgress]);
 
   const onSlidingStart = () => {
     setIsSeeking(true);
+    animatedProgress.stopAnimation();
+    player.pause(); // Dừng video khi bắt đầu kéo
   };
 
   const onValueChange = (value: number) => {
+    animatedProgress.setValue(value);
     setProgress(value);
+
     if (player.duration > 0) {
       const time = value * player.duration;
       setSeekTime(time);
+      // Cập nhật frame video ngay khi kéo để không bị đơ
+      player.currentTime = time;
     }
   };
 
@@ -91,6 +124,25 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
       player.currentTime = newTime;
     }
     setIsSeeking(false);
+    // Video sẽ tự play lại nhờ useEffect
+  };
+
+  const toggleMute = () => {
+    setIsMuted(prev => !prev);
+    setShowMuteIcon(true);
+
+    // Reset animation
+    muteIconOpacity.setValue(1);
+
+    // Fade out icon
+    Animated.timing(muteIconOpacity, {
+      toValue: 0,
+      duration: 1000,
+      delay: 500,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowMuteIcon(false);
+    });
   };
 
   const { width } = useWindowDimensions();
@@ -103,19 +155,37 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
 
   return (
     <>
-      <VideoView
-        player={player}
-        style={[styles.videoBase, { height: '100%' }]}
-        contentFit="cover"
-        nativeControls={false}
-      />
+      <Pressable onPress={toggleMute} style={styles.container}>
+        {/* VIDEO CHÍNH */}
+        <VideoView
+          player={player}
+          style={[styles.videoBase, { height: '100%' }]}
+          contentFit="cover"
+          nativeControls={false}
+        />
 
-      <LinearGradient
-        colors={['#00000000', '#00000040', '#00000080']}
-        style={styles.controlsContainer}
-        pointerEvents="none"
-      />
+        {/* MUTE ICON OVERLAY */}
+        {showMuteIcon && (
+          <View style={styles.muteIconContainer}>
+            <Animated.View style={{ opacity: muteIconOpacity, padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 50 }}>
+              <Ionicons
+                name={isMuted ? "volume-mute" : "volume-high"}
+                size={30}
+                color="white"
+              />
+            </Animated.View>
+          </View>
+        )}
 
+        {/* GRADIENT DƯỚI CHÂN VIDEO */}
+        <LinearGradient
+          colors={['#00000000', '#00000040', '#00000080']}
+          style={styles.controlsContainer}
+          pointerEvents="none"
+        />
+      </Pressable>
+
+      {/* PREVIEW KHI ĐANG KÉO */}
       {isSeeking && (
         <View style={[styles.previewContainer, { left: leftPos }]}>
           <View style={styles.previewVideoWrapper}>
@@ -125,15 +195,16 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
         </View>
       )}
 
+      {/* SLIDER TUA VIDEO */}
       <View style={styles.sliderContainer}>
-        <Slider
+        <AnimatedSlider
           style={{ width: '100%', height: 40 }}
           minimumValue={0}
           maximumValue={1}
-          value={progress}
+          value={animatedProgress}
           minimumTrackTintColor="#FFFFFF"
-          maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
-          thumbTintColor="#FFFFFF"
+          maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
+          thumbTintColor="transparent"
           onSlidingStart={onSlidingStart}
           onSlidingComplete={onSlidingComplete}
           onValueChange={onValueChange}
@@ -146,6 +217,12 @@ const VideoComponent = ({ data, isVisible }: VideoComponentProps) => {
 export default VideoComponent;
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'black',
+  },
   videoBase: {
     backgroundColor: 'black',
     width: '100%',
@@ -160,11 +237,10 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     position: 'absolute',
-    bottom: -10,
-    left: 0,
-    right: 0,
+    bottom: -19,
+    left: -16,
+    right: -16,
     zIndex: 2,
-    paddingHorizontal: 0,
   },
   previewContainer: {
     position: 'absolute',
@@ -196,5 +272,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: -1, height: 1 },
     textShadowRadius: 10,
+  },
+  muteIconContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
 });
