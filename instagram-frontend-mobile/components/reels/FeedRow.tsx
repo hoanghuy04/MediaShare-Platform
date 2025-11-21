@@ -3,11 +3,11 @@ import React, { useRef, useState } from 'react';
 import VideoComponent from './VideoComponent';
 import FeedFooter from './FeedFooter';
 import FeedSideBar from './FeedSideBar';
+import PostLikesModal from './PostLikesModal';
 import { PostResponse } from '../../types/post.type';
 import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import { postService } from '../../services/post.service';
 import { postLikeService } from '../../services/post-like.service';
 
 interface FeedRowProps {
@@ -133,10 +133,32 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
   );
 };
 
+
 const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
   const [isLiked, setIsLiked] = useState(data.likedByCurrentUser);
   const [totalLike, setTotalLike] = useState(data.totalLike);
   const [currentHeart, setCurrentHeart] = useState<HeartItem | null>(null);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+
+  const videoScaleAnim = useRef(new Animated.Value(1)).current;
+  const videoTranslateY = useRef(new Animated.Value(0)).current;
+
+  const handleModalVisibilityChange = (visible: boolean) => {
+    Animated.parallel([
+      Animated.timing(videoScaleAnim, {
+        toValue: visible ? 0.5 : 1,
+        duration: 300,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(videoTranslateY, {
+        toValue: visible ? -height * 0.25 : 0,
+        duration: 300,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const handleLike = async (coords?: { x: number; y: number }) => {
     const previousLikedState = isLiked;
@@ -179,19 +201,41 @@ const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
 
   return (
     <View style={[styles.container, { height: height }]}>
-      <VideoComponent data={data} isVisible={isVisible} onDoubleTap={handleLike} />
+      <Animated.View
+        style={{
+          flex: 1,
+          transform: [
+            { scale: videoScaleAnim },
+            { translateY: videoTranslateY },
+          ],
+        }}>
+        <VideoComponent data={data} isVisible={isVisible} onDoubleTap={handleLike} />
 
-      {currentHeart && (
-        <AnimatedHeart
-          key={currentHeart.id}
-          x={currentHeart.x}
-          y={currentHeart.y}
-          onComplete={() => setCurrentHeart(null)}
+        {currentHeart && (
+          <AnimatedHeart
+            key={currentHeart.id}
+            x={currentHeart.x}
+            y={currentHeart.y}
+            onComplete={() => setCurrentHeart(null)}
+          />
+        )}
+
+        <FeedSideBar
+          data={{ ...data, totalLike }}
+          isLiked={isLiked}
+          onLike={() => handleLike()}
+          onLikeCountPress={() => setShowLikesModal(true)}
         />
-      )}
+        <FeedFooter data={data} />
+      </Animated.View>
 
-      <FeedSideBar data={{ ...data, totalLike }} isLiked={isLiked} onLike={() => handleLike()} />
-      <FeedFooter data={data} />
+      <PostLikesModal
+        visible={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        postId={data.id}
+        totalLikes={totalLike}
+        onVisibilityChange={handleModalVisibilityChange}
+      />
     </View>
   );
 };

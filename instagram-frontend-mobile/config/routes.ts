@@ -51,6 +51,7 @@ export const API_ENDPOINTS = {
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',
   REELS: '/api/posts/reels',
+  GET_POST_LIKES: (id: string) => `api/posts/${id}/likes`,
 
   // Comments (khớp với backend: /comments/*)
   COMMENTS: (postId: string) => `/api/comments/post/${postId}`,

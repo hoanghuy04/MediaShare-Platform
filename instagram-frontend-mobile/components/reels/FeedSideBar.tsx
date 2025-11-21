@@ -7,6 +7,7 @@ interface FeedSideBarProps {
   data: PostResponse;
   isLiked: boolean;
   onLike: () => void;
+  onLikeCountPress?: () => void;
 }
 
 const IconWithText = ({
@@ -14,19 +15,25 @@ const IconWithText = ({
   count,
   color = 'white',
   onPress,
+  onCountPress,
 }: {
   iconName: any;
   count: number;
   color?: string;
   onPress?: () => void;
+  onCountPress?: () => void;
 }) => (
-  <TouchableOpacity onPress={onPress} style={styles.iconContainer} activeOpacity={0.7}>
-    <Ionicons name={iconName} size={28} color={color} />
-    <Text style={styles.countText}>{count}</Text>
-  </TouchableOpacity>
+  <View style={styles.iconContainer}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <Ionicons name={iconName} size={28} color={color} />
+    </TouchableOpacity>
+    <TouchableOpacity onPress={onCountPress} activeOpacity={0.7}>
+      <Text style={styles.countText}>{count}</Text>
+    </TouchableOpacity>
+  </View>
 );
 
-const FeedSideBar = ({ data, isLiked, onLike }: FeedSideBarProps) => {
+const FeedSideBar = ({ data, isLiked, onLike, onLikeCountPress }: FeedSideBarProps) => {
   const { totalLike, totalComment } = data;
 
   return (
@@ -36,6 +43,7 @@ const FeedSideBar = ({ data, isLiked, onLike }: FeedSideBarProps) => {
         count={totalLike}
         color={isLiked ? '#ff3040' : 'white'}
         onPress={onLike}
+        onCountPress={onLikeCountPress}
       />
       <IconWithText iconName="chatbubble-outline" count={totalComment} />
       <IconWithText iconName="share-social-outline" count={0} />

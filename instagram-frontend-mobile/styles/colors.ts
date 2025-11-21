@@ -1,10 +1,10 @@
 export const colors = {
   // Instagram brand colors
-  primary: '#405DE6',
+  primary: '#4D5DF8',
   secondary: '#5851DB',
   accent: '#833AB4',
   gradient: {
-    start: '#405DE6',
+    start: '#4D5DF8',
     middle: '#5851DB',
     end: '#833AB4',
   },
@@ -17,7 +17,7 @@ export const colors = {
 
   // Light theme colors
   light: {
-    primary: '#405DE6',
+    primary: '#4D5DF8',
     background: '#FFFFFF',
     surface: '#FAFAFA',
     card: '#FFFFFF',
@@ -34,7 +34,7 @@ export const colors = {
 
   // Dark theme colors
   dark: {
-    primary: '#405DE6',
+    primary: '#4D5DF8',
     background: '#000000',
     surface: '#121212',
     card: '#1C1C1C',

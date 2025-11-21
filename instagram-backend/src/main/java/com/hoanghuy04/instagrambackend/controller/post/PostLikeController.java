@@ -12,17 +12,22 @@ import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeToggleResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeUserResponse;
 import com.hoanghuy04.instagrambackend.service.post.PostLikeService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-
+@Slf4j
 @RestController
 @RequestMapping("/posts")
 @RequiredArgsConstructor
+@Tag(name = "Posts", description = "Post management APIs")
+@SecurityRequirement(name = "Bearer Authentication")
 public class PostLikeController {
 
     private final PostLikeService postLikeService;

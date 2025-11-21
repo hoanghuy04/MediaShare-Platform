@@ -1,14 +1,12 @@
 import axiosInstance from "../config/axiosInstance";
 import { API_ENDPOINTS } from "../config/routes";
-import { PostLikeToggleResponse } from "../types/post.type";
+import { ApiResponse, PaginatedResponse } from "../types";
+import { PostLikeToggleResponse, PostLikeUserResponse } from "../types/post.type";
 
 export const postLikeService = {
-
     toggleLikePost: async (postId: string): Promise<PostLikeToggleResponse> => {
         try {
-            console.log('[postLikeService] Toggling like for post:', postId);
             const response = await axiosInstance.post(API_ENDPOINTS.TOGGLE_LIKE_POST(postId));
-            console.log('[postLikeService] Response:', response.data);
             return response.data;
         } catch (error: any) {
             console.error('[postLikeService] Error details:', {
@@ -22,4 +20,17 @@ export const postLikeService = {
             throw new Error(errorMsg);
         }
     },
-}
+
+    getPostLikes: async (postId: string, page = 0, pageSize = 20): Promise<PaginatedResponse<PostLikeUserResponse>> => {
+        try {
+            const response = await axiosInstance.get<ApiResponse<PaginatedResponse<PostLikeUserResponse>>>(
+                API_ENDPOINTS.GET_POST_LIKES(postId),
+                { params: { page, pageSize } }
+            );
+            return response.data.data;
+        } catch (error: any) {
+            console.error('[postLikeService] Failed to get post likes:', error);
+            throw new Error(error.response?.data?.message || 'Failed to load likes');
+        }
+    },
+};
