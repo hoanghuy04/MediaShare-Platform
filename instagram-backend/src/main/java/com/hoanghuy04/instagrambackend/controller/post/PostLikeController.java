@@ -33,7 +33,7 @@ public class PostLikeController {
     private final PostLikeService postLikeService;
 
     @PostMapping("/{postId}/like")
-    public ResponseEntity<ApiResponse<PostLikeToggleResponse>> toggleLike(
+    public ResponseEntity<ApiResponse<PostLikeToggleResponse>> toggleLikePost(
             @PathVariable String postId
     ) {
         return ResponseEntity.ok(ApiResponse.success(postLikeService.toggleLikePost(postId)));

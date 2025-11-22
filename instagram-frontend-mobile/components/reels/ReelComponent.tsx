@@ -116,6 +116,12 @@ const ReelComponent = () => {
     []
   );
 
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleModalStateChange = useCallback((isOpen: boolean) => {
+    setIsModalVisible(isOpen);
+  }, []);
+
   const renderItem = useCallback(
     ({ item, index }: { item: PostResponse; index: number }) => {
       const { index: scrollIndex } = scrollInfo;
@@ -125,21 +131,20 @@ const ReelComponent = () => {
       return (
         <FeedRow
           data={item}
-          index={index}
-          isNext={isNext}
           isVisible={isVisible}
           height={containerHeight}
+          onModalStateChange={handleModalStateChange}
         />
       );
     },
-    [scrollInfo, containerHeight]
+    [scrollInfo, containerHeight, handleModalStateChange]
   );
 
   const renderEmpty = () => {
     if (loading && page === 1) {
       return (
         <View style={[styles.centerContainer, { height: containerHeight }]}>
-          <ActivityIndicator size="large" color="white" />
+          <ActivityIndicator size="large" color="#4D5DF8" />
         </View>
       );
     }
@@ -149,8 +154,6 @@ const ReelComponent = () => {
   return (
     <View style={styles.flexContainer} onLayout={handleLayout}>
       <StatusBar barStyle={'light-content'} backgroundColor={'black'} />
-
-      <FeedHeader currentTab={currentTab} onTabChange={handleTabChange} />
 
       {containerHeight > 0 && (
         <Animated.FlatList
@@ -168,7 +171,7 @@ const ReelComponent = () => {
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={
-            loading && page > 1 ? <ActivityIndicator color="white" style={{ margin: 20 }} /> : null
+            loading && page > 1 ? <ActivityIndicator color="#4D5DF8" style={{ margin: 20 }} /> : null
           }
           ListEmptyComponent={renderEmpty}
           removeClippedSubviews={true}
@@ -178,6 +181,10 @@ const ReelComponent = () => {
           initialNumToRender={1}
           maxToRenderPerBatch={2}
         />
+      )}
+
+      {!isModalVisible && (
+        <FeedHeader currentTab={currentTab} onTabChange={handleTabChange} />
       )}
     </View>
   );

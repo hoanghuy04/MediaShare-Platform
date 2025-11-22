@@ -46,6 +46,9 @@ public class Comment {
     @Builder.Default
     private long totalLikes = 0;
 
+    @Builder.Default
+    private long totalReply = 0;
+
     private String mention;
 
     @CreatedDate

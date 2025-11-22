@@ -53,13 +53,14 @@ export const API_ENDPOINTS = {
   REELS: '/api/posts/reels',
   GET_POST_LIKES: (id: string) => `api/posts/${id}/likes`,
 
-  // Comments (khớp với backend: /comments/*)
-  COMMENTS: (postId: string) => `/api/comments/post/${postId}`,
-  COMMENT_REPLIES: (commentId: string) => `/api/comments/${commentId}/replies`,
-  CREATE_COMMENT: `/api/comments`,
+  // Comments
+  GET_COMMENTS: (postId: string) => `/api/posts/${postId}/comments`,
+  CREATE_COMMENT: (postId: string) => `/api/posts/${postId}/comments`,
+  GET_REPLIES: (postId: string, commentId: string) => `/api/posts/${postId}/comments/${commentId}/replies`,
+  TOGGLE_LIKE_COMMENT: (postId: string, commentId: string) => `/api/posts/${postId}/comments/${commentId}/like`,
+
   DELETE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
   UPDATE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
-  TOGGLE_LIKE_COMMENT: (commentId: string) => `/api/comments/${commentId}/like`,
   REPLY_TO_COMMENT: (commentId: string) => `/api/comments/${commentId}/replies`,
 
   // Messages / Conversations

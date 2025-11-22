@@ -3,10 +3,12 @@ package com.hoanghuy04.instagrambackend.service.post;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeToggleResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeUserResponse;
+import com.hoanghuy04.instagrambackend.entity.Comment;
 import com.hoanghuy04.instagrambackend.entity.Like;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
+import com.hoanghuy04.instagrambackend.repository.CommentRepository;
 import com.hoanghuy04.instagrambackend.repository.LikeRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
@@ -24,6 +26,7 @@ public class PostLikeServiceImpl implements PostLikeService {
     private final PostRepository postRepository;
     private final LikeRepository likeRepository;
     private final SecurityUtil securityUtil;
+    private final CommentRepository commentRepository;
 
     @Transactional
     @Override

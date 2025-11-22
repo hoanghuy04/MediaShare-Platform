@@ -26,10 +26,6 @@ const FeedHeader = ({ currentTab, onTabChange }: FeedHeaderProps) => {
           </Text>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.cameraIcon}>
-        <Ionicons name="camera" size={28} color="white" />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -68,10 +64,5 @@ const styles = StyleSheet.create({
     width: 1,
     height: 15,
     backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  cameraIcon: {
-    position: 'absolute',
-    right: 20,
-    top: Platform.OS === 'android' ? 40 : 10,
   },
 });

@@ -15,6 +15,7 @@ import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { MediaCategory } from '../../types/enum.type';
 import { PostResponse } from '../../types/post.type';
+import Reanimated from 'react-native-reanimated';
 
 const AnimatedSlider = Animated.createAnimatedComponent(Slider);
 
@@ -22,6 +23,11 @@ interface VideoComponentProps {
   data: PostResponse;
   isVisible: boolean;
   onDoubleTap?: (coords: { x: number; y: number }) => void;
+  modalTranslateY?: any;
+  screenHeight?: number;
+  isMuted: boolean;
+  onToggleMute?: () => void;
+  isCommentsOpen?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -31,16 +37,24 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 };
 
-const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) => {
+const VideoComponent = ({
+  data,
+  isVisible,
+  onDoubleTap,
+  isMuted,
+  onToggleMute,
+}: VideoComponentProps) => {
   const [progress, setProgress] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
-  const [isMuted, setIsMuted] = useState(false); // State mute của user
   const [showMuteIcon, setShowMuteIcon] = useState(false);
+
   const singleTapTimer = useRef<any>(null);
+  const currentProgressRef = useRef(0);
 
   const muteIconOpacity = useRef(new Animated.Value(0)).current;
   const animatedProgress = useRef(new Animated.Value(0)).current;
+  const { width: screenWidth } = useWindowDimensions();
 
   const videoFile = data.media.find(m => m.category === MediaCategory.VIDEO);
   const videoUrl = videoFile ? videoFile.url : '';
@@ -54,15 +68,8 @@ const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) =
     p.loop = true;
     p.timeUpdateEventInterval = 0.1;
     p.muted = !isVisible || isMuted;
-
-    if (isVisible) {
-      p.play();
-    } else {
-      p.pause();
-    }
   });
 
-  // handle visible / seeking / mute
   useEffect(() => {
     if (!player) return;
 
@@ -73,20 +80,15 @@ const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) =
       player.pause();
       if (!isVisible) player.muted = true;
     }
-  }, [isVisible, isSeeking, player, isMuted]);
+  }, [player, isVisible, isSeeking, isMuted]);
 
-  // update progress khi video chạy
   useEffect(() => {
     if (!player) return;
 
     const subscription = player.addListener('timeUpdate', () => {
       if (!isSeeking && player.duration > 0) {
         const ratio = player.currentTime / player.duration;
-
-        setProgress(prev => {
-          if (Math.abs(ratio - prev) < 0.005) return prev;
-          return ratio;
-        });
+        currentProgressRef.current = ratio;
 
         Animated.timing(animatedProgress, {
           toValue: ratio,
@@ -104,8 +106,9 @@ const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) =
 
   const onSlidingStart = () => {
     setIsSeeking(true);
+    setProgress(currentProgressRef.current);
     animatedProgress.stopAnimation();
-    player.pause(); // Dừng video khi bắt đầu kéo
+    player.pause();
   };
 
   const onValueChange = (value: number) => {
@@ -115,7 +118,6 @@ const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) =
     if (player.duration > 0) {
       const time = value * player.duration;
       setSeekTime(time);
-      // Cập nhật frame video ngay khi kéo để không bị đơ
       player.currentTime = time;
     }
   };
@@ -128,15 +130,28 @@ const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) =
     setIsSeeking(false);
   };
 
+  const toggleMute = () => {
+    onToggleMute?.();
+    setShowMuteIcon(true);
+
+    muteIconOpacity.setValue(1);
+
+    Animated.timing(muteIconOpacity, {
+      toValue: 0,
+      duration: 1000,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setShowMuteIcon(false);
+    });
+  };
+
   const handlePress = (event: any) => {
     const { locationX, locationY } = event.nativeEvent;
 
     if (singleTapTimer.current) {
       clearTimeout(singleTapTimer.current);
       singleTapTimer.current = null;
-      if (onDoubleTap) {
-        onDoubleTap({ x: locationX, y: locationY });
-      }
+      onDoubleTap?.({ x: locationX, y: locationY });
     } else {
       singleTapTimer.current = setTimeout(() => {
         toggleMute();
@@ -145,63 +160,62 @@ const VideoComponent = ({ data, isVisible, onDoubleTap }: VideoComponentProps) =
     }
   };
 
-  const toggleMute = () => {
-    setIsMuted(prev => !prev);
-    setShowMuteIcon(true);
-
-    muteIconOpacity.setValue(1);
-
-    Animated.timing(muteIconOpacity, {
-      toValue: 0,
-      duration: 1000,
-      delay: 500,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowMuteIcon(false);
-    });
-  };
-
-  const { width } = useWindowDimensions();
   const tooltipWidth = 100;
-  const sliderWidth = width;
+  const sliderWidth = screenWidth;
 
   let leftPos = progress * sliderWidth - tooltipWidth / 2;
   if (leftPos < 10) leftPos = 10;
-  if (leftPos > width - tooltipWidth - 10) leftPos = width - tooltipWidth - 10;
+  if (leftPos > screenWidth - tooltipWidth - 10) {
+    leftPos = screenWidth - tooltipWidth - 10;
+  }
 
   return (
     <>
-      <Pressable onPress={handlePress} style={styles.container}>
-        <VideoView
-          player={player}
-          style={[styles.videoBase, { height: '100%' }]}
-          contentFit="cover"
-          nativeControls={false}
-        />
+      <Reanimated.View style={styles.container}>
+        <Pressable onPress={handlePress} style={StyleSheet.absoluteFill}>
+          <View style={styles.videoCard}>
+            <VideoView
+              player={player}
+              style={styles.video}
+              contentFit="contain"    // 👈 luôn luôn contain
+              nativeControls={false}
+            />
 
-        {showMuteIcon && (
-          <View style={styles.muteIconContainer}>
-            <Animated.View style={{ opacity: muteIconOpacity, padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 50 }}>
-              <Ionicons
-                name={isMuted ? "volume-mute" : "volume-high"}
-                size={30}
-                color="white"
-              />
-            </Animated.View>
+            {showMuteIcon && (
+              <View style={styles.muteIconContainer}>
+                <Animated.View
+                  style={{
+                    opacity: muteIconOpacity,
+                    padding: 20,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    borderRadius: 50,
+                  }}>
+                  <Ionicons
+                    name={isMuted ? 'volume-mute' : 'volume-high'}
+                    size={30}
+                    color="white"
+                  />
+                </Animated.View>
+              </View>
+            )}
+
+            <LinearGradient
+              colors={['#00000000', '#00000040', '#00000080']}
+              style={styles.controlsContainer}
+              pointerEvents="none"
+            />
           </View>
-        )}
-
-        <LinearGradient
-          colors={['#00000000', '#00000040', '#00000080']}
-          style={styles.controlsContainer}
-          pointerEvents="none"
-        />
-      </Pressable>
+        </Pressable>
+      </Reanimated.View>
 
       {isSeeking && (
         <View style={[styles.previewContainer, { left: leftPos }]}>
           <View style={styles.previewVideoWrapper}>
-            <Image source={{ uri: thumbnailUrl }} style={styles.previewVideo} contentFit="cover" />
+            <Image
+              source={{ uri: thumbnailUrl }}
+              style={styles.previewVideo}
+              contentFit="cover"
+            />
             <Text style={styles.previewTime}>{formatTime(seekTime)}</Text>
           </View>
         </View>
@@ -229,14 +243,21 @@ export default VideoComponent;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%',
+    height: '100%',
     backgroundColor: 'black',
   },
-  videoBase: {
-    backgroundColor: 'black',
+  videoCard: {
+    flex: 1,
     width: '100%',
+    height: '100%',
+    backgroundColor: 'black',
+  },
+  video: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'black',
   },
   controlsContainer: {
     position: 'absolute',

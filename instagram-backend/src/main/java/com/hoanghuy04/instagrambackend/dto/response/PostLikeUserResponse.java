@@ -11,6 +11,7 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class PostLikeUserResponse {
     private String id;
     private String username;

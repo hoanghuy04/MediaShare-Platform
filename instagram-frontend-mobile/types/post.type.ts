@@ -35,3 +35,31 @@ export interface PostLikeUserResponse {
   username: string;
   avatarUrl: string;
 }
+
+export interface CommentCreateRequest {
+  text: string;
+  parentCommentId?: string;
+  mention?: string;
+}
+
+export interface CommentResponse {
+  id: string;
+  postId: string;
+  author: PostLikeUserResponse;
+  text: string;
+  totalLike: number;
+  totalReply: number;
+  createdAt: string;
+  updatedAt: string;
+  parentCommentId?: string;
+  mention?: string;
+  isLikedByCurrentUser: boolean;
+}
+
+export interface CommentLikeToggleResponse {
+  postId: string;
+  commentId: string;
+  totalLikes: number;
+  liked: boolean;
+}
+

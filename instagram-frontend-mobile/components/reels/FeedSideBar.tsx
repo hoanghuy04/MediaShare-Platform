@@ -1,5 +1,5 @@
+import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { PostResponse } from '../../types/post.type';
 
@@ -8,6 +8,7 @@ interface FeedSideBarProps {
   isLiked: boolean;
   onLike: () => void;
   onLikeCountPress?: () => void;
+  onCommentPress?: () => void;
 }
 
 const IconWithText = ({
@@ -27,13 +28,17 @@ const IconWithText = ({
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <Ionicons name={iconName} size={28} color={color} />
     </TouchableOpacity>
-    <TouchableOpacity onPress={onCountPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      onPress={onCountPress}
+      activeOpacity={0.7}
+      style={styles.countButton}
+    >
       <Text style={styles.countText}>{count}</Text>
     </TouchableOpacity>
   </View>
 );
 
-const FeedSideBar = ({ data, isLiked, onLike, onLikeCountPress }: FeedSideBarProps) => {
+const FeedSideBar = ({ data, isLiked, onLike, onLikeCountPress, onCommentPress }: FeedSideBarProps) => {
   const { totalLike, totalComment } = data;
 
   return (
@@ -45,7 +50,12 @@ const FeedSideBar = ({ data, isLiked, onLike, onLikeCountPress }: FeedSideBarPro
         onPress={onLike}
         onCountPress={onLikeCountPress}
       />
-      <IconWithText iconName="chatbubble-outline" count={totalComment} />
+      <IconWithText
+        iconName="chatbubble-outline"
+        count={totalComment}
+        onPress={onCommentPress}
+        onCountPress={onCommentPress}
+      />
       <IconWithText iconName="share-social-outline" count={0} />
     </View>
   );
@@ -59,16 +69,20 @@ const styles = StyleSheet.create({
     bottom: 40,
     alignSelf: 'flex-end',
     alignItems: 'center',
-    gap: 20,
+    gap: 10,
     right: 20,
     zIndex: 10,
   },
   iconContainer: {
     alignItems: 'center',
   },
+  countButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 2,
+  },
   countText: {
     color: '#fff',
-    marginTop: 10,
     fontSize: 13,
     fontWeight: '500',
   },

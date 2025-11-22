@@ -23,13 +23,13 @@ public class CommentResponse {
     
     private String postId;
     
-    private UserResponse author;
+    private PostLikeUserResponse author;
     
     private String text;
     
-    private Integer likesCount;
+    private Long totalLike;
     
-    private Integer repliesCount;
+    private Long totalReply;
     
     private LocalDateTime createdAt;
     

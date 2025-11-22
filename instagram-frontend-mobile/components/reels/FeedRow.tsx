@@ -1,21 +1,27 @@
 import { StyleSheet, View, Animated, Easing } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import React, { useRef, useState } from 'react';
 import VideoComponent from './VideoComponent';
 import FeedFooter from './FeedFooter';
 import FeedSideBar from './FeedSideBar';
-import PostLikesModal from './PostLikesModal';
+import LikesModal from './LikesModal';
 import { PostResponse } from '../../types/post.type';
 import { Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { postLikeService } from '../../services/post-like.service';
+import CommentsModal from './CommentsModal';
 
 interface FeedRowProps {
   data: PostResponse;
-  index: number;
   isVisible: boolean;
-  isNext: boolean;
   height: number;
+  onModalStateChange?: (isOpen: boolean) => void;
 }
 
 interface HeartItem {
@@ -134,31 +140,35 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
 };
 
 
-const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
+const FeedRow = ({ data, isVisible, height, onModalStateChange }: FeedRowProps) => {
   const [isLiked, setIsLiked] = useState(data.likedByCurrentUser);
   const [totalLike, setTotalLike] = useState(data.totalLike);
   const [currentHeart, setCurrentHeart] = useState<HeartItem | null>(null);
   const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const handleToggleMute = () => setIsMuted(prev => !prev);
 
-  const videoScaleAnim = useRef(new Animated.Value(1)).current;
-  const videoTranslateY = useRef(new Animated.Value(0)).current;
+  const modalTranslateY = useSharedValue(height);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
 
-  const handleModalVisibilityChange = (visible: boolean) => {
-    Animated.parallel([
-      Animated.timing(videoScaleAnim, {
-        toValue: visible ? 0.5 : 1,
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.timing(videoTranslateY, {
-        toValue: visible ? -height * 0.25 : 0,
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+  React.useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(showLikesModal || showCommentsModal);
+    }
+  }, [showLikesModal, showCommentsModal, onModalStateChange]);
+
+  const uiAnimatedStyle = useAnimatedStyle(() => {
+    const stopPoint = height * 0.8;
+    return {
+      opacity: interpolate(
+        modalTranslateY.value,
+        [stopPoint, height],
+        [0, 1],
+        Extrapolation.CLAMP,
+      ),
+    };
+  });
 
   const handleLike = async (coords?: { x: number; y: number }) => {
     const previousLikedState = isLiked;
@@ -193,23 +203,39 @@ const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
         await postLikeService.toggleLikePost(data.id);
       } catch (error) {
         console.error('Failed to toggle like:', error);
-        setIsLiked(previousLikedState);
         setTotalLike(previousTotalLike);
       }
     }
   };
 
+  const videoContainerStyle = useAnimatedStyle(() => {
+    if (!modalTranslateY) return { flex: 1 };
+
+    const stopPoint = height * 0.5;
+
+    return {
+      height: interpolate(
+        modalTranslateY.value,
+        [stopPoint, height],
+        [stopPoint, height],
+        Extrapolation.CLAMP,
+      ),
+    };
+  });
+
   return (
     <View style={[styles.container, { height: height }]}>
-      <Animated.View
-        style={{
-          flex: 1,
-          transform: [
-            { scale: videoScaleAnim },
-            { translateY: videoTranslateY },
-          ],
-        }}>
-        <VideoComponent data={data} isVisible={isVisible} onDoubleTap={handleLike} />
+      <Reanimated.View style={[styles.videoContainer, videoContainerStyle]}>
+        <VideoComponent
+          data={data}
+          isVisible={isVisible}
+          onDoubleTap={handleLike}
+          modalTranslateY={modalTranslateY}
+          screenHeight={height}
+          isMuted={isMuted}
+          onToggleMute={handleToggleMute}
+          isCommentsOpen={showCommentsModal}
+        />
 
         {currentHeart && (
           <AnimatedHeart
@@ -220,21 +246,46 @@ const FeedRow = ({ data, index, isVisible, isNext, height }: FeedRowProps) => {
           />
         )}
 
-        <FeedSideBar
-          data={{ ...data, totalLike }}
-          isLiked={isLiked}
-          onLike={() => handleLike()}
-          onLikeCountPress={() => setShowLikesModal(true)}
-        />
-        <FeedFooter data={data} />
-      </Animated.View>
+        <Reanimated.View
+          style={uiAnimatedStyle}
+          pointerEvents={showLikesModal || showCommentsModal ? 'none' : 'box-none'}>
+          <FeedSideBar
+            data={{ ...data, totalLike }}
+            isLiked={isLiked}
+            onLike={() => handleLike()}
+            onLikeCountPress={() => {
+              setShowLikesModal(true);
+              onModalStateChange?.(true);
+            }}
+            onCommentPress={() => {
+              setShowCommentsModal(true);
+              onModalStateChange?.(true);
+            }}
+          />
+          <FeedFooter data={data} />
+        </Reanimated.View>
+      </Reanimated.View>
 
-      <PostLikesModal
+      <LikesModal
         visible={showLikesModal}
-        onClose={() => setShowLikesModal(false)}
+        onClose={() => {
+          setShowLikesModal(false);
+          onModalStateChange?.(false);
+        }}
         postId={data.id}
         totalLikes={totalLike}
-        onVisibilityChange={handleModalVisibilityChange}
+      />
+
+      <CommentsModal
+        visible={showCommentsModal}
+        onClose={() => {
+          setShowCommentsModal(false);
+          onModalStateChange?.(false);
+        }}
+        postId={data.id}
+        modalTranslateY={modalTranslateY}
+        isMuted={isMuted}
+        onToggleMute={() => setIsMuted(prev => !prev)}
       />
     </View>
   );
@@ -247,6 +298,10 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'black',
     overflow: 'hidden',
+  },
+  videoContainer: {
+    width: '100%',
+    position: 'relative',
   },
   heartContainer: {
     ...StyleSheet.absoluteFillObject,
