@@ -1,7 +1,7 @@
 import axiosInstance from "../config/axiosInstance";
 import { API_ENDPOINTS } from "../config/routes";
 import { ApiResponse, PaginatedResponse } from "../types";
-import { CommentCreateRequest, CommentResponse, CommentLikeToggleResponse } from "../types/post.type";
+import { CommentCreateRequest, CommentResponse, CommentLikeToggleResponse } from "../types/comment.type";
 
 export const postCommentService = {
     createComment: async (postId: string, data: CommentCreateRequest): Promise<CommentResponse> => {
@@ -52,6 +52,17 @@ export const postCommentService = {
         } catch (error: any) {
             console.error('[postCommentService] Failed to toggle like comment:', error);
             throw new Error(error.response?.data?.message || 'Failed to toggle like');
+        }
+    },
+
+    deleteComment: async (postId: string, commentId: string): Promise<void> => {
+        try {
+            await axiosInstance.delete<ApiResponse<void>>(
+                API_ENDPOINTS.DELETE_COMMENT(postId, commentId)
+            );
+        } catch (error: any) {
+            console.error('[postCommentService] Failed to delete comment:', error);
+            throw new Error(error.response?.data?.message || 'Failed to delete comment');
         }
     },
 };

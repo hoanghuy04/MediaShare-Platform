@@ -4,11 +4,9 @@ import {
     View,
     Text,
     StyleSheet,
-    Image,
     TextInput,
     ActivityIndicator,
     Dimensions,
-    KeyboardAvoidingView,
     Platform,
     Keyboard,
     TouchableOpacity,
@@ -36,14 +34,21 @@ import Animated, {
     SharedValue,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { CommentResponse, CommentCreateRequest } from '../../types/post.type';
 import { postCommentService } from '../../services/post-comment.service';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../styles/colors';
+import { CommentCreateRequest, CommentResponse } from '../../types/comment.type';
+import {
+    CommentSkeleton,
+    CommentHeader,
+    CommentInput,
+    CommentActionMenu,
+    CommentData,
+} from './comments';
+import { CommentItemWrapper } from './comments/CommentItemWrapper';
+import { ToastDeleteComment } from './comments/ToastDeleteComment';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -55,18 +60,16 @@ type Props = {
     visible: boolean;
     onClose: () => void;
     postId: string;
+    postAuthorId: string;
     modalTranslateY?: SharedValue<number>;
     isMuted?: boolean;
     onToggleMute?: () => void;
 };
 
-const EMOJIS = ['❤️', '🙌', '🔥', '👏', '😢', '😍', '😮', '😂'];
-
-type CommentWithReplies = CommentResponse & {
+type CommentWithReplies = CommentData & {
     replies?: CommentWithReplies[];
     repliesLoaded?: boolean;
     showReplies?: boolean;
-    isPosting?: boolean;
     loadingReplies?: boolean;
 };
 
@@ -74,6 +77,7 @@ const CommentsModal = ({
     visible,
     onClose,
     postId,
+    postAuthorId,
     modalTranslateY,
     isMuted,
     onToggleMute,
@@ -93,8 +97,31 @@ const CommentsModal = ({
     const [replyingTo, setReplyingTo] = useState<CommentWithReplies | null>(null);
     const [rootIDToReply, setRootIDToReply] = useState<string | null>(null);
 
+    const [selectedComment, setSelectedComment] = useState<CommentWithReplies | null>(null);
+    const [selectedLayout, setSelectedLayout] = useState<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    } | null>(null);
+
     const flatListRef = useRef<FlatList<CommentWithReplies>>(null);
     const inputRef = useRef<TextInput>(null);
+
+    const [toastVisible, setToastVisible] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
+
+    const undoTimeoutRef = useRef<any>(null);
+    const deletedRef = useRef<{
+        comment: CommentWithReplies;
+        isReply: boolean;
+        parentId?: string
+    } | null>(null);
+
+    const showToast = (message: string) => {
+        setToastMessage(message);
+        setToastVisible(true);
+    };
 
     // ------- REANIMATED VALUES -------
     const translateY = useSharedValue(SNAP_CLOSE);
@@ -202,20 +229,6 @@ const CommentsModal = ({
         return <View style={{ height: 20 }} />;
     };
 
-    const CommentSkeleton = () => (
-        <View style={styles.skeletonContainer}>
-            {[1, 2, 3].map((item) => (
-                <View key={item} style={styles.skeletonItem}>
-                    <View style={styles.skeletonAvatar} />
-                    <View style={styles.skeletonContent}>
-                        <View style={styles.skeletonLine} />
-                        <View style={[styles.skeletonLine, { width: '60%' }]} />
-                    </View>
-                </View>
-            ))}
-        </View>
-    );
-
     const renderEmpty = () => {
         if (loading && comments.length === 0) {
             return <CommentSkeleton />;
@@ -276,63 +289,13 @@ const CommentsModal = ({
         Keyboard.dismiss();
     };
 
-    const handleToggleReplies = async (parent: CommentWithReplies) => {
-        if (parent.repliesLoaded) {
-            setComments(prev =>
-                prev.map(c =>
-                    c.id === parent.id ? { ...c, showReplies: !c.showReplies } : c,
-                ),
-            );
-            return;
-        }
-
-        setComments(prev =>
-            prev.map(c =>
-                c.id === parent.id ? { ...c, loadingReplies: true } : c,
-            ),
-        );
-
-        try {
-            const response = await postCommentService.getReplies(
-                postId,
-                parent.id,
-                0,
-                10,
-            );
-            const replies = (response.content || []).map(
-                r => ({ ...r } as CommentWithReplies),
-            );
-            setComments(prev =>
-                prev.map(c =>
-                    c.id === parent.id
-                        ? {
-                            ...c,
-                            replies,
-                            repliesLoaded: true,
-                            showReplies: true,
-                            loadingReplies: false,
-                        }
-                        : c,
-                ),
-            );
-        } catch (error) {
-            console.error('[CommentModal] Failed to load replies:', error);
-            // Remove loading state on error
-            setComments(prev =>
-                prev.map(c =>
-                    c.id === parent.id ? { ...c, loadingReplies: false } : c,
-                ),
-            );
-        }
-    };
-
     // ------- LIKE HANDLER (OPTIMISTIC) -------
     const handleLikeComment = async (
         comment: CommentWithReplies,
         isReply: boolean,
         parentId?: string,
     ) => {
-        const optimisticLiked = !comment.isLikedByCurrentUser;
+        const optimisticLiked = !comment.likedByCurrentUser;
         const optimisticLikes = optimisticLiked
             ? (comment.totalLike || 0) + 1
             : Math.max(0, (comment.totalLike || 0) - 1);
@@ -347,7 +310,7 @@ const CommentsModal = ({
                             r.id === comment.id
                                 ? {
                                     ...r,
-                                    isLikedByCurrentUser: optimisticLiked,
+                                    likedByCurrentUser: optimisticLiked,
                                     totalLike: optimisticLikes,
                                 }
                                 : r,
@@ -361,7 +324,7 @@ const CommentsModal = ({
                     c.id === comment.id
                         ? {
                             ...c,
-                            isLikedByCurrentUser: optimisticLiked,
+                            likedByCurrentUser: optimisticLiked,
                             totalLike: optimisticLikes,
                         }
                         : c,
@@ -385,7 +348,7 @@ const CommentsModal = ({
                                 r.id === comment.id
                                     ? {
                                         ...r,
-                                        isLikedByCurrentUser: result.liked,
+                                        likedByCurrentUser: result.liked,
                                         totalLike: result.totalLikes,
                                     }
                                     : r,
@@ -399,7 +362,7 @@ const CommentsModal = ({
                         c.id === comment.id
                             ? {
                                 ...c,
-                                isLikedByCurrentUser: result.liked,
+                                likedByCurrentUser: result.liked,
                                 totalLike: result.totalLikes,
                             }
                             : c,
@@ -450,14 +413,13 @@ const CommentsModal = ({
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             parentCommentId: parentId || undefined,
-            isLikedByCurrentUser: false,
+            likedByCurrentUser: false,
             isPosting: true,
         };
 
         setCommentText('');
         setReplyingTo(null);
         setRootIDToReply(null);
-        inputRef.current?.blur();
 
         if (parentId) {
             setComments(prev =>
@@ -533,6 +495,112 @@ const CommentsModal = ({
 
     const handleInputFocus = () => {
         scrollTo(SNAP_TOP);
+    };
+
+    // ------- LONG PRESS HANDLER -------
+    const handleLongPressItem = (
+        comment: CommentWithReplies,
+        layout: { x: number; y: number; width: number; height: number }
+    ) => {
+        if (!currentUser) return;
+
+        setSelectedComment(comment);
+        setSelectedLayout(layout);
+    };
+
+    // ------- DELETE COMMENT -------
+
+    useEffect(() => {
+        return () => {
+            if (undoTimeoutRef.current && deletedRef.current) {
+                clearTimeout(undoTimeoutRef.current);
+                const { comment } = deletedRef.current;
+                postCommentService.deleteComment(postId, comment.id).catch(err => console.error(err));
+            }
+        };
+    }, [postId]);
+
+    const handleUndoDelete = () => {
+        if (undoTimeoutRef.current) {
+            clearTimeout(undoTimeoutRef.current);
+            undoTimeoutRef.current = null;
+        }
+
+        const pending = deletedRef.current;
+        if (!pending) return;
+
+        const { comment, isReply, parentId } = pending;
+
+        if (isReply && parentId) {
+            setComments(prev => prev.map(c => {
+                if (c.id !== parentId) return c;
+
+                const currentReplies = c.replies || [];
+                if (currentReplies.find(r => r.id === comment.id)) return c;
+
+                const restoredReplies = [...currentReplies, comment].sort((a, b) =>
+                    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                );
+
+                return {
+                    ...c,
+                    replies: restoredReplies,
+                    totalReply: (c.totalReply || 0) + 1,
+                };
+            }));
+        } else {
+            setComments(prev => {
+                if (prev.find(c => c.id === comment.id)) return prev;
+
+                const restoredList = [comment, ...prev].sort((a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+                return restoredList;
+            });
+        }
+
+        setToastVisible(false);
+        deletedRef.current = null;
+    };
+
+    const handleDeleteComment = (comment: CommentWithReplies, isReply: boolean, parentId?: string) => {
+        setSelectedComment(null);
+        setSelectedLayout(null);
+        Keyboard.dismiss();
+
+        if (undoTimeoutRef.current && deletedRef.current) {
+            clearTimeout(undoTimeoutRef.current);
+            const prevItem = deletedRef.current;
+            postCommentService.deleteComment(postId, prevItem.comment.id).catch(console.error);
+        }
+
+        deletedRef.current = { comment, isReply, parentId };
+
+        if (isReply && parentId) {
+            setComments(prev => prev.map(c => {
+                if (c.id !== parentId) return c;
+                return {
+                    ...c,
+                    replies: c.replies?.filter(r => r.id !== comment.id),
+                    totalReply: Math.max(0, (c.totalReply || 0) - 1),
+                };
+            }));
+        } else {
+            setComments(prev => prev.filter(c => c.id !== comment.id));
+        }
+
+        showToast('Đã xóa bình luận.');
+
+        undoTimeoutRef.current = setTimeout(async () => {
+            try {
+                await postCommentService.deleteComment(postId, comment.id);
+                deletedRef.current = null;
+                undoTimeoutRef.current = null;
+            } catch (error) {
+                console.error('Delete failed', error);
+                handleUndoDelete();
+            }
+        }, 4000);
     };
 
     // ------- PAN GESTURE -------
@@ -630,166 +698,17 @@ const CommentsModal = ({
         };
     });
 
-    const isSendButtonActive = commentText.trim().length > 0;
 
-    // ------- RENDER COMMENT TEXT -------
-    const renderTextWithMentions = (text: string) => {
-        const mentionRegex = /(@[\w.]+)/g;
-        const parts = text.split(mentionRegex);
-
-        return (
-            <Text style={styles.commentText}>
-                {parts.map((part, index) => {
-                    if (part.match(mentionRegex)) {
-                        return (
-                            <Text key={index} style={styles.mentionText}>
-                                {part}
-                            </Text>
-                        );
-                    }
-                    return <Text key={index}>{part}</Text>;
-                })}
-            </Text>
-        );
-    };
-
-    // ------- COMMENT ROW COMPONENT -------
-    const CommentRow = ({
-        comment,
-        rootComment,
-        isReply = false,
-    }: {
-        comment: CommentWithReplies;
-        rootComment: CommentWithReplies;
-        isReply?: boolean;
-    }) => {
-        const avatarSize = isReply ? 28 : 36;
-        const likeScale = useRef(new RNAnimated.Value(1)).current;
-
-        const animateLike = () => {
-            RNAnimated.sequence([
-                RNAnimated.spring(likeScale, {
-                    toValue: 1.3,
-                    friction: 3,
-                    useNativeDriver: true,
-                }),
-                RNAnimated.spring(likeScale, {
-                    toValue: 1,
-                    friction: 3,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        };
-
-        const handleLikePress = () => {
-            animateLike();
-            handleLikeComment(
-                comment,
-                isReply,
-                isReply ? rootComment.id : undefined,
-            );
-        };
-
-        return (
-            <View
-                style={[
-                    comment.isPosting && styles.commentPostingWrapper,
-                    { marginBottom: isReply ? 8 : 12 },
-                ]}
-            >
-                <View style={[styles.commentItem, isReply && styles.replyContainer]}>
-                    <Image
-                        source={{
-                            uri:
-                                comment.author.avatarUrl ||
-                                'https://i.pravatar.cc/150?u=1',
-                        }}
-                        style={[
-                            styles.avatar,
-                            {
-                                width: avatarSize,
-                                height: avatarSize,
-                                borderRadius: avatarSize / 2,
-                            },
-                        ]}
-                    />
-                    <View style={styles.commentContent}>
-                        <View style={styles.commentHeader}>
-                            <Text style={styles.username}>{comment.author.username}</Text>
-                            {!comment.isPosting && (
-                                <Text style={styles.timeText}>
-                                    {formatDistanceToNow(new Date(comment.createdAt), {
-                                        addSuffix: true,
-                                        locale: vi,
-                                    })}
-                                </Text>
-                            )}
-                        </View>
-                        {renderTextWithMentions(comment.text)}
-
-                        {comment.isPosting ? (
-                            <Text style={styles.postingText}>Đang đăng...</Text>
-                        ) : (
-                            <>
-                                <View style={styles.commentActions}>
-                                    <Pressable
-                                        onPress={() => handleReply(comment, rootComment)}
-                                    >
-                                        <Text style={styles.actionText}>Trả lời</Text>
-                                    </Pressable>
-                                </View>
-
-                                {!isReply && (comment.totalReply || 0) > 0 && (
-                                    <Pressable
-                                        onPress={() => handleToggleReplies(comment)}
-                                        style={styles.viewRepliesButton}
-                                    >
-                                        <Text style={styles.viewRepliesText}>
-                                            {comment.showReplies
-                                                ? 'Ẩn trả lời'
-                                                : `Xem ${comment.totalReply} câu trả lời`}
-                                        </Text>
-                                    </Pressable>
-                                )}
-                            </>
-                        )}
-                    </View>
-
-                    {!comment.isPosting && (
-                        <Pressable
-                            style={styles.likeButton}
-                            onPress={handleLikePress}
-                        >
-                            <RNAnimated.View style={{ transform: [{ scale: likeScale }] }}>
-                                <Ionicons
-                                    name={
-                                        comment.isLikedByCurrentUser ? 'heart' : 'heart-outline'
-                                    }
-                                    size={14}
-                                    color={
-                                        comment.isLikedByCurrentUser ? '#F6434E' : '#666'
-                                    }
-                                />
-                            </RNAnimated.View>
-                            {comment.totalLike > 0 && (
-                                <Text style={styles.likeCount}>{comment.totalLike}</Text>
-                            )}
-                        </Pressable>
-                    )}
-                </View>
-            </View>
-        );
-    };
-
-    const renderCommentItem = ({
-        item,
-        index,
-    }: {
-        item: CommentWithReplies;
-        index: number;
-    }) => (
+    const renderCommentItem = ({ item }: { item: CommentWithReplies }) => (
         <View style={styles.commentBlock}>
-            <CommentRow comment={item} rootComment={item} />
+            <CommentItemWrapper
+                comment={item}
+                rootComment={item}
+                onLike={handleLikeComment}
+                onReply={handleReply}
+                onLongPress={handleLongPressItem}
+                isFocused={selectedComment?.id === item.id}
+            />
 
             {item.loadingReplies && (
                 <View style={{ paddingLeft: 48, paddingVertical: 10 }}>
@@ -800,12 +719,17 @@ const CommentsModal = ({
             {item.showReplies &&
                 item.replies &&
                 item.replies.map((reply, index) => (
-                    <CommentRow
-                        key={`reply-${reply.id}-${index}`}
-                        comment={reply}
-                        rootComment={item}
-                        isReply
-                    />
+                    <View key={`reply-${reply.id}-${index}`}>
+                        <CommentItemWrapper
+                            comment={reply}
+                            rootComment={item}
+                            isReply={true}
+                            onLike={handleLikeComment}
+                            onReply={handleReply}
+                            onLongPress={handleLongPressItem}
+                            isFocused={selectedComment?.id === reply.id}
+                        />
+                    </View>
                 ))}
         </View>
     );
@@ -820,7 +744,10 @@ const CommentsModal = ({
             onRequestClose={handleClose}
         >
             <GestureHandlerRootView style={styles.modalOverlay}>
-                <Animated.View style={[styles.backdrop, backdropStyle]}>
+                <Animated.View
+                    style={[styles.backdrop, backdropStyle]}
+                    pointerEvents="box-none"
+                >
                     <TouchableOpacity
                         style={StyleSheet.absoluteFill}
                         activeOpacity={1}
@@ -845,12 +772,7 @@ const CommentsModal = ({
                 <Animated.View style={[styles.modalContent, rStyle]}>
                     <GestureDetector gesture={panGesture}>
                         <View style={{ flex: 1 }}>
-                            <View style={styles.dragHandleArea}>
-                                <View style={styles.handleBarContainer}>
-                                    <View style={styles.handleBar} />
-                                </View>
-                                <Text style={styles.headerTitle}>Bình luận</Text>
-                            </View>
+                            <CommentHeader title="Bình luận" />
 
                             <View style={{ flex: 1 }}>
                                 <View style={styles.listWrapper}>
@@ -882,73 +804,49 @@ const CommentsModal = ({
                         </View>
                     </GestureDetector>
 
-                    <KeyboardAvoidingView
-                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                        keyboardVerticalOffset={0}
-                        style={styles.inputContainer}
-                    >
-                        {replyingTo && (
-                            <View style={styles.replyBanner}>
-                                <Text style={styles.replyText}>
-                                    Đang trả lời {replyingTo.author.username}
-                                </Text>
-                                <Pressable onPress={handleCancelReply}>
-                                    <Ionicons name="close" size={20} color="#666" />
-                                </Pressable>
-                            </View>
-                        )}
-
-                        <View style={styles.emojiBar}>
-                            {EMOJIS.map((emoji, index) => (
-                                <Pressable
-                                    key={index}
-                                    onPress={() =>
-                                        setCommentText(prev => prev + emoji)
-                                    }
-                                    style={styles.emojiButton}
-                                >
-                                    <Text style={styles.emojiText}>{emoji}</Text>
-                                </Pressable>
-                            ))}
-                        </View>
-
-                        <View style={styles.inputRow}>
-                            <Image
-                                source={{
-                                    uri:
-                                        currentUser?.avatar ||
-                                        'https://i.pravatar.cc/150?u=1',
-                                }}
-                                style={styles.inputAvatar}
-                            />
-                            <TextInput
-                                ref={inputRef}
-                                style={styles.input}
-                                placeholder="Thêm bình luận..."
-                                placeholderTextColor="#999"
-                                value={commentText}
-                                onChangeText={setCommentText}
-                                multiline
-                                onFocus={handleInputFocus}
-                            />
-                            <Pressable
-                                onPress={handleSendComment}
-                                disabled={!isSendButtonActive || submitting}
-                                style={styles.sendButton}
-                            >
-                                <Ionicons
-                                    name="arrow-up-circle"
-                                    size={32}
-                                    color={
-                                        isSendButtonActive
-                                            ? colors.primary
-                                            : '#E0E0E0'
-                                    }
-                                />
-                            </Pressable>
-                        </View>
-                    </KeyboardAvoidingView>
+                    <CommentInput
+                        commentText={commentText}
+                        onChangeText={setCommentText}
+                        onSend={handleSendComment}
+                        onFocus={handleInputFocus}
+                        inputRef={inputRef}
+                        userAvatar={currentUser?.avatar}
+                        replyingTo={replyingTo}
+                        onCancelReply={handleCancelReply}
+                        submitting={submitting}
+                    />
                 </Animated.View>
+
+                <CommentActionMenu
+                    visible={!!selectedComment}
+                    comment={selectedComment}
+                    layout={selectedLayout}
+                    currentUserId={currentUser?.id}
+                    postAuthorId={postAuthorId}
+
+                    onClose={() => {
+                        setSelectedComment(null);
+                        setSelectedLayout(null);
+                    }}
+
+                    // 1. Luôn truyền hàm xử lý Xóa
+                    onDelete={handleDeleteComment}
+
+                    // 2. Truyền hàm rỗng để TEST GIAO DIỆN (Nút Ghim sẽ hiện khi đủ điều kiện)
+                    onPin={(comment) => console.log('Ghim', comment.id)}
+                    onReport={(comment) => console.log('Báo cáo', comment.id)}
+                    onBlock={(comment) => console.log('Chặn', comment.author.id)}
+                />
+
+                {toastVisible && (
+                    <ToastDeleteComment
+                        visible={toastVisible}
+                        message={toastMessage}
+                        onUndo={handleUndoDelete}
+                        onHide={() => setToastVisible(false)}
+                    />
+                )}
+
             </GestureHandlerRootView>
         </Modal>
     );
@@ -980,13 +878,6 @@ const styles = StyleSheet.create({
         elevation: 5,
         overflow: 'hidden',
     },
-    dragHandleArea: {
-        backgroundColor: '#fff',
-        paddingBottom: 10,
-        borderBottomWidth: 0.5,
-        borderBottomColor: '#eee',
-        zIndex: 10,
-    },
     muteOverlayButton: {
         position: 'absolute',
         right: 16,
@@ -994,24 +885,6 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         padding: 8,
         zIndex: 50,
-    },
-    handleBarContainer: {
-        width: '100%',
-        alignItems: 'center',
-        paddingVertical: 12,
-    },
-    handleBar: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#ddd',
-        borderRadius: 2,
-    },
-    headerTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#000',
-        textAlign: 'center',
-        marginBottom: 12,
     },
     listWrapper: {
         flex: 1,
@@ -1105,95 +978,5 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#666',
         marginTop: 2,
-    },
-    inputContainer: {
-        borderTopWidth: 1,
-        borderTopColor: '#EFEFEF',
-        backgroundColor: '#fff',
-        paddingBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 20,
-    },
-    replyBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#f0f0f0',
-        borderBottomWidth: 0.5,
-        borderBottomColor: '#ddd',
-    },
-    replyText: {
-        fontSize: 12,
-        color: '#666',
-    },
-    emojiBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
-    emojiButton: {
-        padding: 4,
-    },
-    emojiText: {
-        fontSize: 24,
-    },
-    inputRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        gap: 12,
-    },
-    inputAvatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#f0f0f0',
-    },
-    input: {
-        flex: 1,
-        fontSize: 15,
-        color: '#000',
-        maxHeight: 100,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderWidth: 1,
-        borderColor: '#dbdbdb',
-        borderRadius: 24,
-        backgroundColor: '#fafafa',
-    },
-    sendButton: {
-        padding: 4,
-        marginLeft: 4,
-    },
-    skeletonContainer: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
-    },
-    skeletonItem: {
-        flexDirection: 'row',
-        marginBottom: 20,
-    },
-    skeletonAvatar: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#E0E0E0',
-        marginRight: 12,
-    },
-    skeletonContent: {
-        flex: 1,
-    },
-    skeletonLine: {
-        height: 12,
-        backgroundColor: '#E0E0E0',
-        borderRadius: 4,
-        marginBottom: 8,
     },
 });

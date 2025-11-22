@@ -283,6 +283,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange }: FeedRowProps) 
           onModalStateChange?.(false);
         }}
         postId={data.id}
+        postAuthorId={data.author.id}
         modalTranslateY={modalTranslateY}
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(prev => !prev)}

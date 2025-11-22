@@ -58,8 +58,7 @@ export const API_ENDPOINTS = {
   CREATE_COMMENT: (postId: string) => `/api/posts/${postId}/comments`,
   GET_REPLIES: (postId: string, commentId: string) => `/api/posts/${postId}/comments/${commentId}/replies`,
   TOGGLE_LIKE_COMMENT: (postId: string, commentId: string) => `/api/posts/${postId}/comments/${commentId}/like`,
-
-  DELETE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
+  DELETE_COMMENT: (postId: string, commentId: string) => `/api/posts/${postId}/comments/${commentId}`,
   UPDATE_COMMENT: (commentId: string) => `/api/comments/${commentId}`,
   REPLY_TO_COMMENT: (commentId: string) => `/api/comments/${commentId}/replies`,
 

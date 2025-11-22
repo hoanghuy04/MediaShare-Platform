@@ -16,4 +16,6 @@ public interface PostCommentService {
     PageResponse<CommentResponse> getReplies(String postId, String parentCommentId, Pageable pageable);
 
     CommentLikeToggleResponse toggleLikeComment(String postId, String commentId);
+
+    void deleteComment(String postId, String commentId);
 }

@@ -82,7 +82,7 @@ public class PostCommentServiceImpl implements PostCommentService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
-        User currentUser = securityUtil.getCurrentUser(); // luôn require login
+        User currentUser = securityUtil.getCurrentUser();
 
         Page<Comment> page = commentRepository
                 .findByPostAndParentCommentIsNull(post, pageable);
@@ -116,18 +116,15 @@ public class PostCommentServiceImpl implements PostCommentService {
     @Override
     public CommentLikeToggleResponse toggleLikeComment(String postId, String commentId) {
 
-        // 1. Lấy comment
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new RuntimeException("Comment not found"));
 
-        // 2. Đảm bảo comment thuộc đúng post
         if (!comment.getPost().getId().equals(postId)) {
             throw new RuntimeException("Comment does not belong to this post");
         }
 
         User currentUser = securityUtil.getCurrentUser();
 
-        // 3. Kiểm tra like đã tồn tại chưa
         Optional<Like> existing = likeRepository.findByUserAndTargetTypeAndTargetId(
                 currentUser,
                 LikeTargetType.COMMENT,
@@ -162,6 +159,57 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .build();
     }
 
+    @Transactional
+    @Override
+    public void deleteComment(String postId, String commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found"));
+
+        Post post = comment.getPost();
+        if (post == null || !post.getId().equals(postId)) {
+            throw new RuntimeException("Comment does not belong to this post");
+        }
+
+        User currentUser = securityUtil.getCurrentUser();
+
+        boolean isOwnerOfComment = comment.getAuthor().getId().equals(currentUser.getId());
+        boolean isOwnerOfPost = post.getAuthor().getId().equals(currentUser.getId());
+
+        if (!isOwnerOfComment && !isOwnerOfPost) {
+            throw new RuntimeException("You do not have permission to delete this comment");
+        }
+
+        long decrement = 1L;
+
+        if (comment.getParentComment() == null) {
+            List<Comment> replies = commentRepository.findByParentComment_Id(commentId);
+
+            for (Comment reply : replies) {
+                likeRepository.deleteByTargetTypeAndTargetId(
+                        LikeTargetType.COMMENT,
+                        reply.getId()
+                );
+            }
+
+            commentRepository.deleteAll(replies);
+
+            decrement += replies.size();
+        } else {
+            Comment parent = comment.getParentComment();
+            parent.setTotalReply(Math.max(0, parent.getTotalReply() - 1));
+            commentRepository.save(parent);
+        }
+
+        post.setTotalComments(Math.max(0, post.getTotalComments() - decrement));
+        postRepository.save(post);
+
+        likeRepository.deleteByTargetTypeAndTargetId(
+                LikeTargetType.COMMENT,
+                commentId
+        );
+
+        commentRepository.delete(comment);
+    }
 
     private PageResponse<CommentResponse> mapCommentPageWithLikeInfo(Page<Comment> page, User currentUser) {
         List<Comment> comments = page.getContent();
