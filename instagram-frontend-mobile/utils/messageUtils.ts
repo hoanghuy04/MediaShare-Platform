@@ -102,6 +102,8 @@ export const getConversationAvatar = (
   }
   
   const otherUser = conversation.participants.find((p) => p.userId !== currentUserId);
+  console.log("_____________________________________otherUser_______________________: ", otherUser);
+  
   return otherUser?.avatar;
 };
 

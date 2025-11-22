@@ -1,10 +1,10 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
+import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
-import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +30,7 @@ public interface MessageRequestService {
      * @return MessageRequest entity
      */
     @Transactional
-    MessageRequest createMessageRequest(String senderId, String receiverId, Message firstMessage);
+    com.hoanghuy04.instagrambackend.entity.message.MessageRequest createMessageRequest(String senderId, String receiverId, Message firstMessage);
 
     /**
      * Get pending message requests for a user.
@@ -39,7 +39,7 @@ public interface MessageRequestService {
      * @return List of pending message requests as DTOs
      */
     @Transactional(readOnly = true)
-    List<MessageRequestDTO> getPendingRequests(String userId);
+    List<MessageRequest> getPendingRequests(String userId);
 
     /**
      * Get pending inbox items (received requests only) for a user.
@@ -50,7 +50,7 @@ public interface MessageRequestService {
      * @return PageResponse of InboxItemDTO
      */
     @Transactional(readOnly = true)
-    PageResponse<InboxItemDTO> getPendingInboxItems(String userId, Pageable pageable);
+    PageResponse<InboxItemResponse> getPendingInboxItems(String userId, Pageable pageable);
 
     /**
      * Get count of pending message requests for a user.
@@ -87,7 +87,7 @@ public interface MessageRequestService {
      * @return MessageRequest entity
      */
     @Transactional(readOnly = true)
-    MessageRequest getRequestById(String requestId);
+    com.hoanghuy04.instagrambackend.entity.message.MessageRequest getRequestById(String requestId);
     
     /**
      * Get all pending messages for a message request between sender and receiver.
@@ -98,7 +98,7 @@ public interface MessageRequestService {
      * @return List of pending messages as DTOs
      */
     @Transactional(readOnly = true)
-    List<com.hoanghuy04.instagrambackend.dto.response.MessageDTO> getPendingMessages(String senderId, String receiverId);
+    List<MessageResponse> getPendingMessages(String senderId, String receiverId);
     
     /**
      * Get all pending messages for a message request by request ID.
@@ -110,5 +110,5 @@ public interface MessageRequestService {
      * @return List of pending messages as DTOs
      */
     @Transactional(readOnly = true)
-    List<com.hoanghuy04.instagrambackend.dto.response.MessageDTO> getPendingMessagesByRequestId(String requestId, String viewerId);
+    List<MessageResponse> getPendingMessagesByRequestId(String requestId, String viewerId);
 }

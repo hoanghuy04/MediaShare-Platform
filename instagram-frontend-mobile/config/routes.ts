@@ -99,4 +99,9 @@ export const API_ENDPOINTS = {
   UPLOAD_POST_MEDIA: '/api/files/upload/post-media',
   UPLOAD_POST_MEDIA_BATCH: '/api/files/upload/post-media/batch',
   DELETE_FILE: (fileId: string) => `/api/files/upload/${fileId}`,
+
+  // AI Chat
+  AI_CHAT: '/api/ai/chat',
+  AI_CONVERSATION: '/api/ai/conversation',
+  AI_CLEAR_HISTORY: '/api/ai/conversation/history',
 } as const;

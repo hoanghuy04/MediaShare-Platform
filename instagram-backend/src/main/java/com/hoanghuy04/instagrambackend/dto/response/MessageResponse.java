@@ -6,29 +6,64 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO for message response data.
  * 
  * @author Instagram Backend Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MessageResponse {
+public class MessageDTO {
     
+    /**
+     * Message ID
+     */
     private String id;
     
-    private UserResponse sender;
+    /**
+     * Conversation ID this message belongs to
+     */
+    private String conversationId;
     
-    private UserResponse receiver;
+    /**
+     * Information about the sender
+     */
+    private UserSummaryDTO sender;
     
+    /**
+     * Message text content
+     */
     private String content;
     
+    /**
+     * Optional media URL
+     */
     private String mediaUrl;
     
+    /**
+     * List of user IDs who have read this message
+     */
+    private List<String> readBy;
+    
+    /**
+     * Information about the message this is replying to (threading)
+     */
+    private MessageDTO replyTo;
+    
+    /**
+     * Timestamp when the message was created
+     */
     private LocalDateTime createdAt;
+    
+    /**
+     * Whether this message was deleted by the current user
+     */
+    private boolean isDeleted;
 }
+
 

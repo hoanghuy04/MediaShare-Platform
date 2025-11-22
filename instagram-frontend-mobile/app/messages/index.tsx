@@ -350,6 +350,10 @@ export default function MessagesScreen() {
 
       // Display text
       let displayText = lastMessage?.content || 'Chưa có tin nhắn';
+
+      if (conversationName === "ai-assistant") {
+        displayText = lastMessage?.content || 'Chat với AI Assistant';
+      }
       if (isTyping) {
         displayText = 'Đang nhắn tin...';
       }

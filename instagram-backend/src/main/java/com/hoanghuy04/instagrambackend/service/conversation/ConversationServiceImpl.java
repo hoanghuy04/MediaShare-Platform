@@ -12,7 +12,9 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
 import com.hoanghuy04.instagrambackend.service.FileService;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -29,12 +31,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ConversationServiceImpl implements ConversationService {
 
-    private final ConversationRepository conversationRepository;
-    private final UserRepository userRepository;
-    private final FileService fileService;
-    private final MongoTemplate mongoTemplate;
+    ConversationRepository conversationRepository;
+    UserRepository userRepository;
+    FileService fileService;
+    MongoTemplate mongoTemplate;
 
     // ===============================
     // Direct & Group conversation

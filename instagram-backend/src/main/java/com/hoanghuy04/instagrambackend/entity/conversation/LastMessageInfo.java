@@ -1,9 +1,7 @@
 package com.hoanghuy04.instagrambackend.entity.message;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
 
@@ -16,28 +14,12 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class LastMessageInfo {
-    
-    /**
-     * ID of the last message
-     */
     private String messageId;
-    
-    /**
-     * Content preview of the last message
-     */
     private String content;
-    
-    /**
-     * ID of the user who sent the last message
-     */
     private String senderId;
-    
-    /**
-     * Timestamp when the last message was created
-     */
     private LocalDateTime timestamp;
 }
 

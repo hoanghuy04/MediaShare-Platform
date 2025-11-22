@@ -1,12 +1,11 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
@@ -14,7 +13,9 @@ import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.mapper.MessageRequestMapper;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
 import com.hoanghuy04.instagrambackend.repository.message.MessageRequestRepository;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,21 +38,22 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class MessageRequestServiceImpl implements MessageRequestService {
     
-    private final MessageRequestRepository messageRequestRepository;
-    private final ConversationService conversationService;
-    private final MessageRepository messageRepository;
-    private final MessageRequestMapper messageRequestMapper;
-    private final MessageMapper messageMapper;
+    MessageRequestRepository messageRequestRepository;
+    ConversationService conversationService;
+    MessageRepository messageRepository;
+    MessageRequestMapper messageRequestMapper;
+    MessageMapper messageMapper;
     
     @Transactional
     @Override
-    public MessageRequest createMessageRequest(String senderId, String receiverId, Message firstMessage) {
+    public com.hoanghuy04.instagrambackend.entity.message.MessageRequest createMessageRequest(String senderId, String receiverId, Message firstMessage) {
         log.info("Creating message request from {} to {}", senderId, receiverId);
         
         // Check if request already exists
-        Optional<MessageRequest> existing = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        Optional<com.hoanghuy04.instagrambackend.entity.message.MessageRequest> existing = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
             senderId, 
             receiverId, 
             RequestStatus.PENDING
@@ -59,7 +61,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         
         if (existing.isPresent()) {
             // Add message to existing request
-            MessageRequest request = existing.get();
+            com.hoanghuy04.instagrambackend.entity.message.MessageRequest request = existing.get();
             List<String> pendingIds = request.getPendingMessageIds();
             if (pendingIds == null) {
                 pendingIds = new ArrayList<>();
@@ -74,7 +76,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         }
         
         // Create new request
-        MessageRequest request = MessageRequest.builder()
+        com.hoanghuy04.instagrambackend.entity.message.MessageRequest request = com.hoanghuy04.instagrambackend.entity.message.MessageRequest.builder()
             .senderId(senderId)
             .receiverId(receiverId)
             .sender(firstMessage.getSender())
@@ -94,10 +96,10 @@ public class MessageRequestServiceImpl implements MessageRequestService {
     
     @Transactional(readOnly = true)
     @Override
-    public List<MessageRequestDTO> getPendingRequests(String userId) {
+    public List<MessageRequest> getPendingRequests(String userId) {
         log.debug("Getting pending requests for user: {}", userId);
         
-        List<MessageRequest> requests = messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
+        List<com.hoanghuy04.instagrambackend.entity.message.MessageRequest> requests = messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
             userId, 
             RequestStatus.PENDING
         );
@@ -109,18 +111,18 @@ public class MessageRequestServiceImpl implements MessageRequestService {
     
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<InboxItemDTO> getPendingInboxItems(String userId, Pageable pageable) {
+    public PageResponse<InboxItemResponse> getPendingInboxItems(String userId, Pageable pageable) {
         log.debug("Getting pending inbox items for user: {} with page {} and size {}", 
             userId, pageable.getPageNumber(), pageable.getPageSize());
         
         // Query received requests (others sent to this user)
-        List<MessageRequest> requests = messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
+        List<com.hoanghuy04.instagrambackend.entity.message.MessageRequest> requests = messageRequestRepository.findByReceiverIdAndStatusOrderByCreatedAtDesc(
             userId, 
             RequestStatus.PENDING
         );
         
         // Convert to InboxItemDTO
-        List<InboxItemDTO> allInboxItems = requests.stream()
+        List<InboxItemResponse> allInboxItems = requests.stream()
             .map(req -> messageRequestMapper.toInboxItem(req, userId))
             .collect(Collectors.toList());
         
@@ -142,7 +144,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         int startIndex = pageNumber * pageSize;
         int endIndex = Math.min(startIndex + pageSize, totalElements);
         
-        List<InboxItemDTO> pageContent = (startIndex < totalElements) 
+        List<InboxItemResponse> pageContent = (startIndex < totalElements)
             ? allInboxItems.subList(startIndex, endIndex) 
             : new ArrayList<>();
         
@@ -156,7 +158,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         log.debug("Found {} total pending inbox items for user {}. Returning page {} with {} items", 
             totalElements, userId, pageNumber, pageContent.size());
         
-        return PageResponse.<InboxItemDTO>builder()
+        return PageResponse.<InboxItemResponse>builder()
             .content(pageContent)
             .pageNumber(pageNumber)
             .pageSize(pageSize)
@@ -181,7 +183,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
     public void addPendingMessage(String requestId, Message message) {
         log.debug("Adding message to request: {}", requestId);
         
-        MessageRequest request = getRequestById(requestId);
+        com.hoanghuy04.instagrambackend.entity.message.MessageRequest request = getRequestById(requestId);
         
         if (request.getStatus() != RequestStatus.PENDING) {
             throw new BadRequestException("Can only add messages to pending requests");
@@ -208,18 +210,18 @@ public class MessageRequestServiceImpl implements MessageRequestService {
     
     @Transactional(readOnly = true)
     @Override
-    public MessageRequest getRequestById(String requestId) {
+    public com.hoanghuy04.instagrambackend.entity.message.MessageRequest getRequestById(String requestId) {
         return messageRequestRepository.findById(requestId)
             .orElseThrow(() -> new ResourceNotFoundException("Message request not found with id: " + requestId));
     }
     
     @Transactional(readOnly = true)
     @Override
-    public List<MessageDTO> getPendingMessages(String senderId, String receiverId) {
+    public List<MessageResponse> getPendingMessages(String senderId, String receiverId) {
         log.info("Getting pending messages from {} to {}", senderId, receiverId);
         
         // Find pending message request between sender and receiver
-        Optional<MessageRequest> requestOptional = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        Optional<com.hoanghuy04.instagrambackend.entity.message.MessageRequest> requestOptional = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
             senderId, 
             receiverId, 
             RequestStatus.PENDING
@@ -232,7 +234,7 @@ public class MessageRequestServiceImpl implements MessageRequestService {
             return new ArrayList<>();
         }
         
-        MessageRequest request = requestOptional.get();
+        com.hoanghuy04.instagrambackend.entity.message.MessageRequest request = requestOptional.get();
         List<String> pendingMessageIds = request.getPendingMessageIds();
         
         log.info("Found {} pending message IDs for request {}", pendingMessageIds.size(), request.getId());
@@ -251,21 +253,21 @@ public class MessageRequestServiceImpl implements MessageRequestService {
         messages.sort(Comparator.comparing(Message::getCreatedAt));
         
         // Map to DTOs
-        List<MessageDTO> messageDTOs = messages.stream()
+        List<MessageResponse> messageResponses = messages.stream()
             .map(message -> messageMapper.toMessageDTO(message))
             .collect(Collectors.toList());
         
-        log.info("Successfully mapped {} pending messages to DTOs", messageDTOs.size());
+        log.info("Successfully mapped {} pending messages to DTOs", messageResponses.size());
         
-        return messageDTOs;
+        return messageResponses;
     }
     
     @Transactional(readOnly = true)
     @Override
-    public List<MessageDTO> getPendingMessagesByRequestId(String requestId, String viewerId) {
+    public List<MessageResponse> getPendingMessagesByRequestId(String requestId, String viewerId) {
         log.info("Getting pending messages for request {} by viewer {}", requestId, viewerId);
         
-        MessageRequest request = getRequestById(requestId);
+        com.hoanghuy04.instagrambackend.entity.message.MessageRequest request = getRequestById(requestId);
         
         // Verify viewer is either sender or receiver
         if (!request.getSenderId().equals(viewerId) && !request.getReceiverId().equals(viewerId)) {

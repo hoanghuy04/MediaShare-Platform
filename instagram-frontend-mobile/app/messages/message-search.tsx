@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,7 +8,6 @@ import {
   FlatList,
   StatusBar,
   SafeAreaView,
-  Alert,
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useDebounce } from '../../hooks/useDebounce';
-import { userAPI } from '../../services/api';
+import { userAPI, aiAPI } from '../../services/api';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
 import { UserProfile } from '../../types';
@@ -29,6 +28,7 @@ export default function MessageSearchScreen() {
   const { user: currentUser } = useAuth();
   const router = useRouter();
   const searchInputRef = useRef<TextInput>(null);
+  const isSendingToAI = useRef(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<UserProfile[]>([]);
@@ -134,6 +134,40 @@ export default function MessageSearchScreen() {
     Keyboard.dismiss();
   };
 
+  // Send message to AI assistant
+  const handleSendToAI = useCallback(async () => {
+    
+    const prompt = searchQuery.trim();
+    console.log('=== handleSendToAI called with prompt:', prompt);
+    
+    
+    try {
+      Keyboard.dismiss();
+      
+      const conversation = await aiAPI.getConversation();
+      
+      if (!conversation?.id) {
+        showAlert('Lỗi', 'Không thể tạo cuộc trò chuyện với AI');
+        isSendingToAI.current = false;
+        return;
+      }
+      
+      router.push({
+        pathname: `/messages/${conversation.id}` as any,
+        params: { textPrompt: prompt }
+      });
+      
+    } catch (error: any) {
+      console.error('Error opening AI conversation:', error);
+      showAlert('Lỗi', error?.message || 'Không thể mở cuộc trò chuyện AI');
+    } finally {
+      // Reset flag after navigation
+      setTimeout(() => {
+        isSendingToAI.current = false;
+      }, 500);
+    }
+  }, [searchQuery, router]);
+
   const getFilteredSuggestedUsers = () => {
     const recentUserIds = recentSearches.map(user => user.id);
     return suggestedUsers.filter(user => !recentUserIds.includes(user.id));
@@ -162,6 +196,13 @@ export default function MessageSearchScreen() {
           />
         </View>
       </View>
+      <TouchableOpacity 
+        style={styles.sendButton} 
+        onPress={handleSendToAI}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="paper-plane" size={20} color="#1677FF" />
+      </TouchableOpacity>
     </View>
   );
 
@@ -315,13 +356,17 @@ const styles = StyleSheet.create({
   searchContainer: {
     flex: 1,
   },
+  sendButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
   },
   aiIcon: {
     width: 24,
@@ -330,7 +375,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#8B5CF6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 6,
   },
   searchInput: {
     fontSize: 16,

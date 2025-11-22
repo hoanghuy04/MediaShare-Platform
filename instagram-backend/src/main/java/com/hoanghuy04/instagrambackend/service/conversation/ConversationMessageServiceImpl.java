@@ -1,11 +1,10 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
+import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.*;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
@@ -121,12 +120,12 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             return sendMessageToConversation(conversation.getId(), senderId, content, mediaUrl);
         }
 
-        Optional<MessageRequest> incomingRequest = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
+        Optional<com.hoanghuy04.instagrambackend.entity.message.MessageRequest> incomingRequest = messageRequestRepository.findBySenderIdAndReceiverIdAndStatus(
             receiverId, senderId, RequestStatus.PENDING
         );
 
         if (incomingRequest.isPresent()) {
-            MessageRequest request = incomingRequest.get();
+            com.hoanghuy04.instagrambackend.entity.message.MessageRequest request = incomingRequest.get();
             log.info("Auto-accepting pending request {} when {} replies to {}", request.getId(), senderId, receiverId);
             
             // Update request status
@@ -210,7 +209,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<MessageDTO> getConversationMessagesAsDTO(String conversationId, String userId, Pageable pageable) {
+    public PageResponse<MessageResponse> getConversationMessagesAsDTO(String conversationId, String userId, Pageable pageable) {
         log.debug("Getting messages for conversation {} by user {}", conversationId, userId);
         
         if (!conversationService.isParticipant(conversationId, userId)) {
@@ -224,7 +223,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
                 pageable
             );
         
-        List<MessageDTO> messageDTOs = messages.stream()
+        List<MessageResponse> messageResponses = messages.stream()
             .map((Message message) -> messageMapper.toMessageDTO(message))
             .collect(Collectors.toList());
         
@@ -235,7 +234,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
                 Pageable.unpaged()
             );
         
-        Page<MessageDTO> page = new org.springframework.data.domain.PageImpl<>(messageDTOs, pageable, allMessages.size());
+        Page<MessageResponse> page = new org.springframework.data.domain.PageImpl<>(messageResponses, pageable, allMessages.size());
         return PageResponse.of(page);
     }
     
@@ -416,11 +415,11 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     
     @Transactional(readOnly = true)
     @Override
-    public PageResponse<InboxItemDTO> getInboxItems(String userId, Pageable pageable) {
+    public PageResponse<InboxItemResponse> getInboxItems(String userId, Pageable pageable) {
         log.debug("Getting inbox items for user: {} with page {} and size {}", 
             userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        List<InboxItemDTO> allInboxItems = new ArrayList<>();
+        List<InboxItemResponse> allInboxItems = new ArrayList<>();
         
         // 1. Get all conversations
         List<Conversation> conversations = conversationService.getUserConversations(userId);
@@ -429,8 +428,8 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             if (mediaFileResponse != null) {
                 conv.setAvatar(mediaFileResponse.getUrl());
             }
-            ConversationDTO convDTO = messageMapper.toConversationDTO(conv);
-            InboxItemDTO item = InboxItemDTO.builder()
+            ConversationResponse convDTO = messageMapper.toConversationDTO(conv);
+            InboxItemResponse item = InboxItemResponse.builder()
                 .type(InboxItemType.CONVERSATION)
                 .conversation(convDTO)
                 .timestamp(conv.getUpdatedAt())
@@ -439,15 +438,15 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         }
         
         // 2. Get message requests sent by user (status=PENDING)
-        List<MessageRequest> sentRequests = messageRequestRepository.findBySenderIdOrderByCreatedAtDesc(userId)
+        List<com.hoanghuy04.instagrambackend.entity.message.MessageRequest> sentRequests = messageRequestRepository.findBySenderIdOrderByCreatedAtDesc(userId)
             .stream()
             .filter(req -> req.getStatus() == RequestStatus.PENDING)
             .collect(Collectors.toList());
         
-        for (MessageRequest req : sentRequests) {
-            MessageRequestDTO reqDTO = messageRequestMapper.toMessageRequestDTO(req);
+        for (com.hoanghuy04.instagrambackend.entity.message.MessageRequest req : sentRequests) {
+            MessageRequest reqDTO = messageRequestMapper.toMessageRequestDTO(req);
 
-            InboxItemDTO item = InboxItemDTO.builder()
+            InboxItemResponse item = InboxItemResponse.builder()
                 .type(InboxItemType.MESSAGE_REQUEST)
                 .messageRequest(reqDTO)
                 .timestamp(req.getCreatedAt())
@@ -465,7 +464,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         int startIndex = pageNumber * pageSize;
         int endIndex = Math.min(startIndex + pageSize, totalElements);
         
-        List<InboxItemDTO> pageContent = (startIndex < totalElements) 
+        List<InboxItemResponse> pageContent = (startIndex < totalElements)
             ? allInboxItems.subList(startIndex, endIndex) 
             : new ArrayList<>();
         
@@ -479,7 +478,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         log.debug("Found {} total inbox items for user {}: {} conversations, {} message requests. Returning page {} with {} items", 
             totalElements, userId, conversations.size(), sentRequests.size(), pageNumber, pageContent.size());
         
-        return PageResponse.<InboxItemDTO>builder()
+        return PageResponse.<InboxItemResponse>builder()
             .content(pageContent)
             .pageNumber(pageNumber)
             .pageSize(pageSize)
@@ -495,12 +494,12 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     
     @Transactional(readOnly = true)
     @Override
-    public ConversationDTO getConversationAsDTO(String conversationId, String userId) {
+    public ConversationResponse getConversationAsDTO(String conversationId, String userId) {
         if (!conversationService.isParticipant(conversationId, userId)) {
             throw new BadRequestException("You are not a participant in this conversation");
         }
         Conversation conversation = conversationService.getConversationById(conversationId);
-        ConversationDTO dto = messageMapper.toConversationDTO(conversation);
+        ConversationResponse dto = messageMapper.toConversationDTO(conversation);
 
         // ✅ enrich avatarUrl
         if (conversation.getAvatar() != null) {
@@ -514,7 +513,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     
     @Transactional
     @Override
-    public ConversationDTO createGroupAndConvertToDTO(
+    public ConversationResponse createGroupAndConvertToDTO(
             String creatorId,
             List<String> participantIds,
             String groupName) {
@@ -526,7 +525,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     @Transactional
     @Override
-    public ConversationDTO updateGroupAndConvertToDTO(
+    public ConversationResponse updateGroupAndConvertToDTO(
             String conversationId,
             String name,
             String avatar,

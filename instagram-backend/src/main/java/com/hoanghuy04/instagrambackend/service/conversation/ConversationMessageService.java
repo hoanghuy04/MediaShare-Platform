@@ -1,9 +1,8 @@
 package com.hoanghuy04.instagrambackend.service.message;
 
-import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
-import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.message.Message;
 import org.springframework.data.domain.Pageable;
@@ -57,7 +56,7 @@ public interface ConversationMessageService {
      * @return PageResponse of MessageDTO
      */
     @Transactional(readOnly = true)
-    PageResponse<MessageDTO> getConversationMessagesAsDTO(String conversationId, String userId, Pageable pageable);
+    PageResponse<MessageResponse> getConversationMessagesAsDTO(String conversationId, String userId, Pageable pageable);
 
     /**
      * Mark a message as read (unified intelligent method).
@@ -130,7 +129,7 @@ public interface ConversationMessageService {
      * @return PageResponse of InboxItemDTO sorted by timestamp
      */
     @Transactional(readOnly = true)
-    PageResponse<InboxItemDTO> getInboxItems(String userId, Pageable pageable);
+    PageResponse<InboxItemResponse> getInboxItems(String userId, Pageable pageable);
 
     /**
      * Get conversation details as DTO.
@@ -140,7 +139,7 @@ public interface ConversationMessageService {
      * @return ConversationDTO
      */
     @Transactional(readOnly = true)
-    ConversationDTO getConversationAsDTO(String conversationId, String userId);
+    ConversationResponse getConversationAsDTO(String conversationId, String userId);
 
     /**
      * Create a group conversation and return as DTO.
@@ -151,7 +150,7 @@ public interface ConversationMessageService {
      * @return ConversationDTO
      */
     @Transactional
-    ConversationDTO createGroupAndConvertToDTO(
+    ConversationResponse createGroupAndConvertToDTO(
             String creatorId,
             List<String> participantIds,
             String groupName);
@@ -166,7 +165,7 @@ public interface ConversationMessageService {
      * @return ConversationDTO
      */
     @Transactional
-    ConversationDTO updateGroupAndConvertToDTO(
+    ConversationResponse updateGroupAndConvertToDTO(
             String conversationId,
             String name,
             String avatar,

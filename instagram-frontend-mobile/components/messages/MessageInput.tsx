@@ -30,6 +30,7 @@ type EmojiCategory = (typeof EMOJI_CATEGORIES_ORDER)[number];
 
 export interface MessageInputProps {
   onSend: (message: string) => void;
+  onSendToAI?: (message: string) => void;      // <-- thêm prop này
   onTyping?: () => void;
   onStopTyping?: () => void;
   placeholder?: string;
@@ -50,9 +51,9 @@ const EmojiPanel: React.FC<{
   const { theme } = useTheme();
 
   // cấu hình grid
-  const COLS = EMOJI_DEFAULTS.gridColumns;    // ví dụ: 8
-  const GRID_H_PAD = SIZES.md;                 // padding ngang container
-  const GAP = 8;                               // khoảng cách giữa các cột
+  const COLS = EMOJI_DEFAULTS.gridColumns; // ví dụ: 8
+  const GRID_H_PAD = SIZES.md; // padding ngang container
+  const GAP = 8; // khoảng cách giữa các cột
 
   const itemSize = useMemo(() => {
     if (!panelWidth) return 40;
@@ -82,7 +83,10 @@ const EmojiPanel: React.FC<{
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.emojiOverlay}>
-        <TouchableOpacity style={StyleSheet.absoluteFillObject as StyleProp<ViewStyle>} onPress={onClose} />
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject as StyleProp<ViewStyle>}
+          onPress={onClose}
+        />
         <View
           style={[styles.emojiPanel, { backgroundColor: theme.colors.surface }]}
           onLayout={e => setPanelWidth(e.nativeEvent.layout.width)}
@@ -92,13 +96,20 @@ const EmojiPanel: React.FC<{
             <Text style={[styles.emojiTitle, { color: theme.colors.text }]} allowFontScaling={false}>
               Chọn emoji
             </Text>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Ionicons name="close" size={SIZES.iconSm} color={theme.colors.text} />
             </TouchableOpacity>
           </View>
 
           {/* Tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catRow}
+          >
             {categories.map(cat => {
               const selected = cat === active;
               return (
@@ -164,6 +175,7 @@ const EmojiPanel: React.FC<{
 /* --------------------------------- */
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
+  onSendToAI,
   onTyping,
   onStopTyping,
   placeholder = 'Nhắn tin',
@@ -174,6 +186,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [showEmoji, setShowEmoji] = useState(false);
+
+  // mention AI
+  const [showAiSuggest, setShowAiSuggest] = useState(false);
+  const [routeToAI, setRouteToAI] = useState(false);
+
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // demo recorder timer
@@ -209,18 +226,66 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     typingTimeoutRef.current = setTimeout(stopTyping, 1200);
   }, [stopTyping]);
 
+  const updateMentionState = (text: string) => {
+    // token cuối cùng
+    const tokens = text.split(/\s+/);
+    const last = tokens[tokens.length - 1] || '';
+    const hasAt = last.startsWith('@');
+
+    setShowAiSuggest(hasAt); // nếu đang gõ @... thì mở dropdown
+    // nếu text chứa @ai-assistant → gửi cho AI
+    const willRouteToAI =
+      /(^|\s)@ai-assistant\b/i.test(text) ||
+      (hasAt && last.toLowerCase().startsWith('@ai')); // gõ gần đúng vẫn coi là muốn AI
+    setRouteToAI(willRouteToAI);
+  };
+
   const handleTextChange = (text: string) => {
     setMessage(text);
     if (text.trim()) onTyping?.();
     else onStopTyping?.();
+    updateMentionState(text);
+    scheduleStopTyping();
+  };
+
+  const handleSelectAiAssistant = () => {
+    setMessage(prev => {
+      const tokens = prev.split(/\s+/);
+      if (!tokens.length) return '@ai-assistant ';
+      const last = tokens[tokens.length - 1] || '';
+      if (last.startsWith('@')) {
+        tokens[tokens.length - 1] = '@ai-assistant';
+      } else {
+        tokens.push('@ai-assistant');
+      }
+      return tokens.join(' ') + ' ';
+    });
+    setRouteToAI(true);
+    setShowAiSuggest(false);
+    onTyping?.();
     scheduleStopTyping();
   };
 
   const handleSend = () => {
     const trimmed = message.trim();
     if (!trimmed) return;
-    onSend(trimmed);
+
+    // xác định có gửi cho AI hay không
+    const willSendToAI =
+      !!onSendToAI &&
+      (routeToAI || /^@ai-assistant\b/i.test(trimmed) || /(^|\s)@ai-assistant\b/i.test(trimmed));
+
+    if (willSendToAI) {
+      // bỏ mention ở đầu nếu có
+      const clean = trimmed.replace(/^@ai-assistant\b\s*/i, '').trim() || trimmed;
+      onSendToAI?.(clean);
+    } else {
+      onSend(trimmed);
+    }
+
     setMessage('');
+    setRouteToAI(false);
+    setShowAiSuggest(false);
     stopTyping();
     setShowEmoji(false);
   };
@@ -249,61 +314,92 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const onPickEmoji = (e: string) => {
     setMessage(prev => `${prev}${e}`);
     onTyping?.();
+    updateMentionState(message + e);
     scheduleStopTyping();
   };
 
   return (
     <View style={styles.wrapper}>
-      <TouchableOpacity
-        style={[styles.attachButton, { backgroundColor: theme.chat.fabBg }]}
-        onPress={handleAttachmentPress}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={SIZES.iconMd} color={theme.colors.text} />
-      </TouchableOpacity>
-
-      <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}>
-        <TextInput
-          value={message}
-          onChangeText={handleTextChange}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.textSecondary}
-          style={[styles.input, { color: theme.colors.text }]}
-          multiline
-          allowFontScaling={false}
-        />
-        <View style={styles.inputActions}>
-          <TouchableOpacity style={styles.iconButton} onPress={openEmoji}>
-            <Ionicons name="happy-outline" size={SIZES.iconSm} color={theme.colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={toggleRecording}>
-            <Ionicons
-              name={isRecording ? 'stop-circle' : 'mic-outline'}
-              size={SIZES.iconSm}
-              color={isRecording ? theme.colors.danger : theme.colors.textSecondary}
-            />
+      {/* Dropdown @ai-assistant */}
+      {showAiSuggest && (
+        <View
+          style={[
+            styles.mentionContainer,
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+          ]}
+        >
+          <TouchableOpacity style={styles.mentionRow} onPress={handleSelectAiAssistant}>
+            <View style={styles.mentionAvatar}>
+              <Ionicons name="sparkles-outline" size={18} color={theme.colors.primary} />
+            </View>
+            <View style={styles.mentionTextCol}>
+              <Text style={[styles.mentionTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                ai-assistant
+              </Text>
+              <Text
+                style={[styles.mentionSubtitle, { color: theme.colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                Hỏi trợ lý AI trong cuộc trò chuyện này
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
-      </View>
+      )}
 
-      <TouchableOpacity
-        onPress={handleSend}
-        disabled={!message.trim()}
-        style={[
-          styles.sendButton,
-          {
-            backgroundColor: message.trim()
-              ? themeColor || theme.chat.bubbleOut
-              : theme.colors.border,
-          },
-        ]}
-      >
-        <Ionicons
-          name="send"
-          size={20}
-          color={message.trim() ? theme.chat.bubbleText : theme.colors.textSecondary}
-        />
-      </TouchableOpacity>
+      {/* Hàng input + nút */}
+      <View style={styles.inputRow}>
+        <TouchableOpacity
+          style={[styles.attachButton, { backgroundColor: theme.chat.fabBg }]}
+          onPress={handleAttachmentPress}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={SIZES.iconMd} color={theme.colors.text} />
+        </TouchableOpacity>
+
+        <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}>
+          <TextInput
+            value={message}
+            onChangeText={handleTextChange}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.textSecondary}
+            style={[styles.input, { color: theme.colors.text }]}
+            multiline
+            allowFontScaling={false}
+          />
+          <View style={styles.inputActions}>
+            <TouchableOpacity style={styles.iconButton} onPress={openEmoji}>
+              <Ionicons name="happy-outline" size={SIZES.iconSm} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={toggleRecording}>
+              <Ionicons
+                name={isRecording ? 'stop-circle' : 'mic-outline'}
+                size={SIZES.iconSm}
+                color={isRecording ? theme.colors.danger : theme.colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleSend}
+          disabled={!message.trim()}
+          style={[
+            styles.sendButton,
+            {
+              backgroundColor: message.trim()
+                ? themeColor || theme.chat.bubbleOut
+                : theme.colors.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="send"
+            size={20}
+            color={message.trim() ? theme.chat.bubbleText : theme.colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
 
       {isRecording && (
         <View style={styles.recordingBadge}>
@@ -325,9 +421,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 /* --------------------------------- */
 const styles = StyleSheet.create({
   wrapper: {
+    padding: SIZES.md,
+    gap: SIZES.sm,
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: SIZES.md,
     gap: SIZES.sm,
   },
   attachButton: {
@@ -369,9 +468,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   recordingBadge: {
-    position: 'absolute',
-    top: -18,
-    right: 16,
+    marginTop: 4,
+    alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#D946EF',
@@ -408,7 +506,7 @@ const styles = StyleSheet.create({
     paddingBottom: SIZES.sm,
     gap: SIZES.xs,
     height: 36,
-    marginBottom: 12
+    marginBottom: 12,
   },
   catPill: {
     paddingHorizontal: SIZES.md,
@@ -420,6 +518,32 @@ const styles = StyleSheet.create({
     fontSize: SIZES.fontSm,
     fontWeight: '600',
   },
+
+  // mention dropdown
+  mentionContainer: {
+    width: '100%',
+    borderRadius: SIZES.radiusLg,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: SIZES.xs,
+  },
+  mentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.sm,
+  },
+  mentionAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SIZES.sm,
+    backgroundColor: '#E0F2FE',
+  },
+  mentionTextCol: { flex: 1 },
+  mentionTitle: { fontSize: 14, fontWeight: '600' },
+  mentionSubtitle: { fontSize: 12 },
 });
 
 export default MessageInput;
