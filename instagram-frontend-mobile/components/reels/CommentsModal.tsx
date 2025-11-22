@@ -289,6 +289,67 @@ const CommentsModal = ({
         Keyboard.dismiss();
     };
 
+    // ------- TOGGLE REPLIES -------
+    const handleToggleReplies = async (comment: CommentWithReplies) => {
+        if (comment.showReplies) {
+            setComments(prev =>
+                prev.map(c =>
+                    c.id === comment.id
+                        ? { ...c, showReplies: false }
+                        : c
+                )
+            );
+            return;
+        }
+
+        if (comment.repliesLoaded && comment.replies && comment.replies.length > 0) {
+            setComments(prev =>
+                prev.map(c =>
+                    c.id === comment.id
+                        ? { ...c, showReplies: true }
+                        : c
+                )
+            );
+            return;
+        }
+
+        setComments(prev =>
+            prev.map(c =>
+                c.id === comment.id
+                    ? { ...c, loadingReplies: true }
+                    : c
+            )
+        );
+
+        try {
+            const response = await postCommentService.getReplies(postId, comment.id, 0, 50);
+            const replies = (response.content || []).map(r => ({ ...r } as CommentWithReplies));
+
+            setComments(prev =>
+                prev.map(c =>
+                    c.id === comment.id
+                        ? {
+                            ...c,
+                            replies,
+                            repliesLoaded: true,
+                            showReplies: true,
+                            loadingReplies: false,
+                        }
+                        : c
+                )
+            );
+        } catch (error) {
+            console.error('[CommentModal] Failed to load replies:', error);
+            setComments(prev =>
+                prev.map(c =>
+                    c.id === comment.id
+                        ? { ...c, loadingReplies: false }
+                        : c
+                )
+            );
+        }
+    };
+
     // ------- LIKE HANDLER (OPTIMISTIC) -------
     const handleLikeComment = async (
         comment: CommentWithReplies,
@@ -706,6 +767,7 @@ const CommentsModal = ({
                 rootComment={item}
                 onLike={handleLikeComment}
                 onReply={handleReply}
+                onToggleReplies={handleToggleReplies}
                 onLongPress={handleLongPressItem}
                 isFocused={selectedComment?.id === item.id}
             />
@@ -726,6 +788,7 @@ const CommentsModal = ({
                             isReply={true}
                             onLike={handleLikeComment}
                             onReply={handleReply}
+                            onToggleReplies={handleToggleReplies}
                             onLongPress={handleLongPressItem}
                             isFocused={selectedComment?.id === reply.id}
                         />

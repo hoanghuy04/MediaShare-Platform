@@ -41,9 +41,12 @@ export const CommentInput = ({
     const isSendButtonActive = commentText.trim().length > 0;
 
     const handleSend = () => {
-        if (isSendButtonActive && !submitting) {
-            onSend();
+        // Lấy text mới nhất từ props
+        const text = commentText.trim();
+        if (!text || submitting) {
+            return;
         }
+        onSend();
     };
 
     return (
@@ -57,7 +60,10 @@ export const CommentInput = ({
                     <Text style={styles.replyText}>
                         Đang trả lời {replyingTo.author.username}
                     </Text>
-                    <TouchableOpacity onPress={onCancelReply} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <TouchableOpacity
+                        onPress={onCancelReply}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <Ionicons name="close" size={20} color="#666" />
                     </TouchableOpacity>
                 </View>
@@ -93,8 +99,8 @@ export const CommentInput = ({
                     onFocus={onFocus}
                 />
                 <TouchableOpacity
-                    onPressIn={handleSend}
-                    disabled={!isSendButtonActive || submitting}
+                    onPress={handleSend}
+                    disabled={submitting} // chỉ disable khi đang gửi để tránh spam
                     style={styles.sendButton}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -125,6 +131,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 3,
         elevation: 20,
+        zIndex: 100,
     },
     replyBanner: {
         flexDirection: 'row',

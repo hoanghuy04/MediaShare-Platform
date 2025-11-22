@@ -31,6 +31,7 @@ export type CommentData = {
     likedByCurrentUser?: boolean;
     isLikedByCurrentUser?: boolean;
     isPosting?: boolean;
+    showReplies?: boolean;
 };
 
 type CommentRowProps = {
@@ -39,6 +40,7 @@ type CommentRowProps = {
     isReply?: boolean;
     onLike: (comment: CommentData, isReply: boolean, parentId?: string) => void;
     onReply: (comment: CommentData, rootComment: CommentData) => void;
+    onToggleReplies?: (comment: CommentData) => void;
     onLongPress?: () => void;
     containerRef?: React.RefObject<View>;
 };
@@ -69,6 +71,7 @@ export const CommentRow = ({
     isReply = false,
     onLike,
     onReply,
+    onToggleReplies,
     onLongPress,
     containerRef,
 }: CommentRowProps) => {
@@ -147,6 +150,23 @@ export const CommentRow = ({
                                     <Text style={styles.actionText}>Trả lời</Text>
                                 </Pressable>
                             </View>
+                        )}
+
+                        {!isReply && comment.totalReply > 0 && onToggleReplies && (
+                            <Pressable
+                                style={styles.viewRepliesButton}
+                                onPress={() => onToggleReplies(comment)}
+                                hitSlop={10}
+                            >
+                                <View style={styles.viewRepliesContainer}>
+                                    <View style={styles.horizontalLine} />
+                                    <Text style={styles.viewRepliesText}>
+                                        {comment.showReplies
+                                            ? 'Ẩn câu trả lời'
+                                            : `Xem ${comment.totalReply} câu trả lời`}
+                                    </Text>
+                                </View>
+                            </Pressable>
                         )}
                     </View>
 
@@ -243,5 +263,23 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#666',
         marginTop: 2,
+    },
+    viewRepliesButton: {
+        marginTop: 12,
+    },
+    viewRepliesContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    horizontalLine: {
+        width: 24,
+        height: 1,
+        backgroundColor: '#ccc',
+        marginRight: 12,
+    },
+    viewRepliesText: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '600',
     },
 });

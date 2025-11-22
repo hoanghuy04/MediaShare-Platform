@@ -10,6 +10,7 @@ type WrapperProps = {
     isFocused: boolean;
     onLike: (comment: CommentData, isReply: boolean, parentId?: string) => void;
     onReply: (comment: CommentData, rootComment: CommentData) => void;
+    onToggleReplies?: (comment: CommentData) => void;
     onLongPress: (
         comment: CommentData,
         layout: { x: number; y: number; width: number; height: number }
@@ -23,6 +24,7 @@ export const CommentItemWrapper = ({
     isFocused,
     onLike,
     onReply,
+    onToggleReplies,
     onLongPress,
 }: WrapperProps) => {
     const containerRef = useRef<View>(null);
@@ -42,6 +44,7 @@ export const CommentItemWrapper = ({
                 isReply={isReply}
                 onLike={onLike}
                 onReply={onReply}
+                onToggleReplies={onToggleReplies}
                 onLongPress={handleLongPressWrapper}
             />
         </View>
