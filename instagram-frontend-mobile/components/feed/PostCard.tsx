@@ -23,7 +23,7 @@ import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
 import { PostLikesModal } from './PostLikesModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
@@ -65,9 +65,22 @@ export const PostCard: React.FC<PostCardProps> = ({
   const videoRef = useRef<Video>(null);
   const likeButtonScale = useSharedValue(1);
 
-  const scale = useSharedValue(1);
-  const baseScale = useSharedValue(1);
+  // Create separate scale values for each media item
+  const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({}); 
+  const baseScaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({});
   const uiOpacity = useSharedValue(1);
+
+  // Get or create scale values for a specific media index
+  const getScaleForIndex = (index: number) => {
+    if (!scaleValues.current[index]) {
+      scaleValues.current[index] = useSharedValue(1);
+      baseScaleValues.current[index] = useSharedValue(1);
+    }
+    return {
+      scale: scaleValues.current[index],
+      baseScale: baseScaleValues.current[index],
+    };
+  };
 
   useEffect(() => {
     if (post.totalLike > 0) {
@@ -133,32 +146,6 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const likeButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeButtonScale.value }],
-  }));
-
-  // Pinch gesture for zoom
-  const pinchGesture = Gesture.Pinch()
-    .onStart(() => {
-      baseScale.value = scale.value;
-    })
-    .onUpdate((e) => {
-      scale.value = baseScale.value * e.scale;
-      // Limit between 1x and 3x
-      if (scale.value < 1) scale.value = 1;
-      if (scale.value > 3) scale.value = 3;
-      // Hide UI when zooming
-      uiOpacity.value = scale.value > 1.1 ? 0 : 1;
-    })
-    .onEnd(() => {
-      // Reset to original size with smooth timing animation (no bounce)
-      scale.value = withTiming(1, { duration: 200 });
-      baseScale.value = 1;
-      uiOpacity.value = withTiming(1, { duration: 200 });
-    });
-
-  // Animated style
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    zIndex: scale.value > 1.1 ? 9999 : 1,
   }));
 
   const uiAnimatedStyle = useAnimatedStyle(() => ({
@@ -248,27 +235,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       );
     } else {
-      return (
-        <View style={{ position: 'relative' }}>
-          <GestureDetector gesture={pinchGesture}>
-            <Animated.Image
-              source={{ uri: media.url }}
-              style={[
-                styles.media,
-                animatedStyle,
-              ]}
-              resizeMode="cover"
-              onError={error => {
-                console.error('Image load error:', error.nativeEvent.error);
-                setImageLoadError(true);
-              }}
-              onLoad={() => {
-                setImageLoadError(false);
-              }}
-            />
-          </GestureDetector>
-        </View>
-      );
+      return <ImageWithZoom media={media} index={index} uiOpacity={uiOpacity} />;
     }
   };
 
@@ -296,71 +263,65 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Media */}
       {post.media && post.media.length > 0 && (
-        <TouchableOpacity 
-          activeOpacity={0.95} 
-          onPress={handleMediaPress}
-          disabled={disableNavigation}
-        >
-          <View style={styles.mediaContainer}>
-            {post.media.length === 1 ? (
-              // Single media
-              <View style={styles.singleMediaContainer}>
-                {renderMedia(post.media[0], 0)}
-                {imageLoadError && !isVideo(post.media[0]) && (
-                  <View style={styles.imageErrorContainer}>
-                    <Ionicons name="image-outline" size={48} color="#999" />
-                    <Text style={styles.imageErrorText}>Không thể tải hình ảnh</Text>
-                    <Text style={styles.imageErrorUrl}>{post.media[0].url}</Text>
-                  </View>
-                )}
-              </View>
-            ) : (
-              // Multiple media carousel
-              <View style={styles.carouselContainer}>
-                <ScrollView
-                  ref={scrollViewRef}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onScroll={handleMediaScroll}
-                  onScrollBeginDrag={handleScrollBeginDrag}
-                  onScrollEndDrag={handleScrollEndDrag}
-                  onMomentumScrollEnd={handleScrollEndDrag}
-                  scrollEventThrottle={16}
-                  style={styles.carouselScroll}
-                >
-                  {post.media.map((media, index) => (
-                    <View
-                      key={index}
-                      style={styles.carouselItem}
-                    >
-                      {renderMedia(media, index)}
-                    </View>
-                  ))}
-                </ScrollView>
-
-                {/* Media indicators */}
-                <View style={styles.mediaIndicators}>
-                  {post.media.map((_, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.indicator,
-                        index === currentMediaIndex && styles.activeIndicator,
-                      ]}
-                    />
-                  ))}
+        <View style={styles.mediaContainer}>
+          {post.media.length === 1 ? (
+            // Single media
+            <View style={styles.singleMediaContainer}>
+              {renderMedia(post.media[0], 0)}
+              {imageLoadError && !isVideo(post.media[0]) && (
+                <View style={styles.imageErrorContainer}>
+                  <Ionicons name="image-outline" size={48} color="#999" />
+                  <Text style={styles.imageErrorText}>Không thể tải hình ảnh</Text>
+                  <Text style={styles.imageErrorUrl}>{post.media[0].url}</Text>
                 </View>
+              )}
+            </View>
+          ) : (
+            // Multiple media carousel
+            <View style={styles.carouselContainer}>
+              <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={handleMediaScroll}
+                onScrollBeginDrag={handleScrollBeginDrag}
+                onScrollEndDrag={handleScrollEndDrag}
+                onMomentumScrollEnd={handleScrollEndDrag}
+                scrollEventThrottle={16}
+                style={styles.carouselScroll}
+              >
+                {post.media.map((media, index) => (
+                  <View
+                    key={index}
+                    style={styles.carouselItem}
+                  >
+                    {renderMedia(media, index)}
+                  </View>
+                ))}
+              </ScrollView>
+
+              {/* Media indicators */}
+              <View style={styles.mediaIndicators}>
+                {post.media.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.indicator,
+                      index === currentMediaIndex && styles.activeIndicator,
+                    ]}
+                  />
+                ))}
               </View>
-            )}
-            {/* Loading overlay */}
-            {isNavigating && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#fff" />
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+            </View>
+          )}
+          {/* Loading overlay */}
+          {isNavigating && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          )}
+        </View>
       )}
 
       {/* Actions Row */}
@@ -521,6 +482,7 @@ const styles = StyleSheet.create({
   },
   singleMediaContainer: {
     position: 'relative',
+    overflow: 'hidden',
   },
   carouselContainer: {
     position: 'relative',
@@ -532,6 +494,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH * MEDIA_ASPECT_RATIO,
     position: 'relative',
+    overflow: 'hidden',
   },
   media: {
     width: SCREEN_WIDTH,
@@ -699,3 +662,57 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
 });
+
+// Separate component for image with zoom to avoid hooks in conditional
+const ImageWithZoom: React.FC<{
+  media: any;
+  index: number;
+  uiOpacity: SharedValue<number>;
+}> = ({ media, index, uiOpacity }) => {
+  const scale = useSharedValue(1);
+  const baseScale = useSharedValue(1);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      baseScale.value = scale.value;
+    })
+    .onUpdate((e) => {
+      scale.value = baseScale.value * e.scale;
+      if (scale.value < 1) scale.value = 1;
+      if (scale.value > 3) scale.value = 3;
+      uiOpacity.value = scale.value > 1.1 ? 0 : 1;
+    })
+    .onEnd(() => {
+      scale.value = withTiming(1, { duration: 200 });
+      baseScale.value = 1;
+      uiOpacity.value = withTiming(1, { duration: 200 });
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <GestureDetector gesture={pinchGesture}>
+      <Animated.Image
+        source={{ uri: media.url }}
+        style={[
+          {
+            width: SCREEN_WIDTH,
+            height: SCREEN_WIDTH * MEDIA_ASPECT_RATIO,
+          },
+          animatedStyle,
+        ]}
+        resizeMode="cover"
+        onError={error => {
+          console.error('Image load error:', error.nativeEvent.error);
+          setImageLoadError(true);
+        }}
+        onLoad={() => {
+          setImageLoadError(false);
+        }}
+      />
+    </GestureDetector>
+  );
+};
