@@ -1,8 +1,8 @@
 package com.hoanghuy04.instagrambackend.controller;
 
 import com.hoanghuy04.instagrambackend.dto.request.ApplyThemeRequest;
-import com.hoanghuy04.instagrambackend.dto.response.ChatThemeDTO;
-import com.hoanghuy04.instagrambackend.dto.response.ConversationThemeDTO;
+import com.hoanghuy04.instagrambackend.dto.response.ChatThemeResponse;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationThemeResponse;
 import com.hoanghuy04.instagrambackend.service.conversationtheme.ConversationThemeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,12 +18,12 @@ public class ConversationThemeController {
     private final ConversationThemeService service;
 
     @GetMapping("/themes")
-    public ResponseEntity<List<ChatThemeDTO>> listThemes() {
+    public ResponseEntity<List<ChatThemeResponse>> listThemes() {
         return ResponseEntity.ok(service.listThemes());
     }
 
     @PostMapping("/conversations/{id}/theme")
-    public ResponseEntity<ConversationThemeDTO> applyTheme(
+    public ResponseEntity<ConversationThemeResponse> applyTheme(
             @PathVariable("id") String conversationId,
             @RequestBody ApplyThemeRequest request) {
         return ResponseEntity.ok(service.applyTheme(conversationId, request));

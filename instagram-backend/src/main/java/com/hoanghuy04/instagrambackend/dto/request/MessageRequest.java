@@ -1,5 +1,6 @@
-package com.hoanghuy04.instagrambackend.dto.response;
+package com.hoanghuy04.instagrambackend.dto.request;
 
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +10,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * DTO for message request response data.
+ * DTO for message request data.
  * 
  * @author Instagram Backend Team
  * @version 2.0.0
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MessageRequestDTO {
+public class MessageRequest {
     
     /**
      * Message request ID
@@ -28,12 +29,12 @@ public class MessageRequestDTO {
     /**
      * Information about the sender
      */
-    private UserSummaryDTO sender;
+    private UserSummaryResponse sender;
     
     /**
      * Information about the receiver
      */
-    private UserSummaryDTO receiver;
+    private UserSummaryResponse receiver;
     
     /**
      * Content of the last message in the request

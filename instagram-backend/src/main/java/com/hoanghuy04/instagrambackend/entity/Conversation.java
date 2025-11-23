@@ -1,5 +1,8 @@
-package com.hoanghuy04.instagrambackend.entity.message;
+package com.hoanghuy04.instagrambackend.entity;
 
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationTheme;
+import com.hoanghuy04.instagrambackend.entity.conversation.LastMessageInfo;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -12,7 +15,8 @@ import java.util.*;
 
 @Data
 @Builder
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Document(collection = "conversations")
 @CompoundIndex(name = "participants_userId_idx", def = "{'participants.userId': 1}")
@@ -50,4 +54,8 @@ public class Conversation {
 
     ConversationTheme theme;
     String wallpaperUrl;
+
+    public Conversation(String id) {
+        this.id = id;
+    }
 }

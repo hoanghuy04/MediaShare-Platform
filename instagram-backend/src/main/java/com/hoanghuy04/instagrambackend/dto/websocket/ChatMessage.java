@@ -26,9 +26,15 @@ public class ChatMessage {
     private String id;
     
     /**
-     * Type of message
+     * Type of WebSocket message (CHAT, JOIN, LEAVE, TYPING, etc.)
      */
     private MessageType type;
+    
+    /**
+     * Content type for CHAT messages (TEXT, IMAGE, VIDEO, POST_SHARE).
+     * Only used when type == CHAT.
+     */
+    private com.hoanghuy04.instagrambackend.enums.MessageType contentType;
     
     /**
      * Sender user ID

@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.entity.message;
+package com.hoanghuy04.instagrambackend.entity.conversation;
 
 import com.hoanghuy04.instagrambackend.enums.MemberRole;
 import lombok.*;
@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
  */
 @Data
 @Builder
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ConversationMember {
 

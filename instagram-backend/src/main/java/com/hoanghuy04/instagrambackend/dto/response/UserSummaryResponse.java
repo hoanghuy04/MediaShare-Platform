@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserSummaryDTO {
+public class UserSummaryResponse {
     
     /**
      * User ID

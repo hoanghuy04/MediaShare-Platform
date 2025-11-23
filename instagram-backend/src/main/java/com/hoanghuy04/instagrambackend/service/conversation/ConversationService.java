@@ -1,8 +1,9 @@
-package com.hoanghuy04.instagrambackend.service.message;
+package com.hoanghuy04.instagrambackend.service.conversation;
 
-import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
-import com.hoanghuy04.instagrambackend.entity.message.Message;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,7 @@ public interface ConversationService {
      * @return Optional conversation
      */
     @Transactional(readOnly = true)
-    Optional<Conversation> getExistingDirectConversation(String userId1, String userId2);
+    ConversationResponse getExistingDirectConversation(String userId1, String userId2);
 
     /**
      * Create a new direct conversation between two users.
@@ -37,9 +38,10 @@ public interface ConversationService {
      * @return newly created Conversation
      */
     @Transactional
-    Conversation createDirectConversation(String userId1, String userId2);
+    ConversationResponse createDirectConversation(String userId1, String userId2);
 
-    
+    @Transactional
+    String findOrCreateDirect(String userId, String peerId);
     /**
      * Create a group conversation.
      *
@@ -49,7 +51,7 @@ public interface ConversationService {
      * @return Conversation entity
      */
     @Transactional
-    Conversation createGroupConversation(
+    ConversationResponse createGroupConversation(
             String creatorId,
             List<String> participantIds,
             String groupName
@@ -70,10 +72,9 @@ public interface ConversationService {
      *
      * @param conversationId the conversation ID
      * @param userId the user ID to remove
-     * @param removedBy the user ID who removes the member
      */
     @Transactional
-    void removeMember(String conversationId, String userId, String removedBy);
+    void removeMember(String conversationId, String userId);
 
     /**
      * Leave a group conversation.
@@ -91,7 +92,7 @@ public interface ConversationService {
      * @return List of conversations
      */
     @Transactional(readOnly = true)
-    List<Conversation> getUserConversations(String userId);
+    List<ConversationResponse> getUserConversations(String userId);
 
     /**
      * Update the last message in a conversation.
@@ -100,7 +101,7 @@ public interface ConversationService {
      * @param message the message to set as last message
      */
     @Transactional
-    void updateLastMessage(String conversationId, Message message);
+    void updateLastMessage(String conversationId, MessageResponse message);
 
     /**
      * Check if a user is a participant in a conversation.
@@ -119,15 +120,34 @@ public interface ConversationService {
      * @return Conversation entity
      */
     @Transactional(readOnly = true)
-    Conversation getConversationById(String conversationId);
+    ConversationResponse getConversationById(String conversationId);
 
-    Conversation updateGroupInfo(
+    ConversationResponse updateGroupInfo(
             String conversationId,
             String name,
             String avatarFileId,
             String updatedByUserId
     );
 
+    /**
+     * Promote a member to admin role.
+     *
+     * @param conversationId the conversation ID
+     * @param userId the user ID to promote
+     * @param promotedBy the admin who promotes
+     */
+    @Transactional
+    void promoteMemberToAdmin(String conversationId, String userId);
+
+    /**
+     * Demote an admin to member role.
+     *
+     * @param conversationId the conversation ID
+     * @param userId the user ID to demote
+     * @param demotedBy the admin who demotes
+     */
+    @Transactional
+    void demoteAdminToMember(String conversationId, String userId);
 
     String directKeyOf(String u1, String u2);
 }

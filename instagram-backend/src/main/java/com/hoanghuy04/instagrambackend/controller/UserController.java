@@ -5,7 +5,7 @@ import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
-import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -143,14 +143,14 @@ public class UserController {
      */
     @GetMapping("/{id}/following-summary")
     @Operation(summary = "Get user following summary")
-    public ResponseEntity<ApiResponse<List<UserSummaryDTO>>> getUserFollowingSummary(
+    public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getUserFollowingSummary(
             @PathVariable String id,
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
         log.info("Get following summary request received for user: {} with query: {}", id, query);
-        List<UserSummaryDTO> response = userService.getUserFollowingSummary(id, query, page, size);
+        List<UserSummaryResponse> response = userService.getUserFollowingSummary(id, query, page, size);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -198,14 +198,14 @@ public class UserController {
      */
     @GetMapping("/{userId}/mutual-follows")
     @Operation(summary = "Get mutual follows for a user")
-    public ResponseEntity<ApiResponse<List<UserSummaryDTO>>> getMutualFollows(
+    public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getMutualFollows(
             @PathVariable String userId,
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
         log.info("Get mutual follows for user {} with query: {}", userId, query);
-        List<UserSummaryDTO> mutuals = userService.getMutualFollows(userId, query, page, size);
+        List<UserSummaryResponse> mutuals = userService.getMutualFollows(userId, query, page, size);
         return ResponseEntity.ok(
             ApiResponse.success("Mutual follows retrieved successfully", mutuals)
         );

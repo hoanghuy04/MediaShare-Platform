@@ -1,6 +1,6 @@
-package com.hoanghuy04.instagrambackend.repository.message;
+package com.hoanghuy04.instagrambackend.repository;
 
-import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
+import com.hoanghuy04.instagrambackend.entity.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;

@@ -1,10 +1,10 @@
-package com.hoanghuy04.instagrambackend.service.message;
+package com.hoanghuy04.instagrambackend.service.conversation;
 
 import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +27,12 @@ public interface ConversationMessageService {
      *
      * @param conversationId the conversation ID
      * @param senderId the sender user ID
-     * @param content the message content
-     * @param mediaUrl the media URL (optional)
+     * @param type the message type (TEXT, IMAGE, VIDEO, POST_SHARE)
+     * @param content the message content (meaning depends on type)
      * @return Message entity
      */
     @Transactional
-    Message sendMessageToConversation(String conversationId, String senderId, String content, String mediaUrl);
+    MessageResponse sendMessageToConversation(String conversationId, String senderId, com.hoanghuy04.instagrambackend.enums.MessageType type, String content);
 
     /**
      * Send a message to a user (backward compatibility).
@@ -40,12 +40,12 @@ public interface ConversationMessageService {
      *
      * @param senderId the sender ID
      * @param receiverId the receiver ID
-     * @param content the message content
-     * @param mediaUrl the media URL (optional)
+     * @param type the message type (TEXT, IMAGE, VIDEO, POST_SHARE)
+     * @param content the message content (meaning depends on type)
      * @return Message entity
      */
     @Transactional
-    Message sendMessage(String senderId, String receiverId, String content, String mediaUrl);
+    MessageResponse sendMessage(String senderId, String receiverId, com.hoanghuy04.instagrambackend.enums.MessageType type, String content);
 
     /**
      * Get messages in a conversation as DTOs (excluding deleted by user).
@@ -103,7 +103,7 @@ public interface ConversationMessageService {
      * @return Message entity
      */
     @Transactional
-    Message replyToMessage(String conversationId, String senderId, String replyToMessageId, String content);
+    MessageResponse replyToMessage(String conversationId, String senderId, String replyToMessageId, String content);
 
     /**
      * Check if two users are connected.

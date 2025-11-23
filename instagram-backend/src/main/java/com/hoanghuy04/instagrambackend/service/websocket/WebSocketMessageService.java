@@ -1,6 +1,7 @@
-package com.hoanghuy04.instagrambackend.service.message;
+package com.hoanghuy04.instagrambackend.service.websocket;
 
-import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,7 +21,7 @@ public interface WebSocketMessageService {
      *
      * @param message the Message entity
      */
-    void pushMessage(Message message);
+    void pushMessage(MessageResponse message);
 
     /**
      * Push a read receipt via WebSocket.
@@ -28,7 +29,7 @@ public interface WebSocketMessageService {
      * @param message the Message entity
      * @param readByUserId the user ID who read the message
      */
-    void pushReadReceipt(Message message, String readByUserId);
+    void pushReadReceipt(MessageResponse message, String readByUserId);
 
     /**
      * Push typing indicator via WebSocket.

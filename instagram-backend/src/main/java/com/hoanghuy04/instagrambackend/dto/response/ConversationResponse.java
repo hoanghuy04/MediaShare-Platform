@@ -1,5 +1,7 @@
 package com.hoanghuy04.instagrambackend.dto.response;
 
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
+import com.hoanghuy04.instagrambackend.entity.conversation.LastMessageInfo;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,7 +21,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ConversationDTO {
+public class ConversationResponse {
     
     /**
      * Conversation ID
@@ -44,7 +46,7 @@ public class ConversationDTO {
     /**
      * List of participants in the conversation with their roles and join times
      */
-    private List<ConversationMemberDTO> participants;
+    private List<ConversationMember> participants;
     
     /**
      * List of admin user IDs (only for group conversations)
@@ -54,7 +56,7 @@ public class ConversationDTO {
     /**
      * Information about the last message
      */
-    private LastMessageDTO lastMessage;
+    private LastMessageInfo lastMessage;
     
     /**
      * Timestamp when the conversation was created

@@ -1,5 +1,6 @@
 package com.hoanghuy04.instagrambackend.dto.response;
 
+import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
 import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,7 +20,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InboxItemDTO {
+public class InboxItemResponse {
     
     /**
      * Type of inbox item: CONVERSATION or MESSAGE_REQUEST
@@ -29,12 +30,12 @@ public class InboxItemDTO {
     /**
      * Conversation data (if type is CONVERSATION)
      */
-    private ConversationDTO conversation;
+    private ConversationResponse conversation;
     
     /**
      * Message request data (if type is MESSAGE_REQUEST)
      */
-    private MessageRequestDTO messageRequest;
+    private MessageRequest messageRequest;
     
     /**
      * Timestamp for sorting (conversation.updatedAt or messageRequest.createdAt)

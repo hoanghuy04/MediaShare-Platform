@@ -1,10 +1,15 @@
-package com.hoanghuy04.instagrambackend.service.message;
+package com.hoanghuy04.instagrambackend.service.websocket;
 
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
-import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
+import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.repository.ConversationRepository;
+import com.hoanghuy04.instagrambackend.service.conversation.ConversationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -28,11 +33,13 @@ import java.time.LocalDateTime;
 public class WebSocketMessageServiceImpl implements WebSocketMessageService {
 
     SimpMessagingTemplate messagingTemplate;
+    ConversationService conversationService;
+    private final ConversationRepository conversationRepository;
 
     @Override
-    public void pushMessage(Message message) {
+    public void pushMessage(MessageResponse message) {
         try {
-            User sender = message.getSender();
+            UserSummaryResponse sender = message.getSender();
             if (sender == null) {
                 log.warn("Cannot push message {} - sender is null", message.getId());
                 return;
@@ -41,7 +48,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
             ChatMessage chatMessage = buildChatMessage(message, sender);
 
             // Check if message belongs to a conversation (new system)
-            if (message.getConversation() != null) {
+            if (message.getConversationId() != null) {
                 pushConversationMessage(message, chatMessage, sender);
             } else {
                 // Legacy: Use receiver field (backward compatibility)
@@ -54,9 +61,9 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     }
 
     @Override
-    public void pushReadReceipt(Message message, String readByUserId) {
+    public void pushReadReceipt(MessageResponse message, String readByUserId) {
         try {
-            User sender = message.getSender();
+            UserSummaryResponse sender = message.getSender();
             if (sender == null || sender.getId().equals(readByUserId)) {
                 // Don't send read receipt if sender read their own message
                 return;
@@ -136,15 +143,15 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     /**
      * Build ChatMessage DTO from Message entity.
      */
-    private ChatMessage buildChatMessage(Message message, User sender) {
+    private ChatMessage buildChatMessage(MessageResponse message, UserSummaryResponse sender) {
         return ChatMessage.builder()
                 .id(message.getId())
                 .type(ChatMessage.MessageType.CHAT)
                 .senderId(sender.getId())
                 .senderUsername(sender.getUsername())
-                .senderProfileImage(sender.getProfile() != null ? sender.getProfile().getAvatar() : null)
+                .senderProfileImage(sender.getAvatar())
                 .content(message.getContent())
-                .mediaUrl(message.getMediaUrl())
+//                .mediaUrl(message.getMediaUrl())
                 .timestamp(message.getCreatedAt())
                 .status(ChatMessage.MessageStatus.SENT)
                 .build();
@@ -153,8 +160,9 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     /**
      * Push message for conversation-based messages (direct or group).
      */
-    private void pushConversationMessage(Message message, ChatMessage chatMessage, User sender) {
-        Conversation conversation = message.getConversation();
+    private void pushConversationMessage(MessageResponse message, ChatMessage chatMessage, UserSummaryResponse sender) {
+        Conversation conversation = conversationRepository.findById(message.getConversationId()).orElseThrow(
+                () -> new ResourceNotFoundException("Conversation with id " + message.getConversationId() + " not found"));
 
         // For GROUP conversations: push to all participants
         if (conversation.getType() == ConversationType.GROUP) {
@@ -200,8 +208,8 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
     /**
      * Push message for legacy messages (without conversation).
      */
-    private void pushLegacyMessage(Message message, ChatMessage chatMessage) {
-        User receiver = message.getReceiver();
+    private void pushLegacyMessage(MessageResponse message, ChatMessage chatMessage) {
+        UserSummaryResponse receiver = message.getReceiver();
         if (receiver != null) {
             chatMessage.setReceiverId(receiver.getId());
             messagingTemplate.convertAndSendToUser(
@@ -213,7 +221,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
         }
 
         // Send confirmation back to sender
-        User sender = message.getSender();
+        UserSummaryResponse sender = message.getSender();
         if (sender != null) {
             chatMessage.setReceiverId(sender.getId());
             messagingTemplate.convertAndSendToUser(

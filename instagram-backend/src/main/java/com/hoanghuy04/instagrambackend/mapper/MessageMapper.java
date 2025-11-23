@@ -1,55 +1,61 @@
 package com.hoanghuy04.instagrambackend.mapper;
 
-import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.response.UserSummaryDTO;
-import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.repository.MessageRepository;
-import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.service.FileService;
 import lombok.extern.slf4j.Slf4j;
 import org.mapstruct.*;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/**
- * MapStruct mapper for Message and Conversation entities to DTOs.
- * Handles complex nested mappings with proper null safety and logging.
- * 
- * @author Instagram Backend Team
- * @version 2.0.0
- */
-@Mapper(componentModel = "spring")
+@Mapper(
+        componentModel = "spring",
+        unmappedTargetPolicy = ReportingPolicy.IGNORE,
+        injectionStrategy = InjectionStrategy.FIELD
+)
 @Slf4j
 public abstract class MessageMapper {
 
-    /**
-     * Map User entity to UserSummaryDTO.
-     *
-     * @param user the User entity
-     * @return UserSummaryDTO
-     */
-    public abstract UserSummaryDTO toUserSummaryDTO(User user);
-    
-    /**
-     * Map Message entity to MessageDTO.
-     * Context parameter currentUserId is used to determine if message is deleted by the user.
-     *
-     * @param message the Message entity
-     * @return MessageDTO
-     */
-//    @Mapping(target = "isDeleted", expression = "java(message.getDeletedBy().contains(currentUserId))")
-    @Mapping(target = "readBy", expression = "java(new java.util.ArrayList<>(message.getReadBy()))")
-    public abstract MessageDTO toMessageDTO(Message message);
+    @Autowired
+    protected FileService fileService;
+    @Autowired
+    protected UserMapper userMapper;
 
-    /**
-     * Map Conversation entity to ConversationDTO.
-     * Context parameter currentUserId is used for context-specific operations.
-     *
-     * @param conversation the Conversation entity
-     * @return ConversationDTO
-     */
-    public abstract ConversationDTO toConversationDTO(Conversation conversation);
+    @Mappings({
+            @Mapping(
+                    target = "readBy",
+                    expression = "java(new java.util.ArrayList<>(message.getReadBy()))"
+            ),
+            @Mapping(
+                    target = "conversationId",
+                    source = "conversation.id"
+            ),
+            @Mapping(
+                    target = "sender",
+                    expression = "java(userMapper.toUserSummary(message.getSender()))"
+            ),
+            @Mapping(
+                    target = "receiver",
+                    expression = "java(userMapper.toUserSummary(message.getReceiver()))"
+            ),
+            @Mapping(
+                    target = "content",
+                    expression = "java(message.getContent() == null || message.getContent().isEmpty() " +
+                            "|| !(message.getType() == com.hoanghuy04.instagrambackend.enums.MessageType.IMAGE " +
+                            "|| message.getType() == com.hoanghuy04.instagrambackend.enums.MessageType.VIDEO) " +
+                            "? message.getContent() " +
+                            ": fileService.getMediaFileResponse(message.getContent()).getUrl())"
+            )
+
+
+    })
+    public abstract MessageResponse toMessageDTO(Message message);
+
+    public abstract ConversationResponse toConversationDTO(Conversation conversation);
+
+    public abstract Conversation toConversationEntity(ConversationResponse conversationResponse);
 
 }
-

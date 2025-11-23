@@ -1,6 +1,6 @@
-package com.hoanghuy04.instagrambackend.entity.message;
+package com.hoanghuy04.instagrambackend.entity;
 
-import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.enums.MessageType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.annotation.CreatedDate;
@@ -16,14 +16,19 @@ import java.util.List;
 
 /**
  * Entity representing a message between users.
- * Supports text and media content, threading, read receipts, and soft delete.
+ * The meaning of 'content' depends on 'type':
+ * - TEXT: content is the actual text message
+ * - IMAGE: content is the mediaFileId of an image
+ * - VIDEO: content is the mediaFileId of a video
+ * - POST_SHARE: content is the postId of a shared post
  *
  * @author Instagram Backend Team
  * @version 2.0.0
  */
 @Data
 @Builder
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Document(collection = "messages")
 @CompoundIndex(name = "sender_receiver_idx", def = "{'sender': 1, 'receiver': 1}")
@@ -42,9 +47,20 @@ public class Message {
     @DocumentReference
     User receiver;
 
-    String content;
+    /**
+     * Type of the message (TEXT, IMAGE, VIDEO, POST_SHARE)
+     */
+    @Indexed
+    @Builder.Default
+    MessageType type = MessageType.TEXT;
 
-    String mediaUrl;
+    /**
+     * Content of the message. Meaning depends on type:
+     * - TEXT: actual text content
+     * - IMAGE/VIDEO: mediaFileId
+     * - POST_SHARE: postId
+     */
+    String content;
 
     @Builder.Default
     List<String> readBy = new ArrayList<>();

@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.entity.message;
+package com.hoanghuy04.instagrambackend.entity.conversation;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -6,7 +6,8 @@ import lombok.experimental.FieldDefaults;
 /** Theme áp cho từng conversation (sub-document). */
 @Data
 @Builder
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ConversationTheme {
      String themeKey;

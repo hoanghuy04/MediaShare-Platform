@@ -1,15 +1,17 @@
 package com.hoanghuy04.instagrambackend.service.conversationtheme;
 
 import com.hoanghuy04.instagrambackend.dto.request.ApplyThemeRequest;
-import com.hoanghuy04.instagrambackend.dto.response.ChatThemeDTO;
-import com.hoanghuy04.instagrambackend.dto.response.ConversationThemeDTO;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.entity.message.ConversationTheme;
-import com.hoanghuy04.instagrambackend.entity.theme.ChatTheme;
+import com.hoanghuy04.instagrambackend.dto.response.ChatThemeResponse;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationThemeResponse;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationTheme;
+import com.hoanghuy04.instagrambackend.entity.ChatTheme;
 import com.hoanghuy04.instagrambackend.mapper.ThemeMapper;
 import com.hoanghuy04.instagrambackend.repository.ChatThemeRepository;
-import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
+import com.hoanghuy04.instagrambackend.repository.ConversationRepository;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -18,20 +20,21 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ConversationThemeServiceImpl implements ConversationThemeService {
 
-    private final ConversationRepository conversationRepository;
-    private final ChatThemeRepository chatThemeRepository;
-    private final ThemeMapper themeMapper;
+    ConversationRepository conversationRepository;
+    ChatThemeRepository chatThemeRepository;
+    ThemeMapper themeMapper;
 
     @Override
-    public List<ChatThemeDTO> listThemes() {
+    public List<ChatThemeResponse> listThemes() {
         return chatThemeRepository.findAll()
                 .stream().map(themeMapper::toDTO).collect(Collectors.toList());
     }
 
     @Override
-    public ConversationThemeDTO applyTheme(String conversationId, ApplyThemeRequest req) {
+    public ConversationThemeResponse applyTheme(String conversationId, ApplyThemeRequest req) {
         if (!StringUtils.hasText(conversationId) || !StringUtils.hasText(req.getThemeKey())) {
             throw new IllegalArgumentException("conversationId/themeKey is required");
         }

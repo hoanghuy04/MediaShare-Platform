@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.entity.theme;
+package com.hoanghuy04.instagrambackend.entity;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -10,7 +10,8 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Document(collection = "chat_themes")
 public class ChatTheme {

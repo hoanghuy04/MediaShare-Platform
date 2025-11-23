@@ -156,6 +156,15 @@ public class FileService {
         if (fileId == null) {
             return null;
         }
+
+        if (fileId.startsWith("http://") || fileId.startsWith("https://")) {
+            // If it's already a URL, return as is
+            return MediaFileResponse.builder()
+                    .id(null)
+                    .url(fileId)
+                    .build();
+        }
+
         MediaFile mediaFile = mediaFileRepository.findById(fileId)
                 .orElseThrow(() -> new ResourceNotFoundException("Media file not found with id: " + fileId));
 

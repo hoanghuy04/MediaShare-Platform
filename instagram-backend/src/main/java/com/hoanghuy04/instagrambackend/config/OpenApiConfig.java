@@ -18,33 +18,22 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class OpenApiConfig {
-    
-    /**
-     * Configure OpenAPI documentation.
-     *
-     * @return OpenAPI configuration
-     */
+
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Instagram Backend API")
+                        .title("The Sudo api")
                         .version("1.0.0")
-                        .description("RESTful API for Instagram-like social media platform")
+                        .description("API documentation for frontend")
                         .contact(new Contact()
-                                .name("Instagram Backend Team")
-                                .email("support@instagram.com"))
+                                .name("Dương Hoàng Huy")
+                                .email("duonghoanghuydhi2@gmail.com")
+                                .url("https://github.com/hoanghuy04")
+                        )
                         .license(new License()
                                 .name("MIT License")
-                                .url("https://opensource.org/licenses/MIT")))
-                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
-                .components(new Components()
-                        .addSecuritySchemes("Bearer Authentication",
-                                new SecurityScheme()
-                                        .type(SecurityScheme.Type.HTTP)
-                                        .scheme("bearer")
-                                        .bearerFormat("JWT")
-                                        .description("Enter JWT token")));
+                                .url("https://opensource.org/licenses/MIT")));
     }
 }
 

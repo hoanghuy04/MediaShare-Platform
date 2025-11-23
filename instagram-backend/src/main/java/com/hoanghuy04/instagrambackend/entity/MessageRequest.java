@@ -1,6 +1,5 @@
-package com.hoanghuy04.instagrambackend.entity.message;
+package com.hoanghuy04.instagrambackend.entity;
 
-import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.enums.RequestStatus;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -24,7 +23,8 @@ import java.util.List;
  */
 @Data
 @Builder
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Document(collection = "message_requests")
 @CompoundIndex(name = "receiver_status_idx", def = "{'receiver': 1, 'status': 1}")

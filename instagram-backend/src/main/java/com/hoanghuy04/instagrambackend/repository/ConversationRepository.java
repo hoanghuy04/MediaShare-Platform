@@ -1,6 +1,6 @@
-package com.hoanghuy04.instagrambackend.repository.message;
+package com.hoanghuy04.instagrambackend.repository;
 
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;

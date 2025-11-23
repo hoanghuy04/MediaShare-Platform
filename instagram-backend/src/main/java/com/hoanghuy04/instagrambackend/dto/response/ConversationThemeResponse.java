@@ -3,7 +3,7 @@ package com.hoanghuy04.instagrambackend.dto.response;
 import lombok.Data;
 
 @Data
-public class ConversationThemeDTO {
+public class ConversationThemeResponse {
     private String themeKey;
     private String bubbleIn;
     private String bubbleOut;

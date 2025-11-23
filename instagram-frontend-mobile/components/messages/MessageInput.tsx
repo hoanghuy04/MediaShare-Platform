@@ -1,21 +1,30 @@
 // components/messages/MessageInput.tsx
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React,
+{
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import {
   View,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Text,
-  Platform,
   Alert,
-  Modal,
   Keyboard,
   ScrollView,
   FlatList,
-  StyleProp,
-  ViewStyle,
+  Animated,
+  Dimensions,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import {
   COLORS,
@@ -23,51 +32,64 @@ import {
   EMOJI,
   EMOJI_CATEGORIES_ORDER,
   EMOJI_DEFAULTS,
-  EMOJI_RECENTS_MAX,
 } from '../../utils/constants';
+import { MessageType } from '../../types/enum.type';
 
 type EmojiCategory = (typeof EMOJI_CATEGORIES_ORDER)[number];
 
 export interface MessageInputProps {
   onSend: (message: string) => void;
-  onSendToAI?: (message: string) => void;      // <-- thêm prop này
+  onSendToAI?: (message: string) => void;
+  onSendMedia?: (type: MessageType, mediaFileId: string) => void;
   onTyping?: () => void;
   onStopTyping?: () => void;
   placeholder?: string;
-  themeColor?: string;
+  themeColor?: string; // compat, không dùng trực tiếp
+
+  /** new: cho phép parent điều khiển trạng thái panel emoji */
+  isEmojiVisible?: boolean;
+  onEmojiVisibilityChange?: (visible: boolean) => void;
 }
 
-/* --------------------------------- */
-/* Emoji Panel (FlatList grid đều)   */
-/* --------------------------------- */
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+/* ---------------- Emoji Panel ---------------- */
 const EmojiPanel: React.FC<{
   visible: boolean;
-  onClose: () => void;
   onPick: (emoji: string) => void;
-}> = ({ visible, onClose, onPick }) => {
+}> = ({ visible, onPick }) => {
   const [active, setActive] = useState<EmojiCategory>('smileys');
   const [recents, setRecents] = useState<string[]>([]);
-  const [panelWidth, setPanelWidth] = useState<number>(0);
   const { theme } = useTheme();
 
-  // cấu hình grid
-  const COLS = EMOJI_DEFAULTS.gridColumns; // ví dụ: 8
-  const GRID_H_PAD = SIZES.md; // padding ngang container
-  const GAP = 8; // khoảng cách giữa các cột
+  const COLS = EMOJI_DEFAULTS.gridColumns;
+  const GRID_H_PAD = SIZES.md;
+  const GAP = 8;
+
+  const heightAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(heightAnim, {
+      toValue: visible ? EMOJI_DEFAULTS.panelHeight : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [visible, heightAnim]);
 
   const itemSize = useMemo(() => {
-    if (!panelWidth) return 40;
-    const usable = panelWidth - GRID_H_PAD * 2;
+    const usable = SCREEN_WIDTH - GRID_H_PAD * 2;
     const totalGaps = (COLS - 1) * GAP;
     return Math.floor((usable - totalGaps) / COLS);
-  }, [panelWidth]);
+  }, [COLS, GRID_H_PAD, GAP]);
 
   const categories: EmojiCategory[] = useMemo(
     () =>
       recents.length
-        ? (['smileys'] as EmojiCategory[]).concat(EMOJI_CATEGORIES_ORDER.slice(1))
+        ? (['smileys'] as EmojiCategory[]).concat(
+            EMOJI_CATEGORIES_ORDER.slice(1),
+          )
         : EMOJI_CATEGORIES_ORDER,
-    [recents.length]
+    [recents.length],
   );
 
   const list = useMemo(() => {
@@ -76,124 +98,146 @@ const EmojiPanel: React.FC<{
   }, [active, recents]);
 
   const handlePick = (e: string) => {
-    setRecents(prev => [e, ...prev.filter(x => x !== e)].slice(0, EMOJI_RECENTS_MAX));
     onPick(e);
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.emojiOverlay}>
-        <TouchableOpacity
-          style={StyleSheet.absoluteFillObject as StyleProp<ViewStyle>}
-          onPress={onClose}
-        />
-        <View
-          style={[styles.emojiPanel, { backgroundColor: theme.colors.surface }]}
-          onLayout={e => setPanelWidth(e.nativeEvent.layout.width)}
+    <Animated.View
+      style={[
+        styles.emojiPanel,
+        {
+          backgroundColor: theme.colors.surface,
+          height: heightAnim,
+        },
+      ]}
+    >
+      <View style={styles.emojiHeader}>
+        <Text
+          style={[styles.emojiTitle, { color: theme.colors.text }]}
+          allowFontScaling={false}
         >
-          {/* Header */}
-          <View style={styles.emojiHeader}>
-            <Text style={[styles.emojiTitle, { color: theme.colors.text }]} allowFontScaling={false}>
-              Chọn emoji
-            </Text>
-            <TouchableOpacity
-              onPress={onClose}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="close" size={SIZES.iconSm} color={theme.colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.catRow}
-          >
-            {categories.map(cat => {
-              const selected = cat === active;
-              return (
-                <TouchableOpacity
-                  key={`cat-${cat}`}
-                  onPress={() => setActive(cat)}
-                  style={[
-                    styles.catPill,
-                    { backgroundColor: selected ? theme.colors.primary : theme.colors.border },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.catText,
-                      { color: selected ? COLORS.light.background : theme.colors.text },
-                    ]}
-                    allowFontScaling={false}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Grid (đều hai bên) */}
-          <FlatList
-            data={list}
-            keyExtractor={(_item, index) => `emoji-${active}-${index}`} // dùng index để tránh trùng key
-            numColumns={COLS}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: GRID_H_PAD, paddingBottom: SIZES.md }}
-            columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: GAP }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={{
-                  width: itemSize,
-                  height: itemSize,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: SIZES.radiusMd,
-                }}
-                activeOpacity={0.7}
-                onPress={() => handlePick(item)}
-              >
-                <Text
-                  style={{ fontSize: EMOJI_DEFAULTS.emojiSize, textAlign: 'center' }}
-                  allowFontScaling={EMOJI_DEFAULTS.allowFontScaling}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+          Chọn emoji
+        </Text>
       </View>
-    </Modal>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.catRow}
+      >
+        {categories.map(cat => {
+          const selected = cat === active;
+          return (
+            <TouchableOpacity
+              key={`cat-${cat}`}
+              onPress={() => setActive(cat)}
+              style={[
+                styles.catPill,
+                {
+                  backgroundColor: selected
+                    ? theme.colors.primary
+                    : theme.colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.catText,
+                  {
+                    color: selected
+                      ? COLORS.light.background
+                      : theme.colors.text,
+                  },
+                ]}
+                allowFontScaling={false}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      <FlatList
+        data={list}
+        keyExtractor={(_item, index) => `emoji-${active}-${index}`}
+        numColumns={COLS}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: GRID_H_PAD,
+          paddingBottom: SIZES.md,
+        }}
+        columnWrapperStyle={{
+          justifyContent: 'space-between',
+          marginBottom: GAP,
+        }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={{
+              width: itemSize,
+              height: itemSize,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: SIZES.radiusMd,
+            }}
+            activeOpacity={0.7}
+            onPress={() => handlePick(item)}
+          >
+            <Text
+              style={{
+                fontSize: EMOJI_DEFAULTS.emojiSize,
+                textAlign: 'center',
+              }}
+              allowFontScaling={EMOJI_DEFAULTS.allowFontScaling}
+            >
+              {item}
+            </Text>
+          </TouchableOpacity>
+        )}
+      />
+    </Animated.View>
   );
 };
 
-/* --------------------------------- */
-/* MessageInput                       */
-/* --------------------------------- */
+/* ---------------- MessageInput ---------------- */
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
   onSendToAI,
+  onSendMedia,
   onTyping,
   onStopTyping,
-  placeholder = 'Nhắn tin',
-  themeColor,
+  placeholder = 'Nhắn tin…',
+  isEmojiVisible,
+  onEmojiVisibilityChange,
 }) => {
   const { theme } = useTheme();
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
-  const [showEmoji, setShowEmoji] = useState(false);
 
-  // mention AI
   const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [routeToAI, setRouteToAI] = useState(false);
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasText = message.trim().length > 0;
 
-  // demo recorder timer
+  const buttonGradientColors = [
+    theme.chat.gradientHigh,
+    theme.chat.gradientMedium,
+    theme.chat.gradientLow,
+  ];
+
+  // ---- emoji visible: controlled / uncontrolled ----
+  const [innerEmojiVisible, setInnerEmojiVisible] = useState(false);
+  const controlled = typeof isEmojiVisible === 'boolean';
+
+  const showEmoji = controlled ? !!isEmojiVisible : innerEmojiVisible;
+  const setShowEmoji = (v: boolean) => {
+    if (!controlled) setInnerEmojiVisible(v);
+    onEmojiVisibilityChange?.(v);
+  };
+
+  // fake recorder timer
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (isRecording) {
@@ -206,7 +250,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     };
   }, [isRecording]);
 
-  // cleanup typing debounce
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -227,16 +270,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [stopTyping]);
 
   const updateMentionState = (text: string) => {
-    // token cuối cùng
     const tokens = text.split(/\s+/);
     const last = tokens[tokens.length - 1] || '';
     const hasAt = last.startsWith('@');
 
-    setShowAiSuggest(hasAt); // nếu đang gõ @... thì mở dropdown
-    // nếu text chứa @ai-assistant → gửi cho AI
+    setShowAiSuggest(hasAt);
     const willRouteToAI =
       /(^|\s)@ai-assistant\b/i.test(text) ||
-      (hasAt && last.toLowerCase().startsWith('@ai')); // gõ gần đúng vẫn coi là muốn AI
+      (hasAt && last.toLowerCase().startsWith('@ai'));
     setRouteToAI(willRouteToAI);
   };
 
@@ -270,13 +311,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const trimmed = message.trim();
     if (!trimmed) return;
 
-    // xác định có gửi cho AI hay không
     const willSendToAI =
       !!onSendToAI &&
-      (routeToAI || /^@ai-assistant\b/i.test(trimmed) || /(^|\s)@ai-assistant\b/i.test(trimmed));
+      (routeToAI ||
+        /^@ai-assistant\b/i.test(trimmed) ||
+        /(^|\s)@ai-assistant\b/i.test(trimmed));
 
     if (willSendToAI) {
-      // bỏ mention ở đầu nếu có
       const clean = trimmed.replace(/^@ai-assistant\b\s*/i, '').trim() || trimmed;
       onSendToAI?.(clean);
     } else {
@@ -290,17 +331,77 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setShowEmoji(false);
   };
 
-  const handleAttachmentPress = () => {
-    const options = ['Ảnh/Video', 'Sticker', 'File', 'Hủy'];
+  const handleOpenCamera = () => {
+    Alert.alert('Camera', 'Mở camera (todo: tích hợp).');
+  };
+
+  const handlePickImage = async () => {
+    if (!onSendMedia) {
+      Alert.alert('Thông báo', 'Chức năng gửi media chưa được kích hoạt.');
+      return;
+    }
+
+    // Show selection: Image or Video
     if (Platform.OS === 'ios') {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const ActionSheet = require('react-native').ActionSheetIOS;
-      ActionSheet.showActionSheetWithOptions(
-        { options, cancelButtonIndex: options.length - 1, title: 'Chia sẻ' },
-        () => {}
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Hủy', 'Chọn ảnh', 'Chọn video'],
+          cancelButtonIndex: 0,
+        },
+        buttonIndex => {
+          if (buttonIndex === 1) {
+            pickMedia('image');
+          } else if (buttonIndex === 2) {
+            pickMedia('video');
+          }
+        }
       );
     } else {
-      Alert.alert('Chia sẻ', 'Chọn loại nội dung bạn muốn gửi');
+      // Android: Show alert dialog
+      Alert.alert(
+        'Chọn loại media',
+        'Bạn muốn gửi ảnh hay video?',
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { text: 'Ảnh', onPress: () => pickMedia('image') },
+          { text: 'Video', onPress: () => pickMedia('video') },
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+
+  const pickMedia = async (type: 'image' | 'video') => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Quyền truy cập',
+          'Ứng dụng cần quyền truy cập thư viện ảnh để chọn media.'
+        );
+        return;
+      }
+
+      // Launch picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: false,
+        quality: type === 'image' ? 0.8 : 1,
+        videoMaxDuration: 60, // 60 seconds max for videos
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        // Parent will handle upload and optimistic UI
+        onSendMedia?.(
+          type === 'image' ? MessageType.IMAGE : MessageType.VIDEO,
+          asset.uri
+        );
+      }
+    } catch (error) {
+      console.error('Error picking media:', error);
+      Alert.alert('Lỗi', 'Không thể chọn media. Vui lòng thử lại.');
     }
   };
 
@@ -318,6 +419,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     scheduleStopTyping();
   };
 
+  const handleSearchPress = () => {
+    // TODO: open message search screen
+  };
+
   return (
     <View style={styles.wrapper}>
       {/* Dropdown @ai-assistant */}
@@ -325,19 +430,37 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View
           style={[
             styles.mentionContainer,
-            { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+            },
           ]}
         >
           <TouchableOpacity style={styles.mentionRow} onPress={handleSelectAiAssistant}>
-            <View style={styles.mentionAvatar}>
-              <Ionicons name="sparkles-outline" size={18} color={theme.colors.primary} />
+            <View
+              style={[
+                styles.mentionAvatar,
+                { backgroundColor: theme.colors.overlay },
+              ]}
+            >
+              <Ionicons
+                name="sparkles-outline"
+                size={SIZES.iconSm}
+                color={theme.colors.primary}
+              />
             </View>
             <View style={styles.mentionTextCol}>
-              <Text style={[styles.mentionTitle, { color: theme.colors.text }]} numberOfLines={1}>
+              <Text
+                style={[styles.mentionTitle, { color: theme.colors.text }]}
+                numberOfLines={1}
+              >
                 ai-assistant
               </Text>
               <Text
-                style={[styles.mentionSubtitle, { color: theme.colors.textSecondary }]}
+                style={[
+                  styles.mentionSubtitle,
+                  { color: theme.colors.textSecondary },
+                ]}
                 numberOfLines={1}
               >
                 Hỏi trợ lý AI trong cuộc trò chuyện này
@@ -347,17 +470,32 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </View>
       )}
 
-      {/* Hàng input + nút */}
+      {/* Hàng input */}
       <View style={styles.inputRow}>
         <TouchableOpacity
-          style={[styles.attachButton, { backgroundColor: theme.chat.fabBg }]}
-          onPress={handleAttachmentPress}
-          activeOpacity={0.8}
+          activeOpacity={0.9}
+          onPress={hasText ? handleSearchPress : handleOpenCamera}
         >
-          <Ionicons name="add" size={SIZES.iconMd} color={theme.colors.text} />
+          <LinearGradient
+            colors={buttonGradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.mainCircleButton}
+          >
+            <Ionicons
+              name={hasText ? 'search' : 'camera'}
+              size={24}
+              color={theme.colors.white}
+            />
+          </LinearGradient>
         </TouchableOpacity>
 
-        <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface }]}>
+        <View
+          style={[
+            styles.inputContainer,
+            { backgroundColor: theme.colors.surface },
+          ]}
+        >
           <TextInput
             value={message}
             onChangeText={handleTextChange}
@@ -366,81 +504,121 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             style={[styles.input, { color: theme.colors.text }]}
             multiline
             allowFontScaling={false}
+            onFocus={() => {
+              // nếu đang mở emoji panel, bấm vào input -> đóng panel
+              if (showEmoji) {
+                setShowEmoji(false);
+              }
+            }}
           />
-          <View style={styles.inputActions}>
-            <TouchableOpacity style={styles.iconButton} onPress={openEmoji}>
-              <Ionicons name="happy-outline" size={SIZES.iconSm} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={toggleRecording}>
-              <Ionicons
-                name={isRecording ? 'stop-circle' : 'mic-outline'}
-                size={SIZES.iconSm}
-                color={isRecording ? theme.colors.danger : theme.colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+
+          {!hasText && (
+            <View style={styles.inputIconsRow}>
+              <TouchableOpacity
+                style={styles.inlineIconButton}
+                onPress={toggleRecording}
+              >
+                <Ionicons
+                  name={isRecording ? 'stop-circle' : 'mic-outline'}
+                  size={20}
+                  color={
+                    isRecording ? theme.colors.danger : theme.colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.inlineIconButton}
+                onPress={handlePickImage}
+              >
+                <Ionicons
+                  name="image-outline"
+                  size={20}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.inlineIconButton}
+                onPress={openEmoji}
+              >
+                <Ionicons
+                  name="happy-outline"
+                  size={20}
+                  color={theme.colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={!message.trim()}
-          style={[
-            styles.sendButton,
-            {
-              backgroundColor: message.trim()
-                ? themeColor || theme.chat.bubbleOut
-                : theme.colors.border,
-            },
-          ]}
-        >
-          <Ionicons
-            name="send"
-            size={20}
-            color={message.trim() ? theme.chat.bubbleText : theme.colors.textSecondary}
-          />
-        </TouchableOpacity>
+        {hasText && (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={handleSend}
+            style={{ marginLeft: SIZES.sm }}
+          >
+            <LinearGradient
+              colors={buttonGradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.mainCircleButton}
+            >
+              <Ionicons
+                name="send"
+                size={22}
+                color={theme.colors.white}
+              />
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       {isRecording && (
-        <View style={styles.recordingBadge}>
-          <Ionicons name="pulse" size={12} color="#fff" />
+        <View
+          style={[
+            styles.recordingBadge,
+            { backgroundColor: theme.chat.tint },
+          ]}
+        >
+          <Ionicons name="pulse" size={12} color={theme.colors.white} />
           <Text style={styles.recordingText} allowFontScaling={false}>
             {recordSeconds}s
           </Text>
         </View>
       )}
 
-      {/* Emoji modal */}
-      <EmojiPanel visible={showEmoji} onClose={() => setShowEmoji(false)} onPick={onPickEmoji} />
+      {/* Emoji panel dưới input */}
+      <EmojiPanel visible={showEmoji} onPick={onPickEmoji} />
     </View>
   );
 };
 
-/* --------------------------------- */
-/* Styles                             */
-/* --------------------------------- */
+/* ---------------- Styles ---------------- */
+const CIRCLE = 44;
+
 const styles = StyleSheet.create({
   wrapper: {
-    padding: SIZES.md,
-    gap: SIZES.sm,
+    paddingVertical: SIZES.sm,
   },
   inputRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SIZES.sm,
+    alignItems: 'center',
+    paddingHorizontal: SIZES.md,
   },
-  attachButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+
+  mainCircleButton: {
+    width: CIRCLE,
+    height: CIRCLE,
+    borderRadius: CIRCLE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   inputContainer: {
     flex: 1,
-    borderRadius: SIZES.radiusLg,
-    paddingHorizontal: SIZES.sm + 6,
-    paddingVertical: SIZES.sm - 2,
+    borderRadius: SIZES.radiusFull,
+    paddingHorizontal: SIZES.sm,
+    minHeight: CIRCLE,
+    marginHorizontal: SIZES.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -448,44 +626,32 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: SIZES.fontMd,
     maxHeight: 120,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingVertical: 0,
   },
-  inputActions: {
+  inputIconsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: SIZES.xs + 2,
+    marginLeft: SIZES.xs,
   },
-  iconButton: {
-    padding: 4,
+  inlineIconButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     marginLeft: 4,
   },
-  sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   recordingBadge: {
     marginTop: 4,
     alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D946EF',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
   },
   recordingText: { color: '#fff', fontSize: 12, marginLeft: 4 },
 
-  /* Emoji modal */
-  emojiOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
   emojiPanel: {
-    height: EMOJI_DEFAULTS.panelHeight,
+    width: '100%',
     borderTopLeftRadius: SIZES.radiusLg,
     borderTopRightRadius: SIZES.radiusLg,
     overflow: 'hidden',
@@ -519,7 +685,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // mention dropdown
   mentionContainer: {
     width: '100%',
     borderRadius: SIZES.radiusLg,
@@ -539,7 +704,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SIZES.sm,
-    backgroundColor: '#E0F2FE',
   },
   mentionTextCol: { flex: 1 },
   mentionTitle: { fontSize: 14, fontWeight: '600' },

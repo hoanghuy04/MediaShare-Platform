@@ -20,3 +20,10 @@ export enum UserRole {
   USER,
   ADMIN,
 }
+
+export enum MessageType {
+  TEXT = 'TEXT',
+  IMAGE = 'IMAGE',
+  VIDEO = 'VIDEO',
+  POST_SHARE = 'POST_SHARE',
+}

@@ -28,8 +28,9 @@ interface Props {
   messages: Message[];
   otherUser: UserProfile | null;
   isGroupConversation?: boolean;
-  recentMedia: Message[];
   theme: Theme;
+  conversationDetails?: any;
+  onOpenSettings?: () => void;
 }
 
 export const ConversationMeta: React.FC<Props> = ({
@@ -37,11 +38,19 @@ export const ConversationMeta: React.FC<Props> = ({
   messages,
   otherUser,
   isGroupConversation,
-  recentMedia,
   theme,
+  conversationDetails,
+  onOpenSettings,
 }) => {
   const showContactIntro = messages.length === 0 && !!otherUser && !isGroupConversation;
+  const showGroupIntro = messages.length === 0 && isGroupConversation && !!conversationDetails;
   const showDateSeparator = messages.length > 0;
+
+  const groupName = conversationDetails?.name || (
+    conversationDetails?.participants?.length <= 2
+      ? conversationDetails?.participants.map((m: any) => m.username).join(', ')
+      : conversationDetails?.participants.slice(0, 2).map((m: any) => m.username).join(', ') + '...'
+  );
 
   return (
     <>
@@ -113,7 +122,45 @@ export const ConversationMeta: React.FC<Props> = ({
         </View>
       )}
 
-      {recentMedia.length > 0 && (
+      {showGroupIntro && (
+        <View style={styles.contactInfo}>
+          <Image
+            source={{
+              uri: conversationDetails?.avatar || 'https://via.placeholder.com/100',
+            }}
+            style={styles.largeAvatar}
+          />
+          <Text style={[styles.contactName, { color: theme.colors.text }]}>
+            {groupName}
+          </Text>
+          <Text
+            style={[
+              styles.contactHandle,
+              { color: theme.colors.textSecondary },
+            ]}
+          >
+            {conversationDetails?.participants?.length || 0} thành viên
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.profileButton,
+              { backgroundColor: hexToRgba(theme.colors.border, 0.6) },
+            ]}
+            onPress={onOpenSettings}
+          >
+            <Text
+              style={[
+                styles.profileButtonText,
+                { color: theme.colors.text },
+              ]}
+            >
+              Chỉnh sửa thông tin nhóm
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* {recentMedia.length > 0 && (
         <View style={styles.mediaStripContainer}>
           <Text style={[styles.mediaStripTitle, { color: theme.colors.text }]}>
             Ảnh/Video gần đây
@@ -130,16 +177,16 @@ export const ConversationMeta: React.FC<Props> = ({
                 onPress={() => {}}
               >
                 <Image
-                  source={{ uri: m.mediaUrl || undefined }}
+                  source={{ uri: (m.type === 'IMAGE' || m.type === 'VIDEO') ? `/files/${m.content}` : undefined }}
                   style={styles.mediaImage}
                 />
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
-      )}
+      )} */}
 
-      {showDateSeparator && (
+      {/* {showDateSeparator && (
         <View style={styles.dateSeparator}>
           <View
             style={[
@@ -160,7 +207,7 @@ export const ConversationMeta: React.FC<Props> = ({
             </Text>
           </View>
         </View>
-      )}
+      )} */}
     </>
   );
 };
@@ -220,7 +267,7 @@ const styles = StyleSheet.create({
   mediaImage: { width: '100%', height: '100%' },
 
   // Date separator
-  dateSeparator: { alignItems: 'center', marginTop: 6, marginBottom: 2 },
+  dateSeparator: { alignItems: 'center', marginTop: 6, marginBottom: 2},
   datePill: {
     paddingHorizontal: 12,
     paddingVertical: 6,

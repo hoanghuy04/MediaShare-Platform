@@ -1,17 +1,23 @@
-package com.hoanghuy04.instagrambackend.service.message;
+package com.hoanghuy04.instagrambackend.service.conversation;
 
+import com.hoanghuy04.instagrambackend.constant.AppConstants;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.entity.message.ConversationMember;
-import com.hoanghuy04.instagrambackend.entity.message.LastMessageInfo;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
+import com.hoanghuy04.instagrambackend.entity.conversation.LastMessageInfo;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import com.hoanghuy04.instagrambackend.enums.MemberRole;
 import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
-import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
+import com.hoanghuy04.instagrambackend.repository.ConversationRepository;
 import com.hoanghuy04.instagrambackend.service.FileService;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -38,29 +44,33 @@ public class ConversationServiceImpl implements ConversationService {
     UserRepository userRepository;
     FileService fileService;
     MongoTemplate mongoTemplate;
+    MessageMapper messageMapper;
+    private final SecurityUtil securityUtil;
 
     // ===============================
     // Direct & Group conversation
     // ===============================
     @Transactional(readOnly = true)
     @Override
-    public Optional<Conversation> getExistingDirectConversation(String userId1, String userId2) {
+    public ConversationResponse getExistingDirectConversation(String userId1, String userId2) {
         String key = directKeyOf(userId1, userId2);
-        return conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key);
+        Optional<Conversation> conversation = conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key);
+
+        return conversation.map(messageMapper::toConversationDTO).orElse(null);
     }
 
     @Transactional
     @Override
-    public Conversation createDirectConversation(String userId1, String userId2) {
+    public ConversationResponse createDirectConversation(String userId1, String userId2) {
         if (Objects.equals(userId1, userId2)) {
             throw new BadRequestException("Cannot create conversation with yourself");
         }
 
         // build participants + key
         String key = directKeyOf(userId1, userId2);
-        List<String> sorted = Arrays.asList(userId1, userId2);
-        sorted.sort(String::compareTo);
-        List<ConversationMember> members = createConversationMembers(sorted, userId1, MemberRole.MEMBER);
+//        List<String> sorted = Arrays.asList(userId1, userId2);
+//        sorted.sort(String::compareTo);
+        List<ConversationMember> members = createConversationMembers(Arrays.asList(userId1, userId2), userId1, MemberRole.MEMBER);
 
         // upsert theo (type, directKey)
         Query q = new Query(Criteria.where("type").is(ConversationType.DIRECT).and("directKey").is(key));
@@ -79,17 +89,36 @@ public class ConversationServiceImpl implements ConversationService {
 
         Conversation result = mongoTemplate.findAndModify(q, u, opts, Conversation.class);
         if (result == null) {
-            // cực kỳ hiếm, nhưng để chắc chắn
-            return conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key)
+            Conversation conversation = conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key)
                     .orElseThrow(() -> new BadRequestException("Failed to create or fetch direct conversation"));
+            return messageMapper.toConversationDTO(conversation);
         }
         log.info("Direct conversation ready: {}", result.getId());
-        return result;
+        return messageMapper.toConversationDTO(result);
     }
 
     @Transactional
     @Override
-    public Conversation createGroupConversation(String creatorId, List<String> participantIds, String groupName) {
+    public String findOrCreateDirect(String userId, String peerId) {
+        String key = directKeyOf(userId, peerId);
+        List<ConversationMember> members = createConversationMembers(Arrays.asList(userId, peerId), userId, MemberRole.MEMBER);
+        return conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key)
+                .map(Conversation::getId)
+                .orElseGet(() -> {
+                    Conversation conv = Conversation.builder()
+                            .type(ConversationType.DIRECT)
+                            .directKey(key)
+                            .participants(members)
+                            .createdBy(userId)
+                            .build();
+                    return conversationRepository.save(conv).getId();
+                });
+    }
+
+
+    @Transactional
+    @Override
+    public ConversationResponse createGroupConversation(String creatorId, List<String> participantIds, String groupName) {
         if (groupName == null || groupName.trim().isEmpty()) {
             throw new BadRequestException("Group name is required");
         }
@@ -101,6 +130,7 @@ public class ConversationServiceImpl implements ConversationService {
         Conversation conversation = Conversation.builder()
                 .type(ConversationType.GROUP)
                 .name(groupName)
+                .avatar(AppConstants.DEFAULT_AVATAR_URL)
                 .participants(members)
                 .admins(Collections.singletonList(creatorId))
                 .createdBy(creatorId)
@@ -108,7 +138,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        return conversationRepository.save(conversation);
+        return messageMapper.toConversationDTO(conversationRepository.save(conversation));
     }
 
     // ===============================
@@ -117,7 +147,9 @@ public class ConversationServiceImpl implements ConversationService {
     @Transactional
     @Override
     public void addMember(String conversationId, String userId, String addedBy) {
-        Conversation conversation = getConversationById(conversationId);
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
         if (conversation.getType() != ConversationType.GROUP) {
             throw new BadRequestException("Can only add members to group conversations");
         }
@@ -146,11 +178,15 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Transactional
     @Override
-    public void removeMember(String conversationId, String userId, String removedBy) {
-        Conversation conversation = getConversationById(conversationId);
+    public void removeMember(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
         if (conversation.getType() != ConversationType.GROUP) {
             throw new BadRequestException("Can only remove members from group conversations");
         }
+
+        String removedBy = securityUtil.getCurrentUserId();
         if (!conversation.getAdmins().contains(removedBy)) {
             throw new BadRequestException("Only admins can remove members");
         }
@@ -174,7 +210,9 @@ public class ConversationServiceImpl implements ConversationService {
     @Transactional
     @Override
     public void leaveGroup(String conversationId, String userId) {
-        Conversation conversation = getConversationById(conversationId);
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
         boolean isMember = conversation.getParticipants().stream().anyMatch(p -> p.getUserId().equals(userId));
         if (!isMember) throw new BadRequestException("You are not a member of this conversation");
         if (conversation.getType() == ConversationType.DIRECT) {
@@ -211,8 +249,10 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    public Conversation updateGroupInfo(String conversationId, String name, String avatar, String updatedByUserId) {
-        Conversation conversation = getConversationById(conversationId);
+    public ConversationResponse updateGroupInfo(String conversationId, String name, String avatar, String updatedByUserId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
         if (conversation.getType() != ConversationType.GROUP) {
             throw new BadRequestException("Can only update group conversations");
         }
@@ -240,7 +280,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         conversation.setUpdatedAt(LocalDateTime.now());
-        return conversationRepository.save(conversation);
+        return messageMapper.toConversationDTO(conversationRepository.save(conversation));
     }
 
     // ===============================
@@ -248,17 +288,25 @@ public class ConversationServiceImpl implements ConversationService {
     // ===============================
     @Transactional(readOnly = true)
     @Override
-    public List<Conversation> getUserConversations(String userId) {
-        return conversationRepository.findByParticipantsContainingAndDeletedByNotContaining(userId, userId);
+    public List<ConversationResponse> getUserConversations(String userId) {
+        return conversationRepository.findByParticipantsContainingAndDeletedByNotContaining(userId, userId)
+                .stream()
+                .map(c -> messageMapper.toConversationDTO(c))
+                .collect(Collectors.toList());
     }
 
     @Transactional
     @Override
-    public void updateLastMessage(String conversationId, com.hoanghuy04.instagrambackend.entity.message.Message message) {
-        Conversation conversation = getConversationById(conversationId);
+    public void updateLastMessage(String conversationId, MessageResponse message) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
+        String previewText = buildPreviewTextForMessage(message);
+        
         LastMessageInfo lastMessage = LastMessageInfo.builder()
                 .messageId(message.getId())
-                .content(message.getContent() != null ? message.getContent() : "[Media]")
+                .type(message.getType())
+                .content(previewText)
                 .senderId(message.getSender().getId())
                 .timestamp(message.getCreatedAt())
                 .build();
@@ -266,18 +314,38 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
     }
+    
+    /**
+     * Build human-readable preview text for a message based on its type.
+     */
+    private String buildPreviewTextForMessage(MessageResponse message) {
+        if (message == null || message.getType() == null) {
+            return "[Message]";
+        }
+        
+        return switch (message.getType()) {
+            case TEXT -> message.getContent() != null ? message.getContent() : "";
+            case IMAGE -> "Đã gửi một ảnh";
+            case VIDEO -> "Đã gửi một video";
+            case POST_SHARE -> "Đã chia sẻ một bài viết";
+        };
+    }
 
     @Transactional(readOnly = true)
     @Override
     public boolean isParticipant(String conversationId, String userId) {
-        Conversation conversation = getConversationById(conversationId);
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
         return conversation.getParticipants().stream().anyMatch(p -> p.getUserId().equals(userId));
     }
 
     @Transactional(readOnly = true)
     @Override
-    public Conversation getConversationById(String conversationId) {
+    public ConversationResponse getConversationById(String conversationId) {
         return conversationRepository.findById(conversationId)
+                .stream().findFirst()
+                .map(messageMapper::toConversationDTO)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
     }
 
@@ -290,6 +358,88 @@ public class ConversationServiceImpl implements ConversationService {
         List<String> a = Arrays.asList(u1, u2);
         a.sort(String::compareTo);
         return a.get(0) + "#" + a.get(1);
+    }
+
+    @Transactional
+    @Override
+    public void promoteMemberToAdmin(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        if (conversation.getType() != ConversationType.GROUP) {
+            throw new BadRequestException("Can only promote members in group conversations");
+        }
+
+        String promotedBy = securityUtil.getCurrentUserId();
+
+        // Verify promoter is admin
+        if (!conversation.getAdmins().contains(promotedBy)) {
+            throw new BadRequestException("Only admins can promote members");
+        }
+
+        // Find target member
+        ConversationMember member = conversation.getParticipants().stream()
+                .filter(p -> p.getUserId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+
+        if (member.getRole() == MemberRole.ADMIN) {
+            throw new BadRequestException("User is already an admin");
+        }
+
+        // Promote to admin
+        member.setRole(MemberRole.ADMIN);
+        if (!conversation.getAdmins().contains(userId)) {
+            conversation.getAdmins().add(userId);
+        }
+
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+
+        log.info("User {} promoted to admin in conversation {} by {}", userId, conversationId, promotedBy);
+    }
+
+    @Transactional
+    @Override
+    public void demoteAdminToMember(String conversationId, String userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found"));
+
+        if (conversation.getType() != ConversationType.GROUP) {
+            throw new BadRequestException("Can only demote admins in group conversations");
+        }
+
+        String demotedBy = securityUtil.getCurrentUserId();
+
+        // Verify demoter is admin
+        if (!conversation.getAdmins().contains(demotedBy)) {
+            throw new BadRequestException("Only admins can demote other admins");
+        }
+
+        // Find target admin
+        ConversationMember admin = conversation.getParticipants().stream()
+                .filter(p -> p.getUserId().equals(userId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
+
+        if (admin.getRole() != MemberRole.ADMIN) {
+            throw new BadRequestException("User is not an admin");
+        }
+
+        // Prevent demoting the last admin
+        long adminCount = conversation.getAdmins().size();
+        if (adminCount <= 1) {
+            throw new BadRequestException("Cannot demote the last admin. Promote another member first.");
+        }
+
+        // Demote to member
+        admin.setRole(MemberRole.MEMBER);
+        conversation.getAdmins().remove(userId);
+
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+
+        log.info("Admin {} demoted to member in conversation {} by {}", userId, conversationId, demotedBy);
     }
 
     private List<ConversationMember> createConversationMembers(List<String> userIds, String creatorId, MemberRole defaultRole) {

@@ -3,7 +3,7 @@ package com.hoanghuy04.instagrambackend.dto.response;
 import lombok.Data;
 
 @Data
-public class ChatThemeDTO {
+public class ChatThemeResponse {
     private String key;      // id của ChatTheme
     private String name;
     private Boolean dark;

@@ -1,6 +1,6 @@
 package com.hoanghuy04.instagrambackend.repository;
 
-import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -120,5 +120,19 @@ public interface MessageRepository extends MongoRepository<Message, String> {
      * @return List of messages matching the IDs
      */
     List<Message> findByIdIn(List<String> ids);
-}
 
+    /**
+     * Find messages in a conversation ordered by creation date descending
+     *
+     * @param conversationId the conversation ID
+     * @return List of messages in the conversation
+     */
+    List<Message> findByConversation_IdOrderByCreatedAtDesc(String conversationId);
+
+    /**
+     * Delete all messages in a conversation
+     *
+     * @param conversationId the conversation ID
+     */
+    void deleteByConversation_Id(String conversationId);
+}

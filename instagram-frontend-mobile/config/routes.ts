@@ -78,6 +78,8 @@ export const API_ENDPOINTS = {
   UPDATE_GROUP: (id: string) => `/api/conversations/${id}`,
   ADD_MEMBERS: (id: string) => `/api/conversations/${id}/members`,
   REMOVE_MEMBER: (id: string, userId: string) => `/api/conversations/${id}/members/${userId}`,
+  PROMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/promote`,
+  DEMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/demote`,
   LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
 
   // Message Requests

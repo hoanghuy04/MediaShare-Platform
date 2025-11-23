@@ -1,4 +1,5 @@
 import { UserProfile } from './user';
+import { MessageType } from './enum.type';
 
 // User summary for message sender (lightweight)
 export interface UserSummary {
@@ -56,11 +57,11 @@ export interface Message {
   id: string;
   conversationId?: string;
   sender?: UserSummary;
-  content: string;
-  mediaUrl?: string;
+  content: string; // TEXT: actual text | IMAGE/VIDEO: mediaFileId | POST_SHARE: postId
+  type?: MessageType; // Backend MessageType: TEXT, IMAGE, VIDEO, POST_SHARE
   readBy: string[]; // Changed from isRead: boolean
   replyTo?: MessageRef; // For threading
-  type?: MessageKind;
+  kind?: MessageKind; // UI-level type for rendering (TEXT, STICKER, IMAGE, AUDIO, SYSTEM)
   createdAt: string;
   isDeleted: boolean;
 }
@@ -69,8 +70,8 @@ export interface Message {
 export interface SendMessageRequest {
   receiverId?: string; // For direct messages
   conversationId?: string; // For existing conversations
-  content: string;
-  mediaUrl?: string;
+  content: string; // TEXT: actual text | IMAGE/VIDEO: mediaFileId | POST_SHARE: postId
+  type?: MessageType; // Backend MessageType: TEXT, IMAGE, VIDEO, POST_SHARE
   replyToMessageId?: string; // For threading
 }
 
