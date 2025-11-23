@@ -12,6 +12,7 @@ export const messageAPI = {
   // Get inbox items (conversations + sent message requests)
   getInbox: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
     // userId will be automatically added by axios interceptor
+    console.log("____________________________________getInbox____________________________________");
     const response = await axiosInstance.get(API_ENDPOINTS.INBOX, {
       params: { page, size: limit }, // Backend uses 'size' not 'limit'
     });
@@ -25,6 +26,8 @@ export const messageAPI = {
 
   // Get conversation details
   getConversation: async (conversationId: string): Promise<Conversation> => {
+    console.log("____________________________________get conversation____________________________________");
+    
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATION_DETAIL(conversationId), {
       params: { userId },
@@ -39,12 +42,11 @@ export const messageAPI = {
     page = 0,
     limit = 50
   ): Promise<PaginatedResponse<Message>> => {
+    console.log("____________________________________getMessages____________________________________");
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.get(API_ENDPOINTS.CONVERSATION_MESSAGES(conversationId), {
       params: { userId, page, limit },
     });
-
-    console.log("_______________Messages LOAD FROM API__________:", response.data.data);
     
     return response.data.data;
   },

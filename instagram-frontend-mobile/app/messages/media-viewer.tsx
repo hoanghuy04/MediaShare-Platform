@@ -76,7 +76,6 @@ export default function MediaViewerScreen() {
         return `${dayName} lúc ${time}`;
       }
 
-      // Older: show date + time
       const day = date.getDate();
       const month = date.getMonth() + 1;
       const year = date.getFullYear();

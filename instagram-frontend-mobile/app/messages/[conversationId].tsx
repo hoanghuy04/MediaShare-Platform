@@ -1,4 +1,3 @@
-// app/messages/[conversationId].tsx
 import React, {
   useEffect,
   useState,
@@ -29,11 +28,7 @@ import { MessageInput } from '../../components/messages/MessageInput';
 import { TypingIndicator } from '../../components/messages/TypingIndicator';
 import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import {
-  userAPI,
-  messageRequestAPI,
-  aiAPI,
-} from '../../services/api';
+import { userAPI, messageRequestAPI, aiAPI } from '../../services/api';
 import { messageAPI } from '../../services/message.service';
 import { Conversation, Message, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
@@ -146,7 +141,7 @@ export default function ConversationScreen() {
     [conversationDetails]
   );
 
-  // Palette: ưu tiên themeColor của conversation
+  // Palette
   const chatPalette = useMemo(() => {
     const accent = conversationDetails?.themeColor || theme.chat.bubbleOut;
     return {
@@ -186,7 +181,6 @@ export default function ConversationScreen() {
 
   const scrollToBottom = useCallback(() => {
     flatListRef.current?.scrollToEnd({ animated: true });
-    setShowScrollToBottom(false);
   }, []);
 
   const handleListScroll = useCallback(e => {
@@ -298,7 +292,7 @@ export default function ConversationScreen() {
       setIsLoading(true);
       try {
         const conversation = await messageAPI.getConversation(convId);
-        
+
         setActualConversationId(conversation.id);
         setIsNewConversation(false);
         setConversationDetails(conversation);
@@ -433,19 +427,24 @@ export default function ConversationScreen() {
     sortAsc,
   ]);
 
-  // WebSocket events
+  // WebSocket events (đã xử lý cho group)
   useEffect(() => {
+    // CHAT packet
     const onMsg = (packet: any) => {
-      const peerId = otherUser?.id || peerUserId || routeConversationId;
-      const matchesPeer =
-        peerId &&
-        (packet.senderId === peerId ||
-          packet.receiverId === peerId);
+      // Ưu tiên lọc theo conversationId cho cả direct & group
       const matchesConv =
         !!packet.conversationId &&
         !!actualConversationId &&
         packet.conversationId === actualConversationId;
-      if (packet.type !== 'CHAT' || (!matchesPeer && !matchesConv))
+
+      const peerId =
+        otherUser?.id || peerUserId || routeConversationId;
+      const matchesPeer =
+        !matchesConv &&
+        peerId &&
+        (packet.senderId === peerId || packet.receiverId === peerId);
+
+      if (packet.type !== 'CHAT' || (!matchesConv && !matchesPeer))
         return;
       if (!packet.senderId) return;
 
@@ -459,7 +458,7 @@ export default function ConversationScreen() {
         },
         conversationId: packet.conversationId,
         content: packet.content || '',
-        type: packet.contentType || MessageType.TEXT, // Use contentType from WebSocket
+        type: packet.contentType || MessageType.TEXT,
         readBy:
           packet.status === 'READ' ? [user?.id || ''] : [],
         createdAt: packet.timestamp,
@@ -470,6 +469,7 @@ export default function ConversationScreen() {
         const exists = prev.some(m => m.id === incoming.id);
         if (exists) return prev;
 
+        // replace optimistic message (self)
         if (packet.senderId === user?.id) {
           const hasOptimistic = prev.some(m =>
             m.id.startsWith('temp-')
@@ -488,39 +488,75 @@ export default function ConversationScreen() {
         return sortAsc([...prev, incoming]);
       });
 
+      // direct: khi đang pending, server trả về conversationId thì chuyển sang thread thật
       if (isNewConversation && packet.conversationId) {
         transitionToConversation(packet.conversationId);
       }
 
-      const peer = otherUser?.id || peerUserId || routeConversationId;
+      // auto gửi read-receipt khi đang mở thread tương ứng & msg từ người khác
       if (
         !isNewConversation &&
-        peer &&
-        packet.senderId === peer &&
-        packet.id &&
-        packet.senderId !== user?.id
+        packet.conversationId === actualConversationId &&
+        packet.senderId !== user?.id &&
+        packet.id
       ) {
         sendReadReceipt(packet.id, packet.senderId);
       }
     };
 
-    const onRr = (messageId: string, senderId: string) => {
-      const peer = otherUser?.id || peerUserId || routeConversationId;
-      if (!peer || senderId !== peer) return;
+    // READ RECEIPT packet (đã hỗ trợ group)
+    const onRr = (
+      messageId: string,
+      readerId: string,
+      convId?: string
+    ) => {
+      // Nếu server gửi kèm conversationId thì chỉ nhận khi trùng
+      if (
+        actualConversationId &&
+        convId &&
+        convId !== actualConversationId
+      ) {
+        return;
+      }
+
       setMessages(prev =>
         prev.map(m =>
           m.id === messageId
-            ? { ...m, readBy: [...m.readBy, senderId] }
+            ? m.readBy?.includes(readerId)
+              ? m
+              : { ...m, readBy: [...(m.readBy || []), readerId] }
             : m
         )
       );
     };
 
-    const onTp = (isTyping: boolean, uid: string) => {
-      const peer = otherUser?.id || peerUserId || routeConversationId;
-      if (!peer || uid !== peer) return;
+    // TYPING packet (đã hỗ trợ group)
+    const onTp = (
+      isTypingFlag: boolean,
+      uid: string,
+      convId?: string
+    ) => {
+      // Bắt buộc cùng conversation
+      if (
+        actualConversationId &&
+        convId &&
+        convId !== actualConversationId
+      ) {
+        return;
+      }
+
+      // Không show khi chính mình gõ
+      if (!uid || uid === user?.id) return;
+
+      // Direct: fallback theo peer nếu convId không có
+      if (!isGroupConversation) {
+        const peer =
+          otherUser?.id || peerUserId || routeConversationId;
+        if (!peer || uid !== peer) return;
+      }
+
       setTypingUsers(prev =>
-        isTyping
+        isTypingFlag
           ? prev.includes(uid)
             ? prev
             : [...prev, uid]
@@ -529,11 +565,12 @@ export default function ConversationScreen() {
     };
 
     onMessage(onMsg);
-    onReadReceipt(onRr);
-    onTyping(onTp);
+    onReadReceipt(onRr as any);
+    onTyping(onTp as any);
   }, [
     actualConversationId,
     isNewConversation,
+    isGroupConversation,
     onMessage,
     onReadReceipt,
     onTyping,
@@ -541,6 +578,7 @@ export default function ConversationScreen() {
     peerUserId,
     routeConversationId,
     sendReadReceipt,
+    sortAsc,
     transitionToConversation,
     user?.id,
   ]);
@@ -698,7 +736,8 @@ export default function ConversationScreen() {
         if (newMsg.conversationId)
           transitionToConversation(newMsg.conversationId);
       } else {
-        if (isConnected && peerUserId) {
+        if (isConnected && peerUserId && !isGroupConversation) {
+          // direct + websocket
           sendWebSocketMessage(peerUserId, content);
         } else {
           if (!actualConversationId) {
@@ -711,6 +750,7 @@ export default function ConversationScreen() {
             );
             return;
           }
+          // group hoặc fallback HTTP
           const newMsg = await messageAPI.sendMessage(
             actualConversationId,
             content,
@@ -754,22 +794,22 @@ export default function ConversationScreen() {
         avatar: user?.profile?.avatar,
         isVerified: !!user?.isVerified,
       },
-      content: localUri, // temporarily store local URI for rendering
+      content: localUri,
       type,
       readBy: [],
       createdAt: new Date().toISOString(),
       isDeleted: false,
     };
 
-    // Show optimistic bubble immediately
     setMessages(prev => sortAsc([...prev, optimistic]));
 
     try {
-      // Upload file to backend
       const formData = new FormData();
       const filename = localUri.split('/').pop() || 'media';
       const match = /\.(\w+)$/.exec(filename);
-      const fileType = match ? `${type.toLowerCase()}/${match[1]}` : `${type.toLowerCase()}/jpeg`;
+      const fileType = match
+        ? `${type.toLowerCase()}/${match[1]}`
+        : `${type.toLowerCase()}/jpeg`;
 
       formData.append('file', {
         uri: localUri,
@@ -779,14 +819,11 @@ export default function ConversationScreen() {
 
       const uploadResponse = await fileService.uploadFile(
         formData,
-        'POST' // usage
+        'POST'
       );
 
-      // Backend returns full URL in uploadResponse.url
-      // This URL will be stored in message.content by backend
       const mediaFileId = uploadResponse.id;
 
-      // Send message with mediaFileId (backend will store URL in content)
       let sentMessage: Message;
       if (isNewConversation) {
         sentMessage = await messageAPI.sendDirectMessage(
@@ -815,7 +852,6 @@ export default function ConversationScreen() {
         );
       }
 
-      // Replace optimistic message with real one
       setMessages(prev =>
         sortAsc(
           prev.map(m =>
@@ -826,7 +862,6 @@ export default function ConversationScreen() {
         )
       );
     } catch (e: any) {
-      // Remove optimistic message on error
       setMessages(prev =>
         prev.filter(m => m.id !== optimisticId)
       );
@@ -906,6 +941,7 @@ export default function ConversationScreen() {
       getClusterFlags(index);
     const showAvatar = !isOwn && isClusterEnd;
     const hasPeerSeen =
+      !isGroupConversation &&
       isOwn &&
       peerUserId &&
       item.readBy?.some(id => id === peerUserId);
@@ -969,7 +1005,7 @@ export default function ConversationScreen() {
     }
     const handle = otherUser?.username;
     if (handle) return `@${handle}`;
-    return ''; // không show "Đang hoạt động" nữa
+    return '';
   }, [isGroupConversation, conversationDetails, otherUser]);
 
   const avatarSrc = isGroupConversation
@@ -1225,6 +1261,7 @@ export default function ConversationScreen() {
       <AddMembersModal
         visible={isAddMembersVisible}
         theme={theme}
+        currentUserId={user?.id || ''} // quan trọng để MutualUserPicker lọc theo người hiện tại
         pendingMembers={pendingMembers}
         setPendingMembers={setPendingMembers}
         existingMemberIds={existingMemberIds}
@@ -1279,7 +1316,8 @@ const styles = StyleSheet.create({
   listFooter: { height: 40 },
   scrollFab: {
     position: 'absolute',
-    right: 16,
+    right: '50%',
+    transform: [{ translateX: 22 }],
     bottom: 20,
     width: 44,
     height: 44,
