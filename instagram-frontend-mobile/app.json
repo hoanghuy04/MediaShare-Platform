@@ -23,11 +23,10 @@
       },
       "package": "com.instagram.mobile",
       "permissions": [
+        "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "AUDIO"
+        "NOTIFICATIONS"
       ]
     },
     "web": {
@@ -46,13 +45,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Social Trio to access your photos.",
-          "savePhotosPermission": "Allow Social Trio to save photos.",
-          "isAccessMediaLocationEnabled": true,
-          "granularPermissions": [
-            "audio",
-            "photo"
-          ]
+          "photosPermission": "Allow Instagram to access your photos.",
+          "savePhotosPermission": "Allow Instagram to save photos."
         }
       ],
       [
