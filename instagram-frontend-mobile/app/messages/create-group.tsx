@@ -15,7 +15,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { MutualUserPicker, MutualUserOption } from '../../components/messages/MutualUserPicker';
 import { showAlert } from '../../utils/helpers';
-import { messageAPI } from '../../services/api';
+import { messageAPI } from '../../services/message.service';
 
 export default function CreateGroupScreen() {
   const { theme } = useTheme();

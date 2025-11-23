@@ -350,6 +350,8 @@ const styles = StyleSheet.create({
   content: {
     fontSize: 15,
     lineHeight: 22,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   avatarTail: {
     position: 'absolute',
@@ -396,6 +398,8 @@ const styles = StyleSheet.create({
     width: 220,
     height: 280,
     borderRadius: 12,
+    //image cover
+    resizeMode: 'cover',
   },
   videoContainer: {
     position: 'relative',

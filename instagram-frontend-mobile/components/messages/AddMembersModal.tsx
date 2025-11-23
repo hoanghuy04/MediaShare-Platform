@@ -15,6 +15,7 @@ import { Theme } from '../../hooks/useTheme';
 interface Props {
   visible: boolean;
   theme: Theme;
+  currentUserId: string; // 👈 thêm
   pendingMembers: Record<string, MutualUserOption>;
   setPendingMembers: (value: Record<string, MutualUserOption>) => void;
   existingMemberIds: string[];
@@ -26,6 +27,7 @@ interface Props {
 export const AddMembersModal: React.FC<Props> = ({
   visible,
   theme,
+  currentUserId,
   pendingMembers,
   setPendingMembers,
   existingMemberIds,
@@ -33,26 +35,35 @@ export const AddMembersModal: React.FC<Props> = ({
   onClose,
   onConfirm,
 }) => {
+  const excludeUserIds = [
+    ...new Set([...existingMemberIds, currentUserId].filter(Boolean)),
+  ];
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView
-        style={[styles.addMembersModal, { backgroundColor: theme.colors.background }]}
+        style={[
+          styles.addMembersModal,
+          { backgroundColor: theme.colors.background },
+        ]}
       >
         <View style={styles.addMembersHeader}>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={22} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.addMembersTitle, { color: theme.colors.text }]}>
+          <Text
+            style={[styles.addMembersTitle, { color: theme.colors.text }]}
+          >
             Thêm thành viên
           </Text>
           <View style={{ width: 24 }} />
         </View>
 
         <MutualUserPicker
-          currentUserId={''} // ConversationScreen set bằng user.id qua context, ở đây không cần
+          currentUserId={currentUserId}
           selectedUsers={pendingMembers}
           onSelectedChange={setPendingMembers}
-          excludeUserIds={existingMemberIds}
+          excludeUserIds={excludeUserIds}
           emptyMessage="Chỉ hiện những người theo dõi nhau"
         />
 
