@@ -5,16 +5,12 @@ import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
-import com.hoanghuy04.instagrambackend.entity.Like;
-import com.hoanghuy04.instagrambackend.entity.Post;
-import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.entity.*;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
 import com.hoanghuy04.instagrambackend.enums.PostType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
-import com.hoanghuy04.instagrambackend.repository.FollowRepository;
-import com.hoanghuy04.instagrambackend.repository.LikeRepository;
-import com.hoanghuy04.instagrambackend.repository.PostRepository;
+import com.hoanghuy04.instagrambackend.repository.*;
 import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
@@ -42,11 +38,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PostServiceImpl implements PostService {
 
-    private final PostRepository postRepository;
     private final UserService userService;
+    private final PostRepository postRepository;
     private final FollowRepository followRepository;
     private final FileService fileService;
     private final LikeRepository likeRepository;
+    private final CommentRepository commentRepository;
+    private final MediaFileRepository mediaFileRepository;
+
     private final SecurityUtil securityUtil;
 
 
@@ -258,19 +257,48 @@ public class PostServiceImpl implements PostService {
     @Transactional
     @Override
     public void deletePost(String postId) {
-        String userId = securityUtil.getCurrentUserId();
-        log.info("Deleting post: {}", postId);
 
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
-        // Check if user is the author
-        if (!post.getAuthor().getId().equals(userId)) {
-            throw new UnauthorizedException("You are not authorized to delete this post");
+        User current = securityUtil.getCurrentUser();
+        boolean owner = post.getAuthor() != null
+                && post.getAuthor().getId().equals(current.getId());
+
+        if (!owner) {
+            throw new RuntimeException("You don't have permission to delete this post");
+        }
+
+        likeRepository.deleteByTargetTypeAndTargetId(LikeTargetType.POST, postId);
+
+        List<Comment> allComments = commentRepository.findByPost_Id(postId);
+
+        if (allComments != null && !allComments.isEmpty()) {
+
+            List<String> commentIds = allComments.stream()
+                    .map(Comment::getId)
+                    .collect(Collectors.toList());
+
+            likeRepository.deleteByTargetTypeAndTargetIdIn(
+                    LikeTargetType.COMMENT,
+                    commentIds
+            );
+
+            commentRepository.deleteAll(allComments);
+        }
+
+        List<String> mediaIds = post.getMediaFileIds();
+
+        if (mediaIds != null && !mediaIds.isEmpty()) {
+
+            List<MediaFile> medias = mediaFileRepository.findAllById(mediaIds);
+
+            medias.forEach(media -> {
+                fileService.deleteFile(media.getId());
+            });
         }
 
         postRepository.delete(post);
-        log.info("Post deleted successfully: {}", postId);
     }
 
     /**

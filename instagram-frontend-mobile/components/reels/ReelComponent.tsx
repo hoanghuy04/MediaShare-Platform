@@ -117,9 +117,18 @@ const ReelComponent = () => {
   );
 
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isAnyFullScreen, setIsAnyFullScreen] = useState(false);
 
   const handleModalStateChange = useCallback((isOpen: boolean) => {
     setIsModalVisible(isOpen);
+  }, []);
+
+  const handleFullScreenChange = useCallback((isFullScreen: boolean) => {
+    setIsAnyFullScreen(isFullScreen);
+  }, []);
+
+  const handleDeleteSuccess = useCallback((postId: string) => {
+    setReels(prevReels => prevReels.filter(reel => reel.id !== postId));
   }, []);
 
   const renderItem = useCallback(
@@ -134,10 +143,12 @@ const ReelComponent = () => {
           isVisible={isVisible}
           height={containerHeight}
           onModalStateChange={handleModalStateChange}
+          onDeleteSuccess={() => handleDeleteSuccess(item.id)}
+          onFullScreenChange={handleFullScreenChange}
         />
       );
     },
-    [scrollInfo, containerHeight, handleModalStateChange]
+    [scrollInfo, containerHeight, handleModalStateChange, handleDeleteSuccess, handleFullScreenChange]
   );
 
   const renderEmpty = () => {
@@ -183,7 +194,7 @@ const ReelComponent = () => {
         />
       )}
 
-      {!isModalVisible && (
+      {!isModalVisible && !isAnyFullScreen && (
         <FeedHeader currentTab={currentTab} onTabChange={handleTabChange} />
       )}
     </View>

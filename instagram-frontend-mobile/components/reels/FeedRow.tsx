@@ -1,9 +1,11 @@
-import { StyleSheet, View, Animated, Easing } from 'react-native';
+import { StyleSheet, View, Animated } from 'react-native';
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
   interpolate,
   Extrapolation,
+  withTiming,
+  Easing,
 } from 'react-native-reanimated';
 import React, { useRef, useState } from 'react';
 import VideoComponent from './VideoComponent';
@@ -11,7 +13,7 @@ import FeedFooter from './FeedFooter';
 import FeedSideBar from './FeedSideBar';
 import LikesModal from './LikesModal';
 import { PostResponse } from '../../types/post.type';
-import { Ionicons } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { postLikeService } from '../../services/post-like.service';
@@ -22,6 +24,8 @@ interface FeedRowProps {
   isVisible: boolean;
   height: number;
   onModalStateChange?: (isOpen: boolean) => void;
+  onDeleteSuccess?: () => void;
+  onFullScreenChange?: (isFullScreen: boolean) => void;
 }
 
 interface HeartItem {
@@ -140,7 +144,7 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
 };
 
 
-const FeedRow = ({ data, isVisible, height, onModalStateChange }: FeedRowProps) => {
+const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess, onFullScreenChange }: FeedRowProps) => {
   const [isLiked, setIsLiked] = useState(data.likedByCurrentUser);
   const [totalLike, setTotalLike] = useState(data.totalLike);
   const [currentHeart, setCurrentHeart] = useState<HeartItem | null>(null);
@@ -148,9 +152,11 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange }: FeedRowProps) 
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const handleToggleMute = () => setIsMuted(prev => !prev);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const modalTranslateY = useSharedValue(height);
-  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const fullScreenOpacity = useSharedValue(1);
+  const exitButtonScale = useSharedValue(0);
 
   React.useEffect(() => {
     if (onModalStateChange) {
@@ -158,15 +164,36 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange }: FeedRowProps) 
     }
   }, [showLikesModal, showCommentsModal, onModalStateChange]);
 
+  React.useEffect(() => {
+    if (onFullScreenChange) {
+      onFullScreenChange(isFullScreen);
+    }
+
+    fullScreenOpacity.value = withTiming(isFullScreen ? 0 : 1, { duration: 300 });
+    exitButtonScale.value = withTiming(isFullScreen ? 1 : 0, {
+      duration: 300,
+      easing: Easing.out(Easing.cubic)
+    });
+  }, [isFullScreen, onFullScreenChange]);
+
   const uiAnimatedStyle = useAnimatedStyle(() => {
     const stopPoint = height * 0.8;
+    const modalOpacity = interpolate(
+      modalTranslateY.value,
+      [stopPoint, height],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+
     return {
-      opacity: interpolate(
-        modalTranslateY.value,
-        [stopPoint, height],
-        [0, 1],
-        Extrapolation.CLAMP,
-      ),
+      opacity: modalOpacity * fullScreenOpacity.value,
+    };
+  });
+
+  const exitButtonStyle = useAnimatedStyle(() => {
+    return {
+      opacity: exitButtonScale.value,
+      transform: [{ scale: exitButtonScale.value }],
     };
   });
 
@@ -246,24 +273,34 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange }: FeedRowProps) 
           />
         )}
 
-        <Reanimated.View
-          style={uiAnimatedStyle}
-          pointerEvents={showLikesModal || showCommentsModal ? 'none' : 'box-none'}>
-          <FeedSideBar
-            data={{ ...data, totalLike }}
-            isLiked={isLiked}
-            onLike={() => handleLike()}
-            onLikeCountPress={() => {
-              setShowLikesModal(true);
-              onModalStateChange?.(true);
-            }}
-            onCommentPress={() => {
-              setShowCommentsModal(true);
-              onModalStateChange?.(true);
-            }}
-          />
-          <FeedFooter data={data} />
-        </Reanimated.View>
+        {isFullScreen && (
+          <Reanimated.View style={[styles.exitFullScreenButton, exitButtonStyle]}>
+            <AntDesign name="expand-alt" size={24} color="white" onPress={() => setIsFullScreen(false)} />
+          </Reanimated.View>
+        )}
+
+        {!isFullScreen && (
+          <Reanimated.View
+            style={uiAnimatedStyle}
+            pointerEvents={showLikesModal || showCommentsModal ? 'none' : 'box-none'}>
+            <FeedSideBar
+              data={{ ...data, totalLike }}
+              isLiked={isLiked}
+              onLike={() => handleLike()}
+              onLikeCountPress={() => {
+                setShowLikesModal(true);
+                onModalStateChange?.(true);
+              }}
+              onCommentPress={() => {
+                setShowCommentsModal(true);
+                onModalStateChange?.(true);
+              }}
+              onDeleteSuccess={onDeleteSuccess}
+              onFullScreen={() => setIsFullScreen(true)}
+            />
+            <FeedFooter data={data} />
+          </Reanimated.View>
+        )}
       </Reanimated.View>
 
       <LikesModal
@@ -316,5 +353,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  exitFullScreenButton: {
+    position: 'absolute',
+    bottom: 40,
+    right: 20,
+    zIndex: 20,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: '50%',
   },
 });
