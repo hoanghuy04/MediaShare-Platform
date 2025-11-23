@@ -83,7 +83,6 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
         });
       });
     } else {
-      // Like - bounce animation (faster)
       likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
         likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
       });

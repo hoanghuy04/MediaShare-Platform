@@ -8,12 +8,12 @@ import { postService } from '../services/post.service';
 type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 interface UploadParams {
-  mediaUri: string;
+  mediaUris: string[]; // Changed to array
   mediaType: string;
   caption: string;
   location?: string;
   userId: string;
-  postType?: 'FEED' | 'REEL'; // Add post type option
+  postType?: 'FEED' | 'REEL';
 }
 
 interface UploadState {
@@ -41,48 +41,67 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const startUpload = async (params: UploadParams) => {
-    const { mediaUri, mediaType, caption, location, userId, postType = 'REEL' } = params;
+    const { mediaUris, mediaType, caption, location, userId, postType = 'REEL' } = params;
 
     setUploadState({
       status: 'uploading',
       progress: 0,
-      thumbnailUri: mediaUri,
+      thumbnailUri: mediaUris[0], // Use first media as thumbnail
       lastParams: params,
     });
 
     try {
-      const formData = new FormData();
-      const filename = mediaUri.split('/').pop() || `upload_${Date.now()}`;
+      const uploadedFileIds: string[] = [];
+      const totalFiles = mediaUris.length;
 
-      let fileExtension = filename.split('.').pop()?.toLowerCase();
-      if (!fileExtension || fileExtension === filename) {
-        fileExtension = mediaType === 'video' ? 'mp4' : 'jpg';
+      // Upload each file and track combined progress
+      for (let i = 0; i < mediaUris.length; i++) {
+        const mediaUri = mediaUris[i];
+        const formData = new FormData();
+        const filename = mediaUri.split('/').pop() || `upload_${Date.now()}_${i}`;
+
+        let fileExtension = filename.split('.').pop()?.toLowerCase();
+        if (!fileExtension || fileExtension === filename) {
+          fileExtension = mediaType === 'video' ? 'mp4' : 'jpg';
+        }
+
+        // Always use mp4 for videos to avoid backend Content-Type issues with .mov files
+        let mimeType = mediaType === 'video' ? 'video/mp4' : `image/${fileExtension}`;
+        if (fileExtension === 'jpeg') mimeType = 'image/jpeg';
+        if (fileExtension === 'png') mimeType = 'image/png';
+
+        const cleanUri = Platform.OS === 'ios' ? mediaUri.replace('file://', '') : mediaUri;
+
+        const filePayload = {
+          uri: cleanUri,
+          name: filename,
+          type: mimeType,
+        };
+
+        formData.append('file', filePayload as any);
+
+        const usage = postType === 'FEED' ? 'POST' : 'REEL';
+        
+        // Upload with progress tracking for current file
+        const response = await fileService.uploadFile(formData, usage, fileProgress => {
+          // Calculate combined progress: (completed files + current file progress) / total files
+          const completedProgress = i / totalFiles;
+          const currentFileProgress = fileProgress / totalFiles;
+          const totalProgress = completedProgress + currentFileProgress;
+          
+          setUploadState(prev => ({
+            ...prev,
+            progress: totalProgress * 0.9, // Reserve 10% for post creation
+          }));
+        });
+
+        uploadedFileIds.push(response.id);
       }
 
-      let mimeType = mediaType === 'video' ? `video/${fileExtension}` : `image/${fileExtension}`;
-      if (mimeType === 'video/mov') mimeType = 'video/quicktime';
-
-      const cleanUri = Platform.OS === 'ios' ? mediaUri.replace('file://', '') : mediaUri;
-
-      const filePayload = {
-        uri: cleanUri,
-        name: filename,
-        type: mimeType,
-      };
-
-      formData.append('file', filePayload as any);
-
-      const usage = postType === 'FEED' ? 'POST' : 'REEL';
-      const response = await fileService.uploadFile(formData, usage, progress => {
-        setUploadState(prev => ({
-          ...prev,
-          progress: progress * 0.9,
-        }));
-      });
-
+      // Create post with all uploaded files
       const hashtags = extractHashtags(caption);
       const postData = {
-        mediaFileIds: [response.id],
+        mediaFileIds: uploadedFileIds,
         type: postType === 'FEED' ? PostType.FEED : PostType.REEL,
         caption: caption.trim(),
         tags: hashtags,
@@ -95,7 +114,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
         ...prev,
         status: 'success',
         progress: 1,
-        thumbnailUri: mediaUri,
+        thumbnailUri: mediaUris[0],
       }));
     } catch (error: any) {
       setUploadState(prev => ({

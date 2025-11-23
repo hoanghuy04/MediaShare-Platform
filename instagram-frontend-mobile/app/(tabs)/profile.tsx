@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions, Text } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '@hooks/useTheme';
 import { useAuth } from '@hooks/useAuth';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
@@ -15,10 +15,13 @@ import { Ionicons } from '@expo/vector-icons';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_SIZE = (SCREEN_WIDTH - 4) / 3;
 
+type TabType = 'posts' | 'reels' | 'tagged';
+
 export default function ProfileScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>('posts');
 
   const {
     data: posts,
@@ -37,8 +40,17 @@ export default function ProfileScreen() {
     }
   }, [user?.id]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      // Refresh posts when screen comes into focus
+      if (user?.id) {
+        refresh();
+      }
+    }, [user?.id])
+  );
+
   const handleEdit = () => {
-    // TODO: Navigate to edit profile screen
+    router.push('/profile/edit-profile');
   };
 
   const handleLogout = async () => {
@@ -65,7 +77,15 @@ export default function ProfileScreen() {
   };
 
   const renderItem = ({ item }: { item: Post }) => (
-    <TouchableOpacity style={styles.gridItem} onPress={() => router.push(`/posts/${item.id}`)}>
+    <TouchableOpacity
+      style={styles.gridItem}
+      onPress={() =>
+        router.push({
+          pathname: '/profile/posts',
+          params: { userId: user?.id, postId: item.id },
+        })
+      }
+    >
       <Image source={{ uri: item.media?.[0]?.url }} style={styles.image} resizeMode="cover" />
       {item.media && item.media.length > 1 && (
         <View style={styles.multipleIcon}>
@@ -75,20 +95,103 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Header title={user.username} rightIcon="menu" onRightPress={handleLogout} />
+  const renderTabMenu = () => (
+    <View style={[styles.tabMenu, { borderBottomColor: theme.colors.border }]}>
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => setActiveTab('posts')}
+      >
+        <Ionicons
+          name="grid"
+          size={24}
+          color={activeTab === 'posts' ? theme.colors.text : theme.colors.textSecondary}
+        />
+        {activeTab === 'posts' && (
+          <View style={[styles.tabIndicator, { backgroundColor: theme.colors.text }]} />
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => setActiveTab('reels')}
+      >
+        <Ionicons
+          name="play-circle"
+          size={24}
+          color={activeTab === 'reels' ? theme.colors.text : theme.colors.textSecondary}
+        />
+        {activeTab === 'reels' && (
+          <View style={[styles.tabIndicator, { backgroundColor: theme.colors.text }]} />
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => setActiveTab('tagged')}
+      >
+        <Ionicons
+          name="person-outline"
+          size={24}
+          color={activeTab === 'tagged' ? theme.colors.text : theme.colors.textSecondary}
+        />
+        {activeTab === 'tagged' && (
+          <View style={[styles.tabIndicator, { backgroundColor: theme.colors.text }]} />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderContent = () => {
+    if (activeTab === 'reels') {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            Chưa có thước phim
+          </Text>
+        </View>
+      );
+    }
+
+    if (activeTab === 'tagged') {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            Chưa có bài viết được gắn thẻ
+          </Text>
+        </View>
+      );
+    }
+
+    return (
       <FlatList
         data={posts}
         renderItem={renderItem}
         keyExtractor={item => item.id}
         numColumns={3}
         columnWrapperStyle={styles.row}
-        ListHeaderComponent={<ProfileHeader profile={userProfile} isOwnProfile onEdit={handleEdit} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={isLoading ? <LoadingSpinner /> : null}
+      />
+    );
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Header title={user.username} rightIcon="menu" onRightPress={handleLogout} />
+      <FlatList
+        data={[{ id: 'header' }]}
+        renderItem={() => null}
+        keyExtractor={item => item.id}
+        ListHeaderComponent={
+          <>
+            <ProfileHeader profile={userProfile} isOwnProfile onEdit={handleEdit} />
+            {renderTabMenu()}
+          </>
+        }
+        ListFooterComponent={renderContent()}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
@@ -115,5 +218,30 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
+  },
+  tabMenu: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    position: 'relative',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+  },
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
   },
 });
