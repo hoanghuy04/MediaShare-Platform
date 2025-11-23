@@ -41,6 +41,11 @@ export const postService = {
     };
   },
 
+  getPostById: async (postId: string): Promise<PostResponse> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.POST_DETAIL(postId));
+    return response.data.data;
+  },
+
   getUserPosts: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<PostResponse>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.USER_POSTS(userId), {
       params: { page, limit },

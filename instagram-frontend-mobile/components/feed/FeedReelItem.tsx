@@ -66,7 +66,10 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
   };
 
   const handleWatchMore = () => {
-    // router.push({ pathname: '/reels/[id]', params: { id: post.id } });
+    router.push({
+      pathname: '/(tabs)/reels',
+      params: { initialPostId: post.id }
+    });
   };
 
   const handleReplay = () => {
@@ -74,9 +77,17 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
     player.replay();
   };
 
+  const handleVideoPress = () => {
+    if (!showOverlay) {
+      router.push({
+        pathname: '/(tabs)/reels',
+        params: { initialPostId: post.id }
+      });
+    }
+  };
+
   const handleLike = async () => {
     if (post.likedByCurrentUser) {
-      // Unlike - broken heart animation
       likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
         likeButtonScale.value = withSpring(0.8, { damping: 8, stiffness: 600 }, () => {
           likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
@@ -158,12 +169,14 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
 
       <View style={styles.mediaContainer}>
         {videoSource ? (
-          <VideoView
-            style={styles.video}
-            player={player}
-            contentFit="cover"
-            nativeControls={false}
-          />
+          <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={{ flex: 1 }}>
+            <VideoView
+              style={styles.video}
+              player={player}
+              contentFit="cover"
+              nativeControls={false}
+            />
+          </TouchableOpacity>
         ) : (
           <View style={[styles.video, styles.noVideoPlaceholder]}>
             <Text style={styles.noVideoText}>Video loading...</Text>
@@ -222,25 +235,25 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
 
       <View style={styles.infoSection}>
         {post.totalLike > 0 && (
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => setShowLikesModal(true)}
             activeOpacity={0.7}
           >
             <Text style={styles.likesText}>
-              {firstLiker ? 
-              (
-                post.totalLike === 1 ? (
-                  <>
-                    <Text style={styles.boldText}>{firstLiker.username}</Text> đã thích
-                  </>
+              {firstLiker ?
+                (
+                  post.totalLike === 1 ? (
+                    <>
+                      <Text style={styles.boldText}>{firstLiker.username}</Text> đã thích
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.boldText}>{firstLiker.username}</Text> và <Text style={styles.boldText}>{(post.totalLike - 1).toLocaleString()} người khác</Text> đã thích
+                    </>
+                  )
                 ) : (
-                  <>
-                    <Text style={styles.boldText}>{firstLiker.username}</Text> và <Text style={styles.boldText}>{(post.totalLike - 1).toLocaleString()} người khác</Text> đã thích
-                  </>
-                )
-              ) : (
-                `${post.totalLike.toLocaleString()} lượt thích`
-              )}
+                  `${post.totalLike.toLocaleString()} lượt thích`
+                )}
             </Text>
           </TouchableOpacity>
         )}

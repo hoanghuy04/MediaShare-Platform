@@ -3,54 +3,62 @@ import {
   StyleSheet,
   View,
   StatusBar,
-  ActivityIndicator,
   LayoutChangeEvent,
 } from 'react-native';
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+
 import FeedRow from './FeedRow';
 import FeedHeader from './FeedHeader';
+import ReelSkeleton from './ReelSkeleton';
 import { postService } from '../../services/post.service';
 import { PostResponse } from '../../types/post.type';
+
+const REELS_PER_PAGE = 5;
+const PREFETCH_THRESHOLD = 3;
 
 const ReelComponent = () => {
   const [containerHeight, setContainerHeight] = useState(0);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const params = useLocalSearchParams();
+  const initialPostId = params.initialPostId as string | undefined;
 
   const [currentTab, setCurrentTab] = useState<'reels' | 'friends'>('reels');
-
   const [reels, setReels] = useState<PostResponse[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-
   const [scrollInfo, setScrollInfo] = useState({ isViewable: true, index: 0 });
 
-  const refFlatList = useRef(null);
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80 });
+  const refFlatList = useRef<Animated.FlatList>(null);
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
+
+  const data = useMemo(() => {
+    if (reels.length === 0 && loading) {
+      return Array.from({ length: 3 }).map((_, i) => ({ id: `initial-${i}`, isSkeleton: true }));
+    }
+    if (hasMore) {
+      return [...reels, { id: 'sticky-skeleton-loader', isSkeleton: true }];
+    }
+    return reels;
+  }, [reels, loading, hasMore]);
 
   const fetchReels = async (pageNum: number, tab: 'reels' | 'friends') => {
-    if (loading && pageNum > 1) return;
-
+    if (loading) return;
     setLoading(true);
     try {
-      let data;
+      const limit = REELS_PER_PAGE;
+      const res = await postService.getReels(pageNum, limit);
+      const newReels = res.content || [];
 
-      if (tab === 'reels') {
-        data = await postService.getReels(pageNum, 10);
-      } else {
-        data = await postService.getReels(pageNum, 10);
-      }
+      if (newReels.length < limit) setHasMore(false);
 
-      const newReels = data.content || [];
-
-      if (newReels.length === 0) {
-        setHasMore(false);
-      } else {
-        setReels(prev => {
-          if (pageNum === 1) return newReels;
-          return [...prev, ...newReels];
-        });
-      }
+      setReels(prev => {
+        if (pageNum === 0) return newReels;
+        const existingIds = new Set(prev.map(r => r.id));
+        const uniqueNewReels = newReels.filter(r => !existingIds.has(r.id));
+        return [...prev, ...uniqueNewReels];
+      });
     } catch (error) {
       console.error('Error fetching reels:', error);
     } finally {
@@ -62,14 +70,36 @@ const ReelComponent = () => {
     fetchReels(0, currentTab);
   }, []);
 
+  useEffect(() => {
+    const loadInitialPost = async () => {
+      if (initialPostId && reels.length > 0) {
+        const existingIndex = reels.findIndex(reel => reel.id === initialPostId);
+        if (existingIndex !== -1) {
+          setTimeout(() => {
+            refFlatList.current?.scrollToIndex({ index: existingIndex, animated: false });
+          }, 100);
+        } else {
+          try {
+            const post = await postService.getPostById(initialPostId);
+            setReels(prevReels => [post, ...prevReels]);
+            setTimeout(() => {
+              refFlatList.current?.scrollToIndex({ index: 0, animated: false });
+            }, 100);
+          } catch (error) {
+            console.error('Error fetching initial post:', error);
+          }
+        }
+      }
+    };
+    loadInitialPost();
+  }, [initialPostId, reels.length]);
+
   const handleTabChange = (newTab: 'reels' | 'friends') => {
     if (currentTab === newTab) return;
-
     setCurrentTab(newTab);
     setReels([]);
     setPage(0);
     setHasMore(true);
-
     fetchReels(0, newTab);
   };
 
@@ -81,14 +111,27 @@ const ReelComponent = () => {
     }
   };
 
-  const onViewableItemsChanged = useCallback(({ changed }) => {
+  const onViewableItemsChanged = useCallback(({ changed, viewableItems }) => {
     if (changed.length > 0) {
       setScrollInfo({
         isViewable: changed[0].isViewable,
         index: changed[0].index,
       });
     }
-  }, []);
+
+    if (viewableItems && viewableItems.length > 0) {
+      const lastViewableItem = viewableItems[viewableItems.length - 1];
+      const totalRealItems = reels.length;
+
+      if (
+        lastViewableItem.index >= totalRealItems - PREFETCH_THRESHOLD &&
+        !loading &&
+        hasMore
+      ) {
+        loadMore();
+      }
+    }
+  }, [reels.length, loading, hasMore]);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { height } = event.nativeEvent.layout;
@@ -96,7 +139,7 @@ const ReelComponent = () => {
   }, []);
 
   const getItemLayout = useCallback(
-    (_, index) => ({
+    (_: any, index: number) => ({
       length: containerHeight,
       offset: containerHeight * index,
       index,
@@ -105,7 +148,10 @@ const ReelComponent = () => {
   );
 
   const keyExtractor = useCallback(
-    (item: PostResponse) => `${item.id}-${currentTab}`,
+    (item: any) => {
+      if (item.isSkeleton) return item.id;
+      return `${item.id}-${currentTab}`;
+    },
     [currentTab]
   );
 
@@ -118,23 +164,19 @@ const ReelComponent = () => {
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isAnyFullScreen, setIsAnyFullScreen] = useState(false);
-
-  const handleModalStateChange = useCallback((isOpen: boolean) => {
-    setIsModalVisible(isOpen);
-  }, []);
-
-  const handleFullScreenChange = useCallback((isFullScreen: boolean) => {
-    setIsAnyFullScreen(isFullScreen);
-  }, []);
-
+  const handleModalStateChange = useCallback((isOpen: boolean) => setIsModalVisible(isOpen), []);
+  const handleFullScreenChange = useCallback((isFullScreen: boolean) => setIsAnyFullScreen(isFullScreen), []);
   const handleDeleteSuccess = useCallback((postId: string) => {
     setReels(prevReels => prevReels.filter(reel => reel.id !== postId));
   }, []);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: PostResponse; index: number }) => {
+    ({ item, index }: { item: any; index: number }) => {
+      if (item.isSkeleton) {
+        return <ReelSkeleton height={containerHeight} />;
+      }
+
       const { index: scrollIndex } = scrollInfo;
-      const isNext = Math.abs(index - scrollIndex) <= 1;
       const isVisible = scrollIndex === index;
 
       return (
@@ -151,24 +193,13 @@ const ReelComponent = () => {
     [scrollInfo, containerHeight, handleModalStateChange, handleDeleteSuccess, handleFullScreenChange]
   );
 
-  const renderEmpty = () => {
-    if (loading && page === 1) {
-      return (
-        <View style={[styles.centerContainer, { height: containerHeight }]}>
-          <ActivityIndicator size="large" color="#4D5DF8" />
-        </View>
-      );
-    }
-    return null;
-  };
-
   return (
     <View style={styles.flexContainer} onLayout={handleLayout}>
       <StatusBar barStyle={'light-content'} backgroundColor={'black'} />
 
       {containerHeight > 0 && (
         <Animated.FlatList
-          data={reels}
+          data={data}
           renderItem={renderItem}
           pagingEnabled
           showsVerticalScrollIndicator={false}
@@ -179,18 +210,13 @@ const ReelComponent = () => {
           onScroll={onScroll}
           keyExtractor={keyExtractor}
           getItemLayout={getItemLayout}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            loading && page > 1 ? <ActivityIndicator color="#4D5DF8" style={{ margin: 20 }} /> : null
-          }
-          ListEmptyComponent={renderEmpty}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false}
+          windowSize={5}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          ListFooterComponent={null}
           decelerationRate="fast"
           bounces={false}
-          windowSize={3}
-          initialNumToRender={1}
-          maxToRenderPerBatch={2}
         />
       )}
 
@@ -207,10 +233,5 @@ const styles = StyleSheet.create({
   flexContainer: {
     flex: 1,
     backgroundColor: 'black',
-  },
-  centerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
   },
 });
