@@ -61,16 +61,35 @@ export default function ReelsCreationScreen() {
 
   useEffect(() => {
     (async () => {
-      if (!camPermission?.granted) await requestCamPermission();
-      if (!micPermission?.granted) await requestMicPermission();
+      try {
+        if (camPermission && !camPermission.granted && camPermission.canAskAgain) {
+          await requestCamPermission();
+        }
+        if (micPermission && !micPermission.granted && micPermission.canAskAgain) {
+          await requestMicPermission();
+        }
 
-      const mediaStatus = await MediaLibrary.requestPermissionsAsync();
-      setHasMediaPermission(mediaStatus.status === 'granted');
+        const mediaStatus = await MediaLibrary.getPermissionsAsync(
+          false, // writeOnly
+          [
+            'photo', 'video'
+          ]
+        );
+
+        setHasMediaPermission(mediaStatus.status === 'granted');
+      } catch (err) {
+        console.error('Permission check error:', err);
+        setHasMediaPermission(false);
+      }
     })();
   }, [camPermission, micPermission, requestMicPermission, requestCamPermission]);
 
   useEffect(() => {
-    if (!hasMediaPermission) return;
+    if (hasMediaPermission === null) return;
+    if (hasMediaPermission === false) {
+      setLoadingGallery(false);
+      return;
+    }
 
     (async () => {
       try {
@@ -207,12 +226,59 @@ export default function ReelsCreationScreen() {
     isProgrammaticRef.current = false;
   };
 
-  const goToGallery = useCallback(() => {
+  // ✅ requestPermissionsAsync với PHOTO + VIDEO, không AUDIO
+  const requestMediaPermission = useCallback(async () => {
+    try {
+      const { status, canAskAgain } = await MediaLibrary.requestPermissionsAsync(
+        false,
+        [
+          'photo', 'video'
+        ]
+      );
+
+      if (status === 'granted') {
+        setHasMediaPermission(true);
+        return true;
+      } else {
+        setHasMediaPermission(false);
+
+        if (!canAskAgain) {
+          Alert.alert(
+            'Quyền truy cập thư viện ảnh',
+            'Vui lòng vào Cài đặt > Ứng dụng > Instagram > Quyền để cấp quyền truy cập thư viện ảnh.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert(
+            'Quyền truy cập thư viện ảnh',
+            'Ứng dụng cần quyền truy cập thư viện ảnh để bạn có thể chọn video/ảnh.',
+            [{ text: 'OK' }]
+          );
+        }
+        return false;
+      }
+    } catch (err) {
+      console.error('Media permission request error:', err);
+      setHasMediaPermission(false);
+      Alert.alert('Lỗi', 'Không thể yêu cầu quyền truy cập. Vui lòng thử lại sau.', [
+        { text: 'OK' },
+      ]);
+      return false;
+    }
+  }, []);
+
+  const goToGallery = useCallback(async () => {
     if (!scrollViewRef.current) return;
+
+    if (hasMediaPermission === null || hasMediaPermission === false) {
+      const granted = await requestMediaPermission();
+      if (!granted) return;
+    }
+
     isProgrammaticRef.current = true;
     scrollViewRef.current.scrollTo({ y: FULL_HEIGHT, animated: true });
     setLastOffsetY(FULL_HEIGHT);
-  }, []);
+  }, [hasMediaPermission, requestMediaPermission]);
 
   const goToCamera = useCallback(() => {
     if (!scrollViewRef.current) return;
@@ -237,6 +303,7 @@ export default function ReelsCreationScreen() {
       goToCamera();
     }
   }, [lastOffsetY, goToCamera, goToGallery]);
+
 
   const handleGalleryBeginDrag = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     galleryDragStartYRef.current = e.nativeEvent.contentOffset.y;
@@ -340,6 +407,7 @@ export default function ReelsCreationScreen() {
           height={FULL_HEIGHT}
           gallery={gallery}
           loadingGallery={loadingGallery}
+          hasPermission={hasMediaPermission}
           onGoToCamera={goToCamera}
           onScrollBeginDrag={handleGalleryBeginDrag}
           onScroll={handleGalleryScroll}
