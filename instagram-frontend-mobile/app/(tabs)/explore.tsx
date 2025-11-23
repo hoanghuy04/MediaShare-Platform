@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
-  SafeAreaView,
   Dimensions,
   Image,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
@@ -38,117 +39,181 @@ export default function ExploreScreen() {
     onError: error => showAlert('Error', error.message),
   });
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   useEffect(() => {
     refresh();
   }, []);
 
   const handleSearchPress = () => {
-    // Navigate to search page immediately to show recent searches
     router.push('/search');
   };
 
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
-  const renderGridItem = ({ item, index }: { item: Post; index: number }) => {
+  const renderGridItem = ({ item }: { item: Post; index: number }) => {
     const firstMedia = item.media[0];
-    const isVideo = firstMedia?.type === 'VIDEO' || firstMedia?.type === 'video';
+    const isVideo =
+      firstMedia?.type === 'VIDEO' || firstMedia?.type === 'video';
     const hasMultipleMedia = item.media.length > 1;
-    
+
     return (
       <TouchableOpacity
         style={[styles.gridItem, { width: itemSize, height: itemSize }]}
         onPress={() => router.push(`/posts/${item.id}`)}
+        activeOpacity={0.9}
       >
         <Image
           source={{ uri: firstMedia?.url }}
           style={styles.gridImage}
           resizeMode="cover"
         />
-        
-        {/* Video indicator */}
+
         {isVideo && (
           <View style={styles.videoIndicator}>
-            <Ionicons name="play" size={16} color="white" />
+            <Ionicons name="play" size={14} color="white" />
           </View>
         )}
-        
-        {/* Multiple media indicator */}
+
         {hasMultipleMedia && (
           <View style={styles.multipleIndicator}>
-            <Ionicons name="albums" size={16} color="white" />
+            <Ionicons name="albums" size={14} color="white" />
           </View>
         )}
       </TouchableOpacity>
     );
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      <SafeAreaView style={styles.safeArea}>
-        {/* Top search bar */}
-        <View style={styles.searchContainer}>
-          <TouchableOpacity style={styles.searchBar} onPress={handleSearchPress}>
-            <Ionicons name="search" size={20} color="#8e8e8e" style={styles.searchIcon} />
-            <Text style={styles.searchPlaceholder}>Tìm kiếm</Text>
-          </TouchableOpacity>
+  const renderEmpty = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
+      );
+    }
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+          Chưa có bài viết nào trong mục Khám phá
+        </Text>
+      </View>
+    );
+  };
 
-        {/* Show posts grid */}
-        <FlatList
-          data={posts as Post[] || []}
-          renderItem={renderGridItem}
-          keyExtractor={item => item.id}
-          numColumns={3}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.gridContainer}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          showsVerticalScrollIndicator={false}
-        />
-      </SafeAreaView>
-    </View>
+  return (
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+      ]}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
+
+      {/* Header + ô search */}
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>
+          Khám phá
+        </Text>
+        <TouchableOpacity
+          style={styles.searchBar}
+          onPress={handleSearchPress}
+          activeOpacity={0.9}
+        >
+          <Ionicons
+            name="search"
+            size={18}
+            color="#8e8e8e"
+            style={styles.searchIcon}
+          />
+          <Text style={styles.searchPlaceholder}>Tìm kiếm</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Grid posts */}
+      <FlatList
+        data={(posts as Post[]) || []}
+        renderItem={renderGridItem}
+        keyExtractor={item => item.id}
+        numColumns={3}
+        columnWrapperStyle={styles.row}
+        contentContainerStyle={styles.gridContainer}
+        onEndReached={hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={renderEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+            progressViewOffset={8}
+          />
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
   },
-  safeArea: {
-    flex: 1,
-  },
-  searchContainer: {
+  header: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 10,
+    paddingTop: 4,
     backgroundColor: 'white',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: '#f4f4f5',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   searchPlaceholder: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#8e8e8e',
   },
   gridContainer: {
-    paddingTop: 8,
+    paddingTop: 6,
+    paddingBottom: 16,
+    paddingHorizontal: 2,
   },
   row: {
     justifyContent: 'space-between',
     marginBottom: 2,
   },
   gridItem: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f3f4f6',
     position: 'relative',
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   gridImage: {
     width: '100%',
@@ -156,44 +221,21 @@ const styles = StyleSheet.create({
   },
   videoIndicator: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    padding: 4,
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   multipleIndicator: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  listContainer: {
-    paddingVertical: 8,
-  },
-  userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  userInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  username: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  fullName: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  verified: {
-    fontSize: 16,
-    color: '#1DA1F2',
+    top: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   centerContainer: {
     flex: 1,
@@ -202,7 +244,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
   },
 });

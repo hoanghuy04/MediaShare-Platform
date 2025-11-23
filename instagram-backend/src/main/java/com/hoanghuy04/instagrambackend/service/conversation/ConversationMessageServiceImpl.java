@@ -24,6 +24,7 @@ import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.messagerequest.MessageRequestService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.websocket.WebSocketMessageService;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     FileService fileService;
     UserMapper userMapper;
+    SecurityUtil securityUtil;
 
     @Transactional
     @Override
@@ -242,10 +244,9 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
     @Transactional
     @Override
-    public void markAsRead(String messageId, String userId) {
-        log.info("Marking message {} as read by user {}", messageId, userId);
-
+    public void markAsRead(String messageId) {
         Message message = getMessageById(messageId);
+        String userId = securityUtil.getCurrentUserId();
 
         if (!message.getReadBy().contains(userId)) {
             message.getReadBy().add(userId);
@@ -253,12 +254,9 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         }
 
         if (message.getConversation() != null) {
-            Pageable unpaged = Pageable.unpaged();
             List<Message> unreadMessages = messageRepository
-                    .findByConversationIdAndDeletedByNotContainingOrderByCreatedAtDesc(
-                            message.getConversation().getId(),
-                            userId,
-                            unpaged
+                    .findByConversationId(
+                            message.getConversation().getId()
                     );
 
             for (Message msg : unreadMessages) {

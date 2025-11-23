@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
-  SafeAreaView,
   TextInput,
   Dimensions,
   Image,
-  ScrollView,
   Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
@@ -35,7 +34,7 @@ export default function SearchScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const { query: initialQuery } = useLocalSearchParams<{ query?: string }>();
-  
+
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');
   const [activeTab, setActiveTab] = useState<SearchTab>('for_you');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -61,7 +60,7 @@ export default function SearchScreen() {
   // Filter recent searches when query changes
   useEffect(() => {
     if (searchQuery.trim().length > 0) {
-      const filtered = recentSearches.filter(search => 
+      const filtered = recentSearches.filter(search =>
         search.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredRecentSearches(filtered);
@@ -110,10 +109,10 @@ export default function SearchScreen() {
     try {
       // Search users (this endpoint exists)
       const usersResponse = await userAPI.searchUsers(query, 0, 5);
-      
+
       // Search posts (with fallback)
       const postsResponse = await postService.searchPosts(query, 0, 20);
-      
+
       // Search reels (with fallback)
       const reelsResponse = await postService.searchReels(query, 0, 20);
 
@@ -127,18 +126,18 @@ export default function SearchScreen() {
       await saveRecentSearch(query);
     } catch (error: any) {
       console.error('Search error:', error);
-      
+
       // Show user-friendly error message
       if (error.response?.status === 404) {
         setApiUnavailable(true);
-        
+
         // Fallback to explore content
         try {
           const exploreResponse = await postService.getExplorePosts(0, 20);
           setSearchResults({
             users: [],
             posts: exploreResponse.content || [],
-            reels: exploreResponse.content?.filter(post => 
+            reels: exploreResponse.content?.filter(post =>
               post.media.some(media => media.type === 'VIDEO' || media.type === 'video')
             ) || [],
           });
@@ -436,33 +435,42 @@ export default function SearchScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+      ]}
+      // nếu có bottom tab mà bị dư padding dưới thì bật dòng này:
+      // edges={['top', 'left', 'right']}
+    >
       <StatusBar barStyle="dark-content" backgroundColor="white" />
-      <SafeAreaView style={styles.safeArea}>
-        {/* Header with search bar */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#8e8e8e" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Tìm kiếm"
-              placeholderTextColor="#8e8e8e"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearchSubmit}
-              onBlur={() => Keyboard.dismiss()}
-              autoFocus
-              returnKeyType="search"
-            />
-          </View>
-        </View>
 
+      {/* Header với ô search */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color="#8e8e8e" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm"
+            placeholderTextColor="#8e8e8e"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearchSubmit}
+            onBlur={() => Keyboard.dismiss()}
+            autoFocus
+            returnKeyType="search"
+          />
+        </View>
+      </View>
+
+      {/* Phần nội dung phải flex:1 */}
+      <View style={{ flex: 1 }}>
         {renderContent()}
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -486,11 +494,17 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    backgroundColor: '#f4f4f5',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 0,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   searchIcon: {
     marginRight: 8,

@@ -27,21 +27,21 @@ export interface LastMessage {
   senderId: string;
   senderUsername: string;
   timestamp: string;
+  readBy?: string[]
 }
 
 // Conversation DTO (matches backend ConversationDTO)
 export interface Conversation {
   id: string;
   type: 'DIRECT' | 'GROUP';
-  name?: string; // Group name
-  avatar?: string; // Group avatar
-  participants: ConversationMember[]; // Changed from UserSummary[] to ConversationMember[]
+  name?: string; 
+  avatar?: string; 
+  participants: ConversationMember[]; 
   admins?: string[];
   lastMessage?: LastMessage;
   createdAt: string;
   wallpaperUrl?: string;
   themeColor?: string;
-  // Note: unreadCount removed - calculate on frontend from messages
 }
 
 export type MessageKind = 'TEXT' | 'STICKER' | 'IMAGE' | 'AUDIO' | 'SYSTEM';

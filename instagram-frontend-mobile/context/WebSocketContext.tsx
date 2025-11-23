@@ -7,12 +7,12 @@ interface WebSocketContextType {
   isConnected: boolean;
   connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'reconnecting';
   sendMessage: (receiverId: string, content: string) => void;
-  sendTyping: (receiverId: string) => void;
-  sendStopTyping: (receiverId: string) => void;
+  sendTyping: (receiverOrConversationId: string, isConversationId?: boolean) => void;
+  sendStopTyping: (receiverOrConversationId: string, isConversationId?: boolean) => void;
   sendReadReceipt: (messageId: string, senderId: string) => void;
   onMessage: (callback: (message: ChatMessage) => void) => void;
-  onTyping: (callback: (isTyping: boolean, userId: string) => void) => void;
-  onReadReceipt: (callback: (messageId: string, userId: string) => void) => void;
+  onTyping: (callback: (isTyping: boolean, userId: string, conversationId?: string) => void) => void;
+  onReadReceipt: (callback: (messageId: string, userId: string, conversationId?: string) => void) => void;
   onUserOnline: (callback: (userId: string) => void) => void;
   onUserOffline: (callback: (userId: string) => void) => void;
   onConnectionStatusChange: (callback: (status: string) => void) => void;
@@ -30,8 +30,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'reconnecting'>('disconnected');
   const messageCallbacksRef = useRef<{
     onMessage?: (message: ChatMessage) => void;
-    onTyping?: (isTyping: boolean, userId: string) => void;
-    onReadReceipt?: (messageId: string, userId: string) => void;
+    onTyping?: (isTyping: boolean, userId: string, conversationId?: string) => void;
+    onReadReceipt?: (messageId: string, userId: string, conversationId?: string) => void;
     onUserOnline?: (userId: string) => void;
     onUserOffline?: (userId: string) => void;
     onConnectionStatusChange?: (status: string) => void;
@@ -58,11 +58,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       onMessage: (message: ChatMessage) => {
         messageCallbacksRef.current.onMessage?.(message);
       },
-      onTyping: (isTyping: boolean, userId: string) => {
-        messageCallbacksRef.current.onTyping?.(isTyping, userId);
+      onTyping: (isTyping: boolean, userId: string, conversationId?: string) => {
+        messageCallbacksRef.current.onTyping?.(isTyping, userId, conversationId);
       },
-      onReadReceipt: (messageId: string, userId: string) => {
-        messageCallbacksRef.current.onReadReceipt?.(messageId, userId);
+      onReadReceipt: (messageId: string, userId: string, conversationId?: string) => {
+        messageCallbacksRef.current.onReadReceipt?.(messageId, userId, conversationId);
       },
       onUserOnline: (userId: string) => {
         messageCallbacksRef.current.onUserOnline?.(userId);
@@ -127,12 +127,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     webSocketService.sendMessage(receiverId, content);
   }, []);
 
-  const sendTyping = useCallback((receiverId: string) => {
-    webSocketService.sendTyping(receiverId);
+  const sendTyping = useCallback((receiverOrConversationId: string, isConversationId = false) => {
+    webSocketService.sendTyping(receiverOrConversationId, isConversationId);
   }, []);
 
-  const sendStopTyping = useCallback((receiverId: string) => {
-    webSocketService.sendStopTyping(receiverId);
+  const sendStopTyping = useCallback((receiverOrConversationId: string, isConversationId = false) => {
+    webSocketService.sendStopTyping(receiverOrConversationId, isConversationId);
   }, []);
 
   const sendReadReceipt = useCallback((messageId: string, senderId: string) => {
@@ -143,11 +143,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     messageCallbacksRef.current.onMessage = callback;
   }, []);
 
-  const onTyping = useCallback((callback: (isTyping: boolean, userId: string) => void) => {
+  const onTyping = useCallback((callback: (isTyping: boolean, userId: string, conversationId?: string) => void) => {
     messageCallbacksRef.current.onTyping = callback;
   }, []);
 
-  const onReadReceipt = useCallback((callback: (messageId: string, userId: string) => void) => {
+  const onReadReceipt = useCallback((callback: (messageId: string, userId: string, conversationId?: string) => void) => {
     messageCallbacksRef.current.onReadReceipt = callback;
   }, []);
 

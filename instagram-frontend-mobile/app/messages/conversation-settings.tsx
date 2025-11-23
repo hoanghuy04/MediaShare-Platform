@@ -6,18 +6,19 @@ import {
   Text,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
   ScrollView,
   Modal,
   Platform,
   TextInput,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { useConversation, useConversationActions } from '../../context/ConversationContext';
 import { Avatar } from '../../components/common/Avatar';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { userAPI } from '../../services/api';
@@ -37,9 +38,17 @@ export default function ConversationSettingsScreen() {
   const routeConversationId = normalize(params.conversationId);
 
   const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
-  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // ConversationContext
+  const {
+    conversation,
+    status: conversationStatus,
+    loading: conversationLoading,
+    refresh: refreshConversation,
+  } = useConversation(routeConversationId);
+  const { setConversation, updateConversationLocal } = useConversationActions();
 
   const isGroup = useMemo(() => conversation?.type === 'GROUP', [conversation?.type]);
 
@@ -70,30 +79,20 @@ export default function ConversationSettingsScreen() {
     try {
       setIsLoading(true);
 
-      if (routeConversationId) {
-        const conv = await messageAPI.getConversation(routeConversationId);
-        setConversation(conv);
-
-        if (conv.type === 'DIRECT') {
-          const other =
-            conv.participants?.find(p => p.userId !== currentUser?.id) ||
-            conv.participants?.[0];
-          if (other?.userId) {
-            const profile = await userAPI.getUserProfile(other.userId);
-            setOtherUser(profile);
-          }
-        }
-        return;
-      }
-
+      // Nếu có routeUserId (direct message không có conversation), load user profile
       if (routeUserId) {
         const profile = await userAPI.getUserProfile(routeUserId);
         setOtherUser(profile);
-        setConversation(null);
         return;
       }
 
-      throw new Error('Thiếu userId/conversationId');
+      // Nếu không có routeConversationId thì lỗi
+      if (!routeConversationId) {
+        throw new Error('Thiếu userId/conversationId');
+      }
+
+      // Conversation sẽ được load bởi useConversation hook
+      // Chỉ cần đợi conversation load xong rồi load otherUser nếu là DIRECT
     } catch (e) {
       console.error('load settings error', e);
       showAlert('Error', 'Không thể tải cài đặt cuộc trò chuyện');
@@ -101,17 +100,11 @@ export default function ConversationSettingsScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [routeConversationId, routeUserId, currentUser?.id, router]);
+  }, [routeConversationId, routeUserId, router]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const refreshConversation = useCallback(async () => {
-    if (!routeConversationId) return;
-    const conv = await messageAPI.getConversation(routeConversationId);
-    setConversation(conv);
-  }, [routeConversationId]);
 
   // ----- LEAVE GROUP -----
   const handleLeaveGroup = useCallback(() => {
@@ -496,8 +489,8 @@ export default function ConversationSettingsScreen() {
     }
     try {
       setSaving(true);
-      await messageAPI.updateConversation(routeConversationId, { name: trimmed });
-      await refreshConversation();
+      const updated = await messageAPI.updateConversation(routeConversationId, { name: trimmed });
+      setConversation(updated);
       setRenameVisible(false);
       setActionSheetVisible(false);
     } catch (e: any) {
@@ -506,7 +499,7 @@ export default function ConversationSettingsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [routeConversationId, renameValue, refreshConversation]);
+  }, [routeConversationId, renameValue, setConversation]);
 
   // ----- Handlers: Avatar -----
   const doUploadAndSetAvatar = useCallback(
@@ -528,8 +521,8 @@ export default function ConversationSettingsScreen() {
       setSaving(true);
       try {
         const uploaded = await fileService.uploadFile(form, 'PROFILE');
-        await messageAPI.updateConversation(routeConversationId, { avatar: uploaded.id });
-        await refreshConversation();
+        const updated = await messageAPI.updateConversation(routeConversationId, { avatar: uploaded.id });
+        setConversation(updated);
         setAvatarSheetVisible(false);
         setActionSheetVisible(false);
       } catch (e: any) {
@@ -539,15 +532,15 @@ export default function ConversationSettingsScreen() {
         setSaving(false);
       }
     },
-    [routeConversationId, refreshConversation],
+    [routeConversationId, setConversation],
   );
 
   const handleAvatarRemove = useCallback(async () => {
     if (!routeConversationId) return;
     try {
       setSaving(true);
-      await messageAPI.updateConversation(routeConversationId, { avatar: '__REMOVE__' });
-      await refreshConversation();
+      const updated = await messageAPI.updateConversation(routeConversationId, { avatar: '__REMOVE__' });
+      setConversation(updated);
       setAvatarSheetVisible(false);
       setActionSheetVisible(false);
     } catch (e: any) {
@@ -556,7 +549,7 @@ export default function ConversationSettingsScreen() {
     } finally {
       setSaving(false);
     }
-  }, [routeConversationId, refreshConversation]);
+  }, [routeConversationId, setConversation]);
 
   const pickFromLibrary = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -867,7 +860,7 @@ export default function ConversationSettingsScreen() {
 
   if (isLoading) {
     return (
-      <View
+      <SafeAreaView
         style={[
           styles.container,
           { backgroundColor: theme.colors.background },
@@ -880,7 +873,7 @@ export default function ConversationSettingsScreen() {
             <LoadingSpinner />
           </View>
         </SafeAreaView>
-      </View>
+      </SafeAreaView>
     );
   }
 

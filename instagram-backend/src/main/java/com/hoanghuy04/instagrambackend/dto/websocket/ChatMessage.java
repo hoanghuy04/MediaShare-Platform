@@ -57,6 +57,11 @@ public class ChatMessage {
     private String receiverId;
     
     /**
+     * Conversation ID (for group chat support)
+     */
+    private String conversationId;
+    
+    /**
      * Message content
      */
     private String content;
