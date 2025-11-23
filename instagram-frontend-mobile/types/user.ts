@@ -38,6 +38,7 @@ export interface UpdateUserRequest {
   website?: string;
   location?: string;
   isPrivate?: boolean;
+  avatar?: string;
 }
 
 export interface UserStatsResponse {

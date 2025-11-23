@@ -20,33 +20,52 @@ type TabType = 'posts' | 'reels' | 'tagged';
 export default function ProfileScreen() {
   const { theme } = useTheme();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUserData } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('posts');
 
   const {
     data: posts,
-    isLoading,
-    loadMore,
-    refresh,
+    isLoading: isLoadingPosts,
+    loadMore: loadMorePosts,
+    refresh: refreshPosts,
   } = useInfiniteScroll({
     fetchFunc: (page, limit) => postService.getUserPosts(user?.id || '', page, limit),
     limit: 30,
     onError: error => showAlert('Error', error.message),
   });
 
+  const {
+    data: reels,
+    isLoading: isLoadingReels,
+    loadMore: loadMoreReels,
+    refresh: refreshReels,
+  } = useInfiniteScroll({
+    fetchFunc: (page, limit) => postService.getUserReels(user?.id || '', page, limit),
+    limit: 30,
+    onError: error => showAlert('Error', error.message),
+  });
+
   useEffect(() => {
     if (user?.id) {
-      refresh();
+      if (activeTab === 'posts') {
+        refreshPosts();
+      } else if (activeTab === 'reels') {
+        refreshReels();
+      }
     }
-  }, [user?.id]);
+  }, [user?.id, activeTab]);
 
   useFocusEffect(
     React.useCallback(() => {
-      // Refresh posts when screen comes into focus
       if (user?.id) {
-        refresh();
+        refreshUserData();
+        if (activeTab === 'posts') {
+          refreshPosts();
+        } else if (activeTab === 'reels') {
+          refreshReels();
+        }
       }
-    }, [user?.id])
+    }, [user?.id, activeTab])
   );
 
   const handleEdit = () => {
@@ -142,16 +161,6 @@ export default function ProfileScreen() {
   );
 
   const renderContent = () => {
-    if (activeTab === 'reels') {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-            Chưa có thước phim
-          </Text>
-        </View>
-      );
-    }
-
     if (activeTab === 'tagged') {
       return (
         <View style={styles.emptyContainer}>
@@ -162,9 +171,13 @@ export default function ProfileScreen() {
       );
     }
 
+    const data = activeTab === 'posts' ? posts : reels;
+    const isLoading = activeTab === 'posts' ? isLoadingPosts : isLoadingReels;
+    const loadMore = activeTab === 'posts' ? loadMorePosts : loadMoreReels;
+
     return (
       <FlatList
-        data={posts}
+        data={data}
         renderItem={renderItem}
         keyExtractor={item => item.id}
         numColumns={3}
@@ -172,7 +185,17 @@ export default function ProfileScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={isLoading ? <LoadingSpinner /> : null}
+        ListEmptyComponent={
+          isLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                {activeTab === 'posts' ? 'Chưa có bài viết' : 'Chưa có thước phim'}
+              </Text>
+            </View>
+          )
+        }
       />
     );
   };

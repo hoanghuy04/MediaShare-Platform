@@ -135,7 +135,6 @@ export default function FeedScreen() {
 
       const response = await postLikeService.toggleLikePost(id);
       
-      console.log('API response:', response);
       
       if (response.liked !== newLiked) {
         console.warn('Backend state differs from optimistic update, syncing...');

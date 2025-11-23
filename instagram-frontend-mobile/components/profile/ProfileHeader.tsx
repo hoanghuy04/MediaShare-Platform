@@ -39,7 +39,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Profile Picture and Stats */}
       <View style={styles.topSection}>
         <Avatar uri={profile.profile?.avatar} name={fullName} size={86} />
 

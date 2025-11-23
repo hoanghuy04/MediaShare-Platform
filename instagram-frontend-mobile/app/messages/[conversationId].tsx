@@ -311,14 +311,14 @@ export default function ConversationScreen() {
               prev?.id === other.userId
                 ? prev
                 : {
-                    id: other.userId,
-                    username: other.username,
-                    email: '',
-                    profile: { avatar: other.avatar },
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    isVerified: other.isVerified,
-                  }
+                  id: other.userId,
+                  username: other.username,
+                  email: '',
+                  profile: { avatar: other.avatar },
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  isVerified: other.isVerified,
+                }
             );
           }
         } else {
@@ -477,7 +477,7 @@ export default function ConversationScreen() {
           if (hasOptimistic) {
             const replaced = prev.map(m =>
               m.id.startsWith('temp-') &&
-              m.content === incoming.content
+                m.content === incoming.content
                 ? incoming
                 : m
             );
@@ -884,14 +884,14 @@ export default function ConversationScreen() {
         !!prev &&
         prev.sender?.id === cur?.sender?.id &&
         new Date(cur.createdAt).getTime() -
-          new Date(prev.createdAt).getTime() <=
-          CLUSTER_MS;
+        new Date(prev.createdAt).getTime() <=
+        CLUSTER_MS;
       const sameNext =
         !!next &&
         next.sender?.id === cur?.sender?.id &&
         new Date(next.createdAt).getTime() -
-          new Date(cur.createdAt).getTime() <=
-          CLUSTER_MS;
+        new Date(cur.createdAt).getTime() <=
+        CLUSTER_MS;
 
       return {
         isClusterStart: !samePrev,
@@ -1052,7 +1052,7 @@ export default function ConversationScreen() {
             connectionStatus !== 'connected' && (
               <ConnectionStatus
                 status={connectionStatus}
-                onRetry={() => {}}
+                onRetry={() => { }}
               />
             )}
         </>
@@ -1099,9 +1099,9 @@ export default function ConversationScreen() {
           onAddMembers={
             isGroupConversation
               ? () => {
-                  setPendingMembers({});
-                  setAddMembersVisible(true);
-                }
+                setPendingMembers({});
+                setAddMembersVisible(true);
+              }
               : undefined
           }
         />
@@ -1148,9 +1148,9 @@ export default function ConversationScreen() {
         onAddMembers={
           isGroupConversation
             ? () => {
-                setPendingMembers({});
-                setAddMembersVisible(true);
-              }
+              setPendingMembers({});
+              setAddMembersVisible(true);
+            }
             : undefined
         }
       />
@@ -1291,7 +1291,7 @@ export default function ConversationScreen() {
             showAlert(
               'Lỗi',
               e?.response?.data?.message ||
-                'Không thể thêm thành viên'
+              'Không thể thêm thành viên'
             );
           } finally {
             setIsAddingMembers(false);
