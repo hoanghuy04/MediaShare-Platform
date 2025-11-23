@@ -1,6 +1,6 @@
 import { UserRole } from './enum.type';
 
-export interface ProfileData {
+export interface UserProfile {
   firstName?: string;
   lastName?: string;
   bio?: string;
@@ -10,23 +10,51 @@ export interface ProfileData {
   location?: string;
 }
 
-export interface UserProfile {
+export interface User {
   id: string;
   username: string;
   email: string;
-  profile?: ProfileData;
-  roles?: string[];
-  followersCount?: number;
-  followingCount?: number;
-  postsCount?: number;
-  isPrivate?: boolean;
-  isVerified?: boolean;
-  isActive?: boolean;
-  isFollowing?: boolean;
-  isFollowedBy?: boolean;
+  profile?: UserProfile;
+  roles?: UserRole[];
+  followersCount: number;
+  followingCount: number;
+  isPrivate: boolean;
+  isVerified: boolean;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
+export interface UserResponse extends User {
+  postsCount?: number;
+  isFollowing?: boolean;
+  isFollowedBy?: boolean;
+}
+
+export interface UpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  bio?: string;
+  website?: string;
+  location?: string;
+  isPrivate?: boolean;
+}
+
+export interface UserStatsResponse {
+  userId: string;
+  postsCount: number;
+  followersCount: number;
+  followingCount: number;
+}
+
+export interface FollowResponse {
+  success: boolean;
+  isFollowing: boolean;
+  message: string;
+}
+
+// Legacy types for backward compatibility
+export interface ProfileData extends UserProfile {}
 
 export interface UpdateProfileRequest {
   fullName?: string;
@@ -36,29 +64,8 @@ export interface UpdateProfileRequest {
   coverImage?: string;
 }
 
-export interface FollowResponse {
-  success: boolean;
-  isFollowing: boolean;
-  message: string;
-}
-
 export interface UserStats {
   followersCount: number;
   followingCount: number;
   postsCount: number;
-}
-
-export interface UserResponse {
-  id: string;
-  username: string;
-  email: string;
-  profile: UserProfile | null;
-  roles: UserRole[];
-  followersCount: number;
-  followingCount: number;
-  isPrivate: boolean;
-  isVerified: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }

@@ -3,12 +3,13 @@ import { View, FlatList, TouchableOpacity, Image, StyleSheet, Dimensions } from 
 import { useRouter } from 'expo-router';
 import { Post } from '@types';
 import { Ionicons } from '@expo/vector-icons';
+import { PostResponse } from '../../types/post.type';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_SIZE = (SCREEN_WIDTH - 4) / 3;
 
 interface PostGridProps {
-  posts: Post[];
+  posts: PostResponse[];
   onEndReached?: () => void;
 }
 

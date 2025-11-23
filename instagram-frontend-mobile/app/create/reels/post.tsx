@@ -92,7 +92,7 @@ export default function ReelPostScreen() {
 
     setTimeout(() => {
       startUpload({
-        mediaUri: mediaUri,
+        mediaUris: [mediaUri],
         mediaType: mediaType,
         caption: caption,
         location: pickedLocation?.name,

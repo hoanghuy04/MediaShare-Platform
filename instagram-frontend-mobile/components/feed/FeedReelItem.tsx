@@ -1,18 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
-import { PostResponse } from '../../types/post.type';
+import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { PostLikesModal } from './PostLikesModal';
+import { postLikeService } from '@/services/post-like.service';
 
 const { width } = Dimensions.get('window');
 const MEDIA_HEIGHT = width * (16 / 9);
 
-export const FeedReelItem = ({ post, isVisible }: { post: PostResponse; isVisible: boolean }) => {
+export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; isVisible: boolean; onLike?: (postId: string) => void }) => {
   const router = useRouter();
   const [showOverlay, setShowOverlay] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
+  const likeButtonScale = useSharedValue(1);
 
   const videoSource = post.media && post.media.length > 0 ? post.media[0].url : null;
 
@@ -37,6 +43,23 @@ export const FeedReelItem = ({ post, isVisible }: { post: PostResponse; isVisibl
     return () => subscription.remove();
   }, [player]);
 
+  useEffect(() => {
+    if (post.totalLike > 0) {
+      loadFirstLiker();
+    }
+  }, [post.totalLike]);
+
+  const loadFirstLiker = async () => {
+    try {
+      const response = await postLikeService.getPostLikes(post.id, 0, 1);
+      if (response.content && response.content.length > 0) {
+        setFirstLiker(response.content[0]);
+      }
+    } catch (error) {
+      console.error('Error loading first liker:', error);
+    }
+  };
+
   const toggleMute = () => {
     setIsMuted(!isMuted);
     if (player) player.muted = !isMuted;
@@ -50,6 +73,26 @@ export const FeedReelItem = ({ post, isVisible }: { post: PostResponse; isVisibl
     setShowOverlay(false);
     player.replay();
   };
+
+  const handleLike = async () => {
+    if (post.likedByCurrentUser) {
+      // Unlike - broken heart animation
+      likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
+        likeButtonScale.value = withSpring(0.8, { damping: 8, stiffness: 600 }, () => {
+          likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
+        });
+      });
+    } else {
+      likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
+        likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
+      });
+    }
+    await onLike?.(post.id);
+  };
+
+  const likeButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: likeButtonScale.value }],
+  }));
 
   const avatarUrl = post.author.profile?.avatar || 'https://via.placeholder.com/40';
 
@@ -151,8 +194,14 @@ export const FeedReelItem = ({ post, isVisible }: { post: PostResponse; isVisibl
 
       <View style={styles.actionBar}>
         <View style={styles.leftActions}>
-          <TouchableOpacity style={styles.actionIcon}>
-            <Feather name="heart" size={28} color="#000" />
+          <TouchableOpacity style={styles.actionIcon} onPress={handleLike}>
+            <Animated.View style={likeButtonAnimatedStyle}>
+              <Ionicons
+                name={post.likedByCurrentUser ? 'heart' : 'heart-outline'}
+                size={28}
+                color={post.likedByCurrentUser ? '#ed4956' : '#000'}
+              />
+            </Animated.View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionIcon}>
             <Ionicons
@@ -172,10 +221,38 @@ export const FeedReelItem = ({ post, isVisible }: { post: PostResponse; isVisibl
       </View>
 
       <View style={styles.infoSection}>
-        <Text style={styles.likesText}>{post.totalLike.toLocaleString()} lượt thích</Text>
+        {post.totalLike > 0 && (
+          <TouchableOpacity 
+            onPress={() => setShowLikesModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.likesText}>
+              {firstLiker ? 
+              (
+                post.totalLike === 1 ? (
+                  <>
+                    <Text style={styles.boldText}>{firstLiker.username}</Text> đã thích
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.boldText}>{firstLiker.username}</Text> và <Text style={styles.boldText}>{(post.totalLike - 1).toLocaleString()} người khác</Text> đã thích
+                  </>
+                )
+              ) : (
+                `${post.totalLike.toLocaleString()} lượt thích`
+              )}
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.captionContainer}>{renderCaption()}</View>
         <Text style={styles.dateText}>6 ngày trước</Text>
       </View>
+
+      <PostLikesModal
+        visible={showLikesModal}
+        onClose={() => setShowLikesModal(false)}
+        postId={post.id}
+      />
     </View>
   );
 };
@@ -297,7 +374,8 @@ const styles = StyleSheet.create({
   leftActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   actionIcon: {},
   infoSection: { paddingHorizontal: 12, paddingBottom: 12 },
-  likesText: { fontWeight: '600', fontSize: 14, marginBottom: 6, color: '#000' },
+  likesText: { fontSize: 13, fontWeight: '400', marginBottom: 4, color: '#000' },
+  boldText: { fontWeight: '600' },
   captionContainer: { marginBottom: 4 },
   captionText: { fontSize: 14, color: '#000', lineHeight: 20 },
   hashtagText: { fontSize: 14, color: '#00376b', lineHeight: 20 },

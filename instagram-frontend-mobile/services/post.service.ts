@@ -5,20 +5,11 @@ import { PaginatedResponse, Post } from '../types';
 import { CreatePostRequest, PostResponse, PostLikeToggleResponse } from '../types/post.type';
 
 export const postService = {
-  getFeed: async (page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
+  getFeed: async (page = 0, limit = 20): Promise<PaginatedResponse<PostResponse>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.FEED, {
       params: { page, limit },
     });
-    console.log('[getFeed] Sample post:', response.data.data.content[0]);
-    // Map backend field names to frontend
-    const mappedContent = response.data.data.content.map((post: any) => ({
-      ...post,
-      isLikedByCurrentUser: post.likedByCurrentUser,
-    }));
-    return {
-      ...response.data.data,
-      content: mappedContent,
-    };
+    return response.data.data;
   },
 
   getReels: async (page = 0, limit = 20): Promise<PaginatedResponse<PostResponse>> => {
@@ -34,7 +25,6 @@ export const postService = {
     });
     const mappedContent = response.data.data.content.map((post: any) => ({
       ...post,
-      isLikedByCurrentUser: post.likedByCurrentUser,
     }));
     return {
       ...response.data.data,
@@ -51,18 +41,13 @@ export const postService = {
     };
   },
 
-  getUserPosts: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
+  getUserPosts: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<PostResponse>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.USER_POSTS(userId), {
       params: { page, limit },
     });
-    const mappedContent = response.data.data.content.map((post: any) => ({
-      ...post,
-      isLikedByCurrentUser: post.likedByCurrentUser,
-    }));
-    return {
-      ...response.data.data,
-      content: mappedContent,
-    };
+    console.log('User posts response data:', response.data);
+    return response.data.data;
+    
   },
 
   createPost: async (data: CreatePostRequest): Promise<Post> => {

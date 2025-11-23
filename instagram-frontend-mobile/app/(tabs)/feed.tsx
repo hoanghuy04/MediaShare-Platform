@@ -16,7 +16,9 @@ import { UploadProgressWidget } from '@components/feed/UploadProgressWidget';
 
 import { userAPI } from '@services/api';
 import { postService } from '../../services/post.service';
+import { postLikeService } from '../../services/post-like.service';
 import { showAlert } from '@utils/helpers';
+import { PostResponse } from '../../types/post.type';
 
 export default function FeedScreen() {
   const { theme } = useTheme();
@@ -76,7 +78,7 @@ export default function FeedScreen() {
     loadMore,
     refresh,
     updateItem,
-  } = useInfiniteScroll({
+  } = useInfiniteScroll<PostResponse>({
     fetchFunc: postService.getFeed,
     limit: 20,
     onError: error => showAlert('Error', error.message),
@@ -89,11 +91,9 @@ export default function FeedScreen() {
     }
   }, []);
 
-  // Reload feed when returning from post detail
   useFocusEffect(
     React.useCallback(() => {
       if (hasInitialized.current) {
-        // Silent refresh to sync like/comment changes
         refresh();
       }
     }, [])
@@ -112,34 +112,54 @@ export default function FeedScreen() {
         showAlert('Error', 'Please login to like posts');
         return;
       }
+      
       const post = posts.find(p => p.id === id);
-      const wasLiked = post?.isLikedByCurrentUser;
+      if (!post) return;
+      
+      const wasLiked = post.likedByCurrentUser;
+      const oldLikeCount = post.totalLike;
+      
+      console.log('Before like:', { wasLiked, oldLikeCount });
+      
+      // Optimistic update
+      const newLiked = !wasLiked;
+      const newLikeCount = newLiked ? oldLikeCount + 1 : Math.max(0, oldLikeCount - 1);
       
       updateItem(id, (item) => ({
         ...item,
-        isLikedByCurrentUser: !item.isLikedByCurrentUser,
-        likesCount: item.isLikedByCurrentUser ? item.likesCount - 1 : item.likesCount + 1,
+        likedByCurrentUser: newLiked,
+        totalLike: newLikeCount,
       }));
+      
+      console.log('After optimistic update:', { newLiked, newLikeCount });
 
-      const isLiked = await postService.toggleLikePost(id);
+      const response = await postLikeService.toggleLikePost(id);
       
-      updateItem(id, (item) => ({
-        ...item,
-        isLikedByCurrentUser: isLiked,
-        likesCount: wasLiked && !isLiked ? item.likesCount : !wasLiked && isLiked ? item.likesCount : item.likesCount,
-      }));
+      console.log('API response:', response);
+      
+      if (response.liked !== newLiked) {
+        console.warn('Backend state differs from optimistic update, syncing...');
+        updateItem(id, (item) => ({
+          ...item,
+          likedByCurrentUser: response.liked,
+        }));
+      }
     } catch (e: any) {
       console.error('Error liking post:', e);
-      // Revert on error
-      updateItem(id, (item) => ({
-        ...item,
-        isLikedByCurrentUser: !item.isLikedByCurrentUser,
-        likesCount: item.isLikedByCurrentUser ? item.likesCount - 1 : item.likesCount + 1,
-      }));
+      const post = posts.find(p => p.id === id);
+      if (post) {
+        updateItem(id, (item) => ({
+          ...item,
+          likedByCurrentUser: post.likedByCurrentUser,
+          totalLike: post.totalLike,
+        }));
+      }
       showAlert('Error', e.message);
     }
   };
-  const handleComment = (id: string) => router.push(`/posts/${id}`);
+  const handleComment = (id: string) => {
+    showAlert('Comments', 'Comment feature coming soon');
+  };
   const handleShare = () => showAlert('Share', 'Coming soon');
   const handleBookmark = () => showAlert('Saved', 'Saved to collection');
   const handleFollow = async (id: string) => {

@@ -107,13 +107,14 @@ export function SharePage({
     onPostCreated?.();
 
     setTimeout(() => {
-      const firstAsset = selectedAssets[0];
+      const mediaUris = selectedAssets.map(asset => asset.uri);
+      const mediaType = selectedAssets[0].mediaType === 'video' ? 'video' : 'photo';
       
-      console.log('Starting upload for:', firstAsset);
+      console.log('Starting upload for', selectedAssets.length, 'files');
       
       startUpload({
-        mediaUri: firstAsset.uri,
-        mediaType: firstAsset.mediaType === 'video' ? 'video' : 'photo',
+        mediaUris: mediaUris,
+        mediaType: mediaType,
         caption: caption,
         location: pickedLocation?.name,
         userId: user.id,

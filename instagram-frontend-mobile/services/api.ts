@@ -134,7 +134,6 @@ export const commentAPI = {
       params: { page, limit },
     });
     
-    // Map comments to add isLiked field
     const mappedContent = response.data.data.content.map((comment: any) => ({
       ...comment,
       isLiked: comment.likedByCurrentUser || false,
