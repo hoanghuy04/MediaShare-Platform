@@ -7,9 +7,9 @@ import {
   TextInput,
   FlatList,
   StatusBar,
-  SafeAreaView,
   Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
@@ -321,15 +321,12 @@ export default function MessageSearchScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {renderHeader()}
         <View style={styles.content}>
           {renderContent()}
         </View>
-      </SafeAreaView>
-    </View>
+    </SafeAreaView>
   );
 }
 
