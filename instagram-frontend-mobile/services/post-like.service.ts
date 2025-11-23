@@ -21,11 +21,11 @@ export const postLikeService = {
         }
     },
 
-    getPostLikes: async (postId: string, page = 0, pageSize = 20): Promise<PaginatedResponse<PostLikeUserResponse>> => {
+    getPostLikes: async (postId: string, page = 0, pageSize = 20, query = ''): Promise<PaginatedResponse<PostLikeUserResponse>> => {
         try {
             const response = await axiosInstance.get<ApiResponse<PaginatedResponse<PostLikeUserResponse>>>(
                 API_ENDPOINTS.GET_POST_LIKES(postId),
-                { params: { page, pageSize } }
+                { params: { page, pageSize, query } }
             );
             return response.data.data;
         } catch (error: any) {

@@ -46,28 +46,67 @@ const LikesModal = ({ visible, onClose, postId, totalLikes }: PostLikesModalProp
     const [searchQuery, setSearchQuery] = useState('');
     const { user: currentUser } = useAuth();
 
+    const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     const translateY = useSharedValue(SNAP_CLOSE);
     const context = useSharedValue({ y: 0 });
+
+    const loadLikes = async (query = '', pageNum = 0, shouldAppend = false) => {
+        if (pageNum === 0) setLoading(true);
+        else setLoadingMore(true);
+
+        try {
+            const response = await postLikeService.getPostLikes(postId, pageNum, 10, query);
+            const newLikes = response.content || [];
+
+            if (shouldAppend) {
+                setLikes(prev => [...prev, ...newLikes]);
+            } else {
+                setLikes(newLikes);
+            }
+
+            setHasMore(!response.last);
+            setPage(pageNum);
+        } catch (error) {
+            console.error('Failed to load likes:', error);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    };
 
     useEffect(() => {
         if (visible) {
             translateY.value = SNAP_CLOSE;
             scrollTo(SNAP_HALF);
-            loadLikes();
+            setPage(0);
+            setHasMore(true);
+            loadLikes('', 0, false);
         } else {
             setSearchQuery('');
+            setLikes([]);
+            setPage(0);
+            setHasMore(true);
         }
     }, [visible, postId]);
 
-    const loadLikes = async () => {
-        setLoading(true);
-        try {
-            const response = await postLikeService.getPostLikes(postId, 0, 20);
-            setLikes(response.content || []);
-        } catch (error) {
-            console.error('Failed to load likes:', error);
-        } finally {
-            setLoading(false);
+    useEffect(() => {
+        if (!visible) return;
+
+        const timer = setTimeout(() => {
+            setPage(0);
+            setHasMore(true);
+            loadLikes(searchQuery, 0, false);
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    const handleLoadMore = () => {
+        if (!loadingMore && hasMore && !loading) {
+            loadLikes(searchQuery, page + 1, true);
         }
     };
 
@@ -120,7 +159,7 @@ const LikesModal = ({ visible, onClose, postId, totalLikes }: PostLikesModalProp
                 if (currentY < SNAP_HALF - 100) {
                     scrollTo(SNAP_TOP);
                 } else {
-                    scrollTo(SNAP_HALF);
+                    scrollTo(SNAP_TOP);
                 }
             } else {
                 if (currentY < SNAP_HALF / 2) {
@@ -228,7 +267,7 @@ const LikesModal = ({ visible, onClose, postId, totalLikes }: PostLikesModalProp
                         </View>
 
                         <View style={styles.listWrapper}>
-                            {loading ? (
+                            {loading && page === 0 ? (
                                 <ActivityIndicator size="large" color="#000" style={styles.loader} />
                             ) : (
                                 <FlatList
@@ -237,7 +276,20 @@ const LikesModal = ({ visible, onClose, postId, totalLikes }: PostLikesModalProp
                                     keyExtractor={(item) => item.id}
                                     contentContainerStyle={styles.listContent}
                                     showsVerticalScrollIndicator={false}
-                                    ListFooterComponent={<View style={{ height: 150 }} />}
+                                    onEndReached={handleLoadMore}
+                                    onEndReachedThreshold={0.5}
+                                    ListFooterComponent={
+                                        <View style={{ height: 150, justifyContent: 'center', alignItems: 'center' }}>
+                                            {loadingMore && <ActivityIndicator size="small" color="#000" />}
+                                        </View>
+                                    }
+                                    ListEmptyComponent={
+                                        !loading && (
+                                            <View style={styles.emptyContainer}>
+                                                <Text style={styles.emptyText}>Chưa có lượt thích nào</Text>
+                                            </View>
+                                        )
+                                    }
                                 />
                             )}
                         </View>
@@ -378,5 +430,14 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 14,
         fontWeight: '600',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 50,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#666',
     },
 });

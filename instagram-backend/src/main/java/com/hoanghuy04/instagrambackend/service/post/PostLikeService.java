@@ -9,5 +9,5 @@ import org.springframework.data.domain.Pageable;
 public interface PostLikeService {
     PostLikeToggleResponse toggleLikePost(String postId);
 
-    PageResponse<PostLikeUserResponse> getPostLikes(String postId, Pageable pageable);
+    PageResponse<PostLikeUserResponse> getPostLikes(String postId, String query, Pageable pageable);
 }

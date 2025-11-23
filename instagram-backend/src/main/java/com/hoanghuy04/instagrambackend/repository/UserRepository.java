@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -67,5 +68,7 @@ public interface UserRepository extends MongoRepository<User, String> {
            "{'profile.lastName': {$regex: ?2, $options: 'i'}}" +
            "]}")
     Page<User> searchUsers(String username, String firstName, String lastName, Pageable pageable);
+
+    List<User> findByUsernameContainingIgnoreCase(String username);
 }
 

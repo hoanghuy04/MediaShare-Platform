@@ -35,5 +35,12 @@ public interface LikeRepository extends MongoRepository<Like, String> {
     void deleteByTargetTypeAndTargetId(LikeTargetType likeTargetType, String commentId);
 
     void deleteByTargetTypeAndTargetIdIn(LikeTargetType likeTargetType, List<String> commentIds);
+
+    Page<Like> findByTargetTypeAndTargetIdAndUserIn(
+            LikeTargetType targetType,
+            String targetId,
+            List<User> users,
+            Pageable pageable
+    );
 }
 

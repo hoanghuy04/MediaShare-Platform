@@ -42,13 +42,14 @@ public class PostLikeController {
     @GetMapping("/{postId}/likes")
     public ResponseEntity<ApiResponse<PageResponse<PostLikeUserResponse>>> getPostLikes(
             @PathVariable String postId,
+            @RequestParam(required = false) String query,
             @PageableDefault(
                     sort = "createdAt",
                     direction = Sort.Direction.DESC
             ) Pageable pageable
     ) {
 
-        return ResponseEntity.ok(ApiResponse.success(postLikeService.getPostLikes(postId, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(postLikeService.getPostLikes(postId, query, pageable)));
     }
 }
 

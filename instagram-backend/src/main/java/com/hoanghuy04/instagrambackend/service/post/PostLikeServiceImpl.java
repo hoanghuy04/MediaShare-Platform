@@ -27,6 +27,7 @@ public class PostLikeServiceImpl implements PostLikeService {
     private final LikeRepository likeRepository;
     private final SecurityUtil securityUtil;
     private final CommentRepository commentRepository;
+    private final com.hoanghuy04.instagrambackend.repository.UserRepository userRepository;
 
     @Transactional
     @Override
@@ -70,16 +71,31 @@ public class PostLikeServiceImpl implements PostLikeService {
 
     @Transactional
     @Override
-    public PageResponse<PostLikeUserResponse> getPostLikes(String postId, Pageable pageable) {
+    public PageResponse<PostLikeUserResponse> getPostLikes(String postId, String query, Pageable pageable) {
         if (!postRepository.existsById(postId)) {
             throw new RuntimeException("Post not found");
         }
 
-        Page<Like> likePage = likeRepository.findByTargetTypeAndTargetId(
-                LikeTargetType.POST,
-                postId,
-                pageable
-        );
+        Page<Like> likePage;
+
+        if (query != null && !query.trim().isEmpty()) {
+            var users = userRepository.findByUsernameContainingIgnoreCase(query.trim());
+            if (users.isEmpty()) {
+                return PageResponse.of(Page.empty(pageable));
+            }
+            likePage = likeRepository.findByTargetTypeAndTargetIdAndUserIn(
+                    LikeTargetType.POST,
+                    postId,
+                    users,
+                    pageable
+            );
+        } else {
+            likePage = likeRepository.findByTargetTypeAndTargetId(
+                    LikeTargetType.POST,
+                    postId,
+                    pageable
+            );
+        }
 
         Page<PostLikeUserResponse> dtoPage = likePage.map(like -> {
             User user = like.getUser();
