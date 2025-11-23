@@ -6,7 +6,7 @@ import apiConfig from '../config/apiConfig';
 interface WebSocketContextType {
   isConnected: boolean;
   connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'reconnecting';
-  sendMessage: (receiverId: string, content: string, mediaUrl?: string) => void;
+  sendMessage: (receiverId: string, content: string) => void;
   sendTyping: (receiverId: string) => void;
   sendStopTyping: (receiverId: string) => void;
   sendReadReceipt: (messageId: string, senderId: string) => void;
@@ -123,8 +123,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     };
   }, [user, token, connectWebSocket, disconnectWebSocket]);
 
-  const sendMessage = useCallback((receiverId: string, content: string, mediaUrl?: string) => {
-    webSocketService.sendMessage(receiverId, content, mediaUrl);
+  const sendMessage = useCallback((receiverId: string, content: string) => {
+    webSocketService.sendMessage(receiverId, content);
   }, []);
 
   const sendTyping = useCallback((receiverId: string) => {

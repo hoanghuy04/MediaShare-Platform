@@ -1,15 +1,15 @@
 package com.hoanghuy04.instagrambackend.controller;
 
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage;
 import com.hoanghuy04.instagrambackend.dto.websocket.ChatMessage.MessageType;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
+import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.repository.MessageRepository;
-import com.hoanghuy04.instagrambackend.service.message.ConversationMessageService;
-import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageService;
+import com.hoanghuy04.instagrambackend.service.conversation.ConversationMessageService;
+import com.hoanghuy04.instagrambackend.service.websocket.WebSocketMessageService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
-import com.hoanghuy04.instagrambackend.service.message.ConversationMessageServiceImpl;
-import com.hoanghuy04.instagrambackend.service.message.WebSocketMessageServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -38,6 +38,7 @@ public class WebSocketMessageController {
     private final ConversationMessageService conversationMessageService;
     private final WebSocketMessageService webSocketMessageService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final MessageMapper messageMapper;
 
     /**
      * Handle private chat messages.
@@ -61,18 +62,22 @@ public class WebSocketMessageController {
                 return;
             }
             
-            // Get sender and receiver
             User sender = userService.getUserEntityById(chatMessage.getSenderId());
             User receiver = userService.getUserEntityById(chatMessage.getReceiverId());
             
-            // Use ConversationMessageService to handle conversation logic
-            Message message;
+            MessageResponse message;
             try {
+                // Default to TEXT if contentType not specified
+                com.hoanghuy04.instagrambackend.enums.MessageType contentType = 
+                    chatMessage.getContentType() != null 
+                        ? chatMessage.getContentType() 
+                        : com.hoanghuy04.instagrambackend.enums.MessageType.TEXT;
+                
                 message = conversationMessageService.sendMessage(
                     chatMessage.getSenderId(),
                     chatMessage.getReceiverId(),
-                    chatMessage.getContent(),
-                    chatMessage.getMediaUrl()
+                    contentType,
+                    chatMessage.getContent()
                 );
                 log.info("Message sent via conversation service: {}", message.getId());
             } catch (Exception e) {

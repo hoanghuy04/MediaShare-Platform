@@ -7,97 +7,76 @@ import {
   StatusBar,
   SafeAreaView,
   FlatList,
-  Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { messageRequestAPI } from '../../services/api';
-import { MessageRequest } from '../../types/message';
+import { InboxItem } from '../../types/message';
 import { Avatar } from '../../components/common/Avatar';
 import { showAlert } from '../../utils/helpers';
+import { formatMessageTime } from '../../utils/messageUtils';
 
 export default function PendingMessagesScreen() {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
-  const [requests, setRequests] = useState<MessageRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const {
+    data: inboxItems,
+    isLoading,
+    refresh,
+  } = useInfiniteScroll<InboxItem>({
+    fetchFunc: messageRequestAPI.getPendingInboxItems,
+    limit: 20,
+    onError: error => showAlert('Lỗi', error.message),
+  });
+
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    loadPendingRequests();
-  }, []);
-
-  const loadPendingRequests = async () => {
-    try {
-      setIsLoading(true);
-      const data = await messageRequestAPI.getPendingRequests();
-      setRequests(data);
-    } catch (error: any) {
-      console.error('Error loading pending requests:', error);
-      showAlert('Lỗi', 'Không thể tải tin nhắn đang chờ');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    refresh();
+  }, [refresh]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await loadPendingRequests();
-    setIsRefreshing(false);
-  };
-
-  const handleAccept = async (requestId: string) => {
     try {
-      const conversation = await messageRequestAPI.acceptRequest(requestId);
-      showAlert('Thành công', 'Đã chấp nhận tin nhắn');
-      
-      // Remove from list
-      setRequests(prev => prev.filter(r => r.id !== requestId));
-      
-      // Navigate to conversation
-      router.push(`/messages/${conversation.id}`);
-    } catch (error: any) {
-      console.error('Error accepting request:', error);
-      showAlert('Lỗi', 'Không thể chấp nhận tin nhắn');
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  const handleReject = async (requestId: string) => {
-    Alert.alert(
-      'Từ chối tin nhắn',
-      'Bạn có chắc muốn từ chối tin nhắn này?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Từ chối',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await messageRequestAPI.rejectRequest(requestId);
-              showAlert('Đã từ chối', 'Tin nhắn đã bị từ chối');
-              setRequests(prev => prev.filter(r => r.id !== requestId));
-            } catch (error: any) {
-              console.error('Error rejecting request:', error);
-              showAlert('Lỗi', 'Không thể từ chối tin nhắn');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleIgnore = async (requestId: string) => {
-    try {
-      await messageRequestAPI.ignoreRequest(requestId);
-      setRequests(prev => prev.filter(r => r.id !== requestId));
-    } catch (error: any) {
-      console.error('Error ignoring request:', error);
-      showAlert('Lỗi', 'Không thể bỏ qua tin nhắn');
+  const handleItemPress = (item: InboxItem) => {
+    if (!currentUser || item.type !== 'MESSAGE_REQUEST' || !item.messageRequest) {
+      return;
     }
+
+    const mr = item.messageRequest;
+    const selfId = currentUser.id;
+    
+    // Get the other user (not the current user)
+    // In PendingMessagesScreen, currentUser is receiver, other is sender
+    const other = mr.sender?.id === selfId ? mr.receiver : mr.sender;
+    
+    if (!other || !mr.sender?.id || !mr.receiver?.id) {
+      showAlert('Lỗi', 'Không thể xác định người nhận');
+      return;
+    }
+
+    router.push({
+      pathname: '/messages/[conversationId]',
+      params: {
+        conversationId: other.id, // peerId
+        isNewConversation: 'true',
+        requestId: mr.id, // để log/telemetry
+        direction: 'received', // currentUser is receiver
+        senderId: mr.sender.id, // BE-safe
+        receiverId: mr.receiver.id, // BE-safe
+      },
+    });
   };
 
   const renderHeader = () => (
@@ -112,59 +91,79 @@ export default function PendingMessagesScreen() {
     </View>
   );
 
-  const renderRequestItem = ({ item }: { item: MessageRequest }) => (
-    <View style={styles.requestItem}>
-      <Avatar
-        uri={item.sender.avatar}
-        name={item.sender.username}
-        size={56}
-      />
+  const renderInboxItem = ({ item }: { item: InboxItem }) => {
+    if (!currentUser) return null;
+
+    // Only handle MESSAGE_REQUEST type (received requests)
+    if (item.type === 'MESSAGE_REQUEST' && item.messageRequest) {
+      const mr = item.messageRequest;
+      const selfId = currentUser.id;
       
-      <View style={styles.requestContent}>
-        <View style={styles.requestHeader}>
-          <Text style={[styles.username, { color: theme.colors.text }]}>
-            {item.sender.username}
-          </Text>
-          {item.sender.isVerified && (
-            <Ionicons name="checkmark-circle" size={16} color="#1DA1F2" />
-          )}
-        </View>
-        
-        {item.firstMessage && (
-          <Text
-            style={[styles.messagePreview, { color: theme.colors.textSecondary }]}
-            numberOfLines={2}
-          >
-            {item.firstMessage.content}
-          </Text>
-        )}
-        
-        {item.pendingCount > 1 && (
-          <Text style={[styles.pendingCount, { color: theme.colors.textSecondary }]}>
-            {item.pendingCount} tin nhắn
-          </Text>
-        )}
-        
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.acceptButton]}
-            onPress={() => handleAccept(item.id)}
-          >
-            <Text style={styles.acceptButtonText}>Chấp nhận</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, styles.rejectButton]}
-            onPress={() => handleReject(item.id)}
-          >
-            <Text style={[styles.rejectButtonText, { color: theme.colors.text }]}>
-              Từ chối
+      // Get the other user (not the current user)
+      const other = mr.sender?.id === selfId ? mr.receiver : mr.sender;
+      
+      if (!other) {
+        return null;
+      }
+
+      const name = other.username || 'Unknown';
+      const avatar = other.avatar;
+      const lastMessageContent = mr.lastMessageContent || 'Gửi yêu cầu nhắn tin';
+      const timestamp = mr.lastMessageTimestamp || mr.createdAt;
+      
+      // Prefix "You: " if current user is the sender
+      const displayText = mr.sender?.id === selfId 
+        ? `You: ${lastMessageContent}` 
+        : lastMessageContent;
+
+      return (
+        <TouchableOpacity
+          style={styles.messageItem}
+          onPress={() => handleItemPress(item)}
+        >
+          <Avatar uri={avatar} name={name} size={50} />
+          <View style={styles.messageContent}>
+            <View style={styles.messageHeader}>
+              <View style={styles.messageHeaderLeft}>
+                <Text
+                  style={[
+                    styles.messageUsername,
+                    {
+                      color: theme.colors.text,
+                      fontWeight: '600',
+                    },
+                  ]}
+                >
+                  {name}
+                </Text>
+                <View style={styles.pendingRequestBadge}>
+                  <Text style={styles.pendingRequestBadgeText}>Pending</Text>
+                </View>
+              </View>
+              <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
+                {formatMessageTime(timestamp)}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.messageText,
+                {
+                  fontWeight: '400',
+                  color: theme.colors.textSecondary,
+                  fontStyle: mr.sender?.id === selfId ? 'italic' : 'normal',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {displayText}
             </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -182,37 +181,25 @@ export default function PendingMessagesScreen() {
     </View>
   );
 
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <StatusBar barStyle="dark-content" backgroundColor="white" />
-        <SafeAreaView style={styles.safeArea}>
-          {renderHeader()}
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-          </View>
-        </SafeAreaView>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       <SafeAreaView style={styles.safeArea}>
         {renderHeader()}
         
-        <FlatList
-          data={requests}
-          renderItem={renderRequestItem}
-          keyExtractor={(item) => item.id}
+        <FlatList<InboxItem>
+          data={inboxItems || []}
+          renderItem={renderInboxItem}
+          keyExtractor={item =>
+            item.type === 'MESSAGE_REQUEST'
+              ? item.messageRequest?.id || ''
+              : ''
+          }
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmptyState}
-          ItemSeparatorComponent={() => (
-            <View style={[styles.separator, { backgroundColor: theme.colors.border }]} />
-          )}
+          ListEmptyComponent={!isLoading ? renderEmptyState : null}
+          showsVerticalScrollIndicator={false}
         />
       </SafeAreaView>
     </View>
@@ -248,73 +235,55 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 32,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   listContent: {
     flexGrow: 1,
   },
-  requestItem: {
+  messageItem: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: 'white',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  requestContent: {
+  messageContent: {
     flex: 1,
     marginLeft: 12,
   },
-  requestHeader: {
+  messageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  messageHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    flex: 1,
   },
-  username: {
+  messageUsername: {
     fontSize: 16,
     fontWeight: '600',
     marginRight: 4,
   },
-  messagePreview: {
-    fontSize: 14,
-    marginBottom: 4,
-    lineHeight: 20,
+  pendingRequestBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+    backgroundColor: '#FFA500',
   },
-  pendingCount: {
-    fontSize: 12,
-    marginBottom: 12,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  acceptButton: {
-    backgroundColor: '#0095F6',
-  },
-  acceptButtonText: {
+  pendingRequestBadgeText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '600',
   },
-  rejectButton: {
-    backgroundColor: '#f0f0f0',
+  messageTime: {
+    fontSize: 12,
+    fontWeight: '400',
   },
-  rejectButtonText: {
+  messageText: {
     fontSize: 14,
-    fontWeight: '600',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginHorizontal: 16,
   },
   emptyContainer: {
     flex: 1,

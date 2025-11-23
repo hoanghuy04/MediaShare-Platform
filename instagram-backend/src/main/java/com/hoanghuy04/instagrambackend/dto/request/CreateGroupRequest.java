@@ -32,11 +32,6 @@ public class CreateGroupRequest {
      */
     @NotBlank(message = "Group name is required")
     private String groupName;
-    
-    /**
-     * Optional avatar URL for the group
-     */
-    private String avatar;
 }
 
 

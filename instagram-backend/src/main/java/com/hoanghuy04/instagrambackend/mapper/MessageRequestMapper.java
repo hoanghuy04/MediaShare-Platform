@@ -1,8 +1,9 @@
 package com.hoanghuy04.instagrambackend.mapper;
 
-import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
+import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
 import com.hoanghuy04.instagrambackend.entity.User;
-import com.hoanghuy04.instagrambackend.entity.message.MessageRequest;
+import com.hoanghuy04.instagrambackend.enums.InboxItemType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -16,16 +17,16 @@ import org.springframework.beans.factory.annotation.Autowired;
  * @author Instagram Backend Team
  * @version 2.0.0
  */
-@Mapper(componentModel = "spring", uses = MessageMapper.class)
+@Mapper(componentModel = "spring", uses = MessageMapper.class, unmappedTargetPolicy = ReportingPolicy.IGNORE)
 @Slf4j
 public abstract class MessageRequestMapper {
     
     @Autowired
-    protected MessageMapper messageMapper;
-    
-    @Autowired
     protected UserRepository userRepository;
-    
+
+    @Autowired
+    private UserMapper userMapper;
+
     /**
      * Map MessageRequest entity to MessageRequestDTO.
      * Uses MessageMapper for nested sender and firstMessage mappings.
@@ -33,9 +34,7 @@ public abstract class MessageRequestMapper {
      * @param request the MessageRequest entity
      * @return MessageRequestDTO
      */
-    @Mapping(target = "sender", ignore = true)
-    @Mapping(target = "receiver", ignore = true)
-    public abstract MessageRequestDTO toMessageRequestDTO(MessageRequest request);
+    public abstract MessageRequest toMessageRequestDTO(com.hoanghuy04.instagrambackend.entity.MessageRequest request);
     
     /**
      * Enrich MessageRequestDTO with nested sender and receiver.
@@ -46,7 +45,7 @@ public abstract class MessageRequestMapper {
      * @param request the source MessageRequest entity
      */
     @AfterMapping
-    public void enrichMessageRequest(@MappingTarget MessageRequestDTO dto, MessageRequest request) {
+    public void enrichMessageRequest(@MappingTarget MessageRequest dto, com.hoanghuy04.instagrambackend.entity.MessageRequest request) {
         if (request == null) {
             return;
         }
@@ -56,7 +55,7 @@ public abstract class MessageRequestMapper {
             try {
                 User sender = userRepository.findById(request.getSenderId())
                     .orElseThrow(() -> new ResourceNotFoundException("Sender not found: " + request.getSenderId()));
-                dto.setSender(messageMapper.toUserSummaryDTO(sender));
+                dto.setSender(userMapper.toUserSummary(sender));
             } catch (Exception e) {
                 log.warn("Failed to load sender for message request {}: {}", request.getId(), e.getMessage());
             }
@@ -67,13 +66,42 @@ public abstract class MessageRequestMapper {
             try {
                 User receiver = userRepository.findById(request.getReceiverId())
                     .orElseThrow(() -> new ResourceNotFoundException("Receiver not found: " + request.getReceiverId()));
-                dto.setReceiver(messageMapper.toUserSummaryDTO(receiver));
+                dto.setReceiver(userMapper.toUserSummary(receiver));
             } catch (Exception e) {
                 log.warn("Failed to load receiver for message request {}: {}", request.getId(), e.getMessage());
             }
         }
         
         // lastMessageContent and lastMessageTimestamp are already mapped by MapStruct
+    }
+    
+    /**
+     * Convert MessageRequest to InboxItemDTO.
+     * Used for pending inbox items display.
+     *
+     * @param req the MessageRequest entity
+     * @param viewerId the user ID viewing the inbox (for context)
+     * @return InboxItemDTO with type MESSAGE_REQUEST
+     */
+    public InboxItemResponse toInboxItem(com.hoanghuy04.instagrambackend.entity.MessageRequest req, String viewerId) {
+        if (req == null) {
+            return null;
+        }
+        
+        // Convert to MessageRequestDTO and enrich
+        MessageRequest reqDTO = toMessageRequestDTO(req);
+        enrichMessageRequest(reqDTO, req);
+        
+        // Determine timestamp: use lastMessageTimestamp if available, fallback to createdAt
+        java.time.LocalDateTime timestamp = req.getLastMessageTimestamp() != null 
+            ? req.getLastMessageTimestamp() 
+            : req.getCreatedAt();
+        
+        return InboxItemResponse.builder()
+            .type(InboxItemType.MESSAGE_REQUEST)
+            .messageRequest(reqDTO)
+            .timestamp(timestamp)
+            .build();
     }
 }
 

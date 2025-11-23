@@ -8,7 +8,9 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.NotificationRepository;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class NotificationServiceImpl implements NotificationService {
     
     private final NotificationRepository notificationRepository;

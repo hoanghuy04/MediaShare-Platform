@@ -49,6 +49,50 @@ export const colors = {
     tabBarInactive: '#A8A8A8',
   },
 
+  // Chat-specific palettes cho từng theme
+  chat: {
+    light: {
+      bubbleIn: '#f3f3f3ff', // bong bóng nhận (xám nhạt)
+      bubbleOut: '#8c1aff',  // bong bóng gửi (màu chính)
+
+      // 3 mức màu dùng cho gradient (top-left -> bottom-right)
+      gradientHigh: '#ac4abbff',   // sáng hơn
+      gradientMedium: '#8333d3ff', // trung bình (màu chính)
+      gradientLow: '#4a00c3',    // đậm hơn
+
+      bubbleTextIn: '#2e2e2eff',
+      bubbleTextOut: '#FFFFFF',
+      headerBg: '#FFFFFF',
+      headerText: '#000000',
+      tint: '#8c1aff',
+      fabBg: '#FFFFFF',
+      inputBg: '#FAFAFA',
+      inputBorder: '#DBDBDB',
+      timestamp: '#8E8E8E',
+      seenText: '#8E8E8E',
+    },
+    dark: {
+      bubbleIn: '#262626',
+      bubbleOut: '#3797F0',
+
+      // 3 mức màu dùng cho gradient (top-left -> bottom-right)
+      gradientHigh: '#5eb8ff',
+      gradientMedium: '#3797F0',
+      gradientLow: '#1b4f80',
+
+      bubbleTextIn: '#FFFFFF',
+      bubbleTextOut: '#FFFFFF',
+      headerBg: '#000000',
+      headerText: '#FFFFFF',
+      tint: '#3797F0',
+      fabBg: '#262626',
+      inputBg: '#121212',
+      inputBorder: '#262626',
+      timestamp: '#A8A8A8',
+      seenText: '#A8A8A8',
+    },
+  },
+
   // Common colors (theme independent)
   common: {
     white: '#FFFFFF',
@@ -60,4 +104,3 @@ export const colors = {
 };
 
 export type ColorTheme = 'light' | 'dark';
-

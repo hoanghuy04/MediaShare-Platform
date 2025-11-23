@@ -61,14 +61,14 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   const getTypingText = () => {
     if (multipleUsers.length > 0) {
       if (multipleUsers.length === 1) {
-        return `${multipleUsers[0]} is typing`;
+        return `${multipleUsers[0]} đang nhập…`;
       } else if (multipleUsers.length === 2) {
-        return `${multipleUsers[0]} and ${multipleUsers[1]} are typing`;
+        return `${multipleUsers[0]} và ${multipleUsers[1]} đang nhập…`;
       } else {
-        return `${multipleUsers.length} people are typing`;
+        return `${multipleUsers[0]}, ${multipleUsers[1]} và ${multipleUsers.length - 2} người khác đang nhập…`;
       }
     }
-    return username ? `${username} is typing` : 'Someone is typing';
+    return username ? `${username} đang nhập…` : 'Ai đó đang nhập…';
   };
 
   return (

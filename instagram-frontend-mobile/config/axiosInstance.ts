@@ -43,6 +43,8 @@ axiosInstance.interceptors.request.use(
           url.includes('/notifications') ||
           url.includes('/auth/logout');
 
+          console.log("____________________________________USERID____________________________________", userId);
+
         if (needsUserId && !config.params.userId) {
           config.params.userId = userId;
         }

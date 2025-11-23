@@ -102,6 +102,8 @@ export const getConversationAvatar = (
   }
   
   const otherUser = conversation.participants.find((p) => p.userId !== currentUserId);
+  console.log("_____________________________________otherUser_______________________: ", otherUser);
+  
   return otherUser?.avatar;
 };
 
@@ -165,5 +167,12 @@ export const sortConversationsByRecent = (
     const timeB = b.lastMessage?.timestamp || b.createdAt;
     return new Date(timeB).getTime() - new Date(timeA).getTime();
   });
+};
+
+export const parsePresetIdFromUrl = (url?: string | null): string | null => {
+  if (!url) return null;
+  // ví dụ url: http://.../api/static/avatars/p7.png -> lấy 'p7'
+  const m = url.match(/\/avatars\/(p\d+)\.png$/);
+  return m?.[1] ?? null;
 };
 

@@ -1,10 +1,8 @@
 package com.hoanghuy04.instagrambackend.entity;
 
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.hoanghuy04.instagrambackend.enums.MessageType;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
@@ -18,8 +16,12 @@ import java.util.List;
 
 /**
  * Entity representing a message between users.
- * Supports text and media content, threading, read receipts, and soft delete.
- * 
+ * The meaning of 'content' depends on 'type':
+ * - TEXT: content is the actual text message
+ * - IMAGE: content is the mediaFileId of an image
+ * - VIDEO: content is the mediaFileId of a video
+ * - POST_SHARE: content is the postId of a shared post
+ *
  * @author Instagram Backend Team
  * @version 2.0.0
  */
@@ -27,75 +29,51 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 @Document(collection = "messages")
 @CompoundIndex(name = "sender_receiver_idx", def = "{'sender': 1, 'receiver': 1}")
 @CompoundIndex(name = "conversation_created_idx", def = "{'conversation': 1, 'createdAt': -1}")
 public class Message {
-    
-    /**
-     * Unique identifier for the message
-     */
     @Id
-    private String id;
-    
-    /**
-     * Reference to the conversation this message belongs to
-     */
+    String id;
+
     @DocumentReference
     @Indexed
-    private Conversation conversation;
-    
-    /**
-     * Reference to the user who sent the message
-     */
+    Conversation conversation;
+
     @DocumentReference
-    private User sender;
-    
-    /**
-     * DEPRECATED: Reference to the user who receives the message
-     * Kept for migration compatibility - use conversation.participants instead
-     */
+    User sender;
+
     @DocumentReference
-    private User receiver;
-    
+    User receiver;
+
     /**
-     * The message text content
+     * Type of the message (TEXT, IMAGE, VIDEO, POST_SHARE)
      */
-    private String content;
-    
-    /**
-     * Optional URL to media attachment
-     */
-    private String mediaUrl;
-    
-    /**
-     * List of user IDs who have read this message
-     * Used for multi-user read receipts in group chats
-     */
+    @Indexed
     @Builder.Default
-    private List<String> readBy = new ArrayList<>();
-    
+    MessageType type = MessageType.TEXT;
+
     /**
-     * ID of the message this message is replying to (threading support)
+     * Content of the message. Meaning depends on type:
+     * - TEXT: actual text content
+     * - IMAGE/VIDEO: mediaFileId
+     * - POST_SHARE: postId
      */
-    private String replyToMessageId;
-    
-    /**
-     * NEW: List of user IDs who deleted this message (soft delete)
-     */
+    String content;
+
     @Builder.Default
-    private List<String> deletedBy = new ArrayList<>();
-    
-    /**
-     * NEW: Timestamp when the message was deleted
-     */
-    private LocalDateTime deletedAt;
-    
-    /**
-     * Timestamp when the message was created
-     */
+    List<String> readBy = new ArrayList<>();
+
+    String replyToMessageId;
+
+    @Builder.Default
+    List<String> deletedBy = new ArrayList<>();
+
+    LocalDateTime deletedAt;
+
     @CreatedDate
     @Indexed
-    private LocalDateTime createdAt;
+    LocalDateTime createdAt;
 }
 

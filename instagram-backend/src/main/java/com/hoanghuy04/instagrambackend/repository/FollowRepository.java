@@ -93,5 +93,21 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return true if the follow relationship exists, false otherwise
      */
     boolean existsByFollowerIdAndFollowingId(String followerId, String followingId);
+    
+    /**
+     * Find all follow relationships where the given user is the follower.
+     *
+     * @param followerId the ID of the follower user
+     * @return List of follow relationships
+     */
+    List<Follow> findByFollowerId(String followerId);
+    
+    /**
+     * Find all follow relationships where the given user is being followed.
+     *
+     * @param followingId the ID of the user being followed
+     * @return List of follow relationships
+     */
+    List<Follow> findByFollowingId(String followingId);
 }
 
