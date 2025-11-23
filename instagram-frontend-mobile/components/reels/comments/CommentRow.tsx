@@ -7,7 +7,7 @@ import {
     Pressable,
     Animated as RNAnimated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { colors } from '../../../styles/colors';
@@ -32,6 +32,8 @@ export type CommentData = {
     isLikedByCurrentUser?: boolean;
     isPosting?: boolean;
     showReplies?: boolean;
+    pinned?: boolean;
+    authorCommentedPost?: boolean;
 };
 
 type CommentRowProps = {
@@ -130,12 +132,20 @@ export const CommentRow = ({
                         <View style={styles.commentHeader}>
                             <Text style={styles.username}>{comment.author.username}</Text>
                             {!comment.isPosting && (
-                                <Text style={styles.timeText}>
-                                    {formatDistanceToNow(new Date(comment.createdAt), {
-                                        addSuffix: true,
-                                        locale: vi,
-                                    })}
-                                </Text>
+                                <>
+                                    <Text style={styles.timeText}>
+                                        {formatDistanceToNow(new Date(comment.createdAt), {
+                                            addSuffix: true,
+                                            locale: vi,
+                                        })}
+                                    </Text>
+                                    {comment.authorCommentedPost && (
+                                        <Text style={styles.authorLabel}> · Tác giả</Text>
+                                    )}
+                                    {comment.pinned && (
+                                        <AntDesign name="pushpin" size={12} color="#666" style={{ marginLeft: 6 }} />
+                                    )}
+                                </>
                             )}
                         </View>
                         {renderTextWithMentions(comment.text)}
@@ -227,6 +237,11 @@ const styles = StyleSheet.create({
     timeText: {
         fontSize: 12,
         color: '#999',
+    },
+    authorLabel: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
     },
     commentText: {
         fontSize: 14,

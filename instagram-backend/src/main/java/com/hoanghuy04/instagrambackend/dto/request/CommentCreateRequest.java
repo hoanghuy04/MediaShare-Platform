@@ -16,6 +16,4 @@ public class CommentCreateRequest {
     private String text;
 
     private String parentCommentId;
-
-    private String mention;
 }

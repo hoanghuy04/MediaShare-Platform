@@ -49,7 +49,10 @@ public class Comment {
     @Builder.Default
     private long totalReply = 0;
 
-    private String mention;
+    private List<String> mentions;
+
+    @Builder.Default
+    private boolean pinned = false;
 
     @CreatedDate
     private LocalDateTime createdAt;

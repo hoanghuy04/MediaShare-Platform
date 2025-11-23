@@ -5,10 +5,10 @@ import {
     TextInput,
     Image,
     StyleSheet,
-    TouchableOpacity,
     KeyboardAvoidingView,
     Platform,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../styles/colors';
 import { CommentData } from './CommentRow';
@@ -41,7 +41,6 @@ export const CommentInput = ({
     const isSendButtonActive = commentText.trim().length > 0;
 
     const handleSend = () => {
-        // Lấy text mới nhất từ props
         const text = commentText.trim();
         if (!text || submitting) {
             return;
@@ -100,7 +99,7 @@ export const CommentInput = ({
                 />
                 <TouchableOpacity
                     onPress={handleSend}
-                    disabled={submitting} // chỉ disable khi đang gửi để tránh spam
+                    disabled={submitting}
                     style={styles.sendButton}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -131,7 +130,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 3,
         elevation: 20,
-        zIndex: 100,
     },
     replyBanner: {
         flexDirection: 'row',

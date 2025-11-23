@@ -1,7 +1,12 @@
 import axiosInstance from "../config/axiosInstance";
 import { API_ENDPOINTS } from "../config/routes";
 import { ApiResponse, PaginatedResponse } from "../types";
-import { CommentCreateRequest, CommentResponse, CommentLikeToggleResponse } from "../types/comment.type";
+import {
+    CommentCreateRequest,
+    CommentResponse,
+    CommentLikeToggleResponse,
+    CommentPinToggleResponse
+} from "../types/comment.type";
 
 export const postCommentService = {
     createComment: async (postId: string, data: CommentCreateRequest): Promise<CommentResponse> => {
@@ -63,6 +68,18 @@ export const postCommentService = {
         } catch (error: any) {
             console.error('[postCommentService] Failed to delete comment:', error);
             throw new Error(error.response?.data?.message || 'Failed to delete comment');
+        }
+    },
+
+    togglePinComment: async (postId: string, commentId: string): Promise<CommentPinToggleResponse> => {
+        try {
+            const response = await axiosInstance.post<ApiResponse<CommentPinToggleResponse>>(
+                `/api/posts/${postId}/comments/${commentId}/pin`
+            );
+            return response.data.data;
+        } catch (error: any) {
+            console.error('[postCommentService] Failed to toggle pin comment:', error);
+            throw new Error(error.response?.data?.message || 'Failed to toggle pin');
         }
     },
 };

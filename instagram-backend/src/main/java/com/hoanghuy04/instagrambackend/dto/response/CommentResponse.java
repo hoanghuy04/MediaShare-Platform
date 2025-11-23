@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO for comment response data.
@@ -22,6 +23,8 @@ public class CommentResponse {
     private String id;
     
     private String postId;
+
+    private boolean isAuthorCommentedPost;
     
     private PostLikeUserResponse author;
     
@@ -30,14 +33,18 @@ public class CommentResponse {
     private Long totalLike;
     
     private Long totalReply;
-    
+
+    private boolean totalPin;
+
+    private boolean pinned;
+
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
 
     private String parentCommentId;
 
-    private String mention;
+    private List<String> mentions;
 
     private boolean isLikedByCurrentUser;
 }

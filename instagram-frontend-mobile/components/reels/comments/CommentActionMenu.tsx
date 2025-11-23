@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, TouchableOpacity, Image, Dimensions } from 'react-native';
-import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { AntDesign, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { CommentData } from './CommentRow';
@@ -116,8 +116,10 @@ export const CommentActionMenu = ({
                     <>
                         {isTopLevelComment && onPin && (
                             <TouchableOpacity style={styles.actionMenuItem} onPress={() => { onPin(comment); onClose(); }}>
-                                <AntDesign name="pushpin" size={20} color="#262626" />
-                                <Text style={styles.actionMenuText}>Ghim</Text>
+                                <MaterialCommunityIcons name={comment.pinned ? 'pin' : 'pin-outline'} size={24} color='black' />
+                                <Text style={styles.actionMenuText}>
+                                    {comment.pinned ? "Bỏ ghim bình luận" : "Ghim bình luận"}
+                                </Text>
                             </TouchableOpacity>
                         )}
 
@@ -149,13 +151,13 @@ export const CommentActionMenu = ({
                             <>
                                 {onReport && (
                                     <TouchableOpacity style={styles.actionMenuItem} onPress={() => { onReport(comment); onClose(); }}>
-                                        <Ionicons name="alert-circle-outline" size={20} color="#262626" />
+                                        <Ionicons name="alert-circle-outline" size={20} color="#ED4956" />
                                         <Text style={styles.actionMenuText}>Báo cáo</Text>
                                     </TouchableOpacity>
                                 )}
                                 {onBlock && (
                                     <TouchableOpacity style={styles.actionMenuItem} onPress={() => { onBlock(comment); onClose(); }}>
-                                        <Ionicons name="ban-outline" size={20} color="#262626" />
+                                        <Ionicons name="ban-outline" size={20} color="#ED4956" />
                                         <Text style={styles.actionMenuText}>Chặn tài khoản</Text>
                                     </TouchableOpacity>
                                 )}
@@ -202,5 +204,5 @@ const styles = StyleSheet.create({
         borderBottomWidth: 0.5,
         borderBottomColor: '#EFEFEF'
     },
-    actionMenuText: { fontSize: 15, color: '#262626', fontWeight: '500' },
+    actionMenuText: { fontSize: 15, color: '#000', fontWeight: '500' },
 });

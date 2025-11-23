@@ -46,9 +46,10 @@ import {
     CommentInput,
     CommentActionMenu,
     CommentData,
+    UnpinCommentModal,
 } from './comments';
 import { CommentItemWrapper } from './comments/CommentItemWrapper';
-import { ToastDeleteComment } from './comments/ToastDeleteComment';
+import { Toast } from './comments/Toast';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -110,6 +111,11 @@ const CommentsModal = ({
 
     const [toastVisible, setToastVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
+    const [toastConfig, setToastConfig] = useState<{
+        type: 'undo' | 'info' | 'loading';
+        position: 'bottom' | 'center';
+        duration?: number;
+    }>({ type: 'info', position: 'bottom', duration: 4000 });
 
     const undoTimeoutRef = useRef<any>(null);
     const deletedRef = useRef<{
@@ -118,8 +124,14 @@ const CommentsModal = ({
         parentId?: string
     } | null>(null);
 
-    const showToast = (message: string) => {
+    const showToast = (
+        message: string,
+        type: 'undo' | 'info' | 'loading' = 'info',
+        position: 'bottom' | 'center' = 'bottom',
+        duration = 4000
+    ) => {
         setToastMessage(message);
+        setToastConfig({ type, position, duration });
         setToastVisible(true);
     };
 
@@ -186,6 +198,7 @@ const CommentsModal = ({
         setLoading(true);
         try {
             const response = await postCommentService.getComments(postId, pageNum, 10);
+            console.log(response.content)
             const list = (response.content || []).map(
                 c => ({ ...c } as CommentWithReplies),
             );
@@ -650,7 +663,7 @@ const CommentsModal = ({
             setComments(prev => prev.filter(c => c.id !== comment.id));
         }
 
-        showToast('Đã xóa bình luận.');
+        showToast('Đã xóa bình luận.', 'undo', 'bottom');
 
         undoTimeoutRef.current = setTimeout(async () => {
             try {
@@ -662,6 +675,48 @@ const CommentsModal = ({
                 handleUndoDelete();
             }
         }, 4000);
+    };
+
+    // ------- PIN COMMENT HANDLER -------
+    const [unpinModalVisible, setUnpinModalVisible] = useState(false);
+    const [commentToUnpin, setCommentToUnpin] = useState<CommentWithReplies | null>(null);
+
+    const handlePinComment = async (comment: CommentWithReplies) => {
+        if (comment.pinned) {
+            setCommentToUnpin(comment);
+            setUnpinModalVisible(true);
+        } else {
+            const pinnedCount = comments.filter(c => c.pinned).length;
+            if (pinnedCount >= 2) {
+                showToast('Giới hạn là 2 bình luận', 'info', 'center');
+                return;
+            }
+            await performPin(comment);
+        }
+    };
+
+    const confirmUnpin = async () => {
+        if (commentToUnpin) {
+            setUnpinModalVisible(false);
+            await performPin(commentToUnpin);
+            setCommentToUnpin(null);
+        }
+    };
+
+    const performPin = async (comment: CommentWithReplies) => {
+        const isPinning = !comment.pinned;
+        showToast(isPinning ? 'Đang ghim bình luận...' : 'Đang bỏ ghim...', 'loading', 'center', 0);
+
+        try {
+            await postCommentService.togglePinComment(postId, comment.id);
+            setPage(0);
+            setComments([]);
+            await loadComments(0);
+            setToastVisible(false);
+        } catch (error) {
+            console.error('Failed to pin comment', error);
+            showToast('Có lỗi xảy ra khi ghim bình luận.', 'info', 'center');
+        }
     };
 
     // ------- PAN GESTURE -------
@@ -892,23 +947,33 @@ const CommentsModal = ({
                         setSelectedLayout(null);
                     }}
 
-                    // 1. Luôn truyền hàm xử lý Xóa
                     onDelete={handleDeleteComment}
-
-                    // 2. Truyền hàm rỗng để TEST GIAO DIỆN (Nút Ghim sẽ hiện khi đủ điều kiện)
-                    onPin={(comment) => console.log('Ghim', comment.id)}
+                    onPin={handlePinComment}
                     onReport={(comment) => console.log('Báo cáo', comment.id)}
                     onBlock={(comment) => console.log('Chặn', comment.author.id)}
                 />
 
                 {toastVisible && (
-                    <ToastDeleteComment
+                    <Toast
                         visible={toastVisible}
                         message={toastMessage}
                         onUndo={handleUndoDelete}
                         onHide={() => setToastVisible(false)}
+                        type={toastConfig.type}
+                        position={toastConfig.position}
+                        duration={toastConfig.duration}
                     />
                 )}
+
+                {/* Loading Overlay for Pinning */}
+
+
+                {/* Unpin Confirmation Modal */}
+                <UnpinCommentModal
+                    visible={unpinModalVisible}
+                    onConfirm={confirmUnpin}
+                    onCancel={() => setUnpinModalVisible(false)}
+                />
 
             </GestureHandlerRootView>
         </Modal>
@@ -1042,4 +1107,6 @@ const styles = StyleSheet.create({
         color: '#666',
         marginTop: 2,
     },
+
+
 });

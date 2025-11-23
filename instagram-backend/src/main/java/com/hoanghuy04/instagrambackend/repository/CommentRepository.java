@@ -12,10 +12,10 @@ import java.util.List;
 
 public interface CommentRepository extends MongoRepository<Comment, String> {
 
+    long countByPostAndParentCommentIsNullAndPinnedTrue(Post post);
+    List<Comment> findByParentComment_Id(String parentId);
     Page<Comment> findByPostAndParentCommentIsNull(Post post, Pageable pageable);
+    Page<Comment> findByPostAndParentComment(Post post, Comment parent, Pageable pageable);
 
-    Page<Comment> findByPostAndParentComment(Post post, Comment parentComment, Pageable pageable);
-
-    List<Comment> findByParentComment_Id(String parentCommentId);
 }
 

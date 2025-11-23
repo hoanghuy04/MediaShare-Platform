@@ -2,6 +2,7 @@ package com.hoanghuy04.instagrambackend.service.post;
 
 import com.hoanghuy04.instagrambackend.dto.request.CommentCreateRequest;
 import com.hoanghuy04.instagrambackend.dto.response.CommentLikeToggleResponse;
+import com.hoanghuy04.instagrambackend.dto.response.CommentPinToggleResponse;
 import com.hoanghuy04.instagrambackend.dto.response.CommentResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeUserResponse;
@@ -22,19 +23,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/**
- * Implementation of PostCommentService.
- */
 @Service
 @RequiredArgsConstructor
 public class PostCommentServiceImpl implements PostCommentService {
+
+    private static final int MAX_PINNED_COMMENTS = 2;
 
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final LikeRepository likeRepository;
     private final SecurityUtil securityUtil;
+
 
     @Transactional
     @Override
@@ -57,20 +60,24 @@ public class PostCommentServiceImpl implements PostCommentService {
             commentRepository.save(parent);
         }
 
+        String rawText = request.getText() != null ? request.getText().trim() : "";
+        List<String> mentions = extractMentions(rawText);
+
         Comment comment = Comment.builder()
                 .post(post)
                 .author(currentUser)
-                .text(request.getText().trim())
+                .text(rawText)
                 .parentComment(parent)
-                .mention(request.getMention())
-                .totalLikes(0)
-                .totalReply(0)
+                .mentions(mentions)
+                .totalLikes(0L)
+                .totalReply(0L)
+                .pinned(false)
                 .build();
 
         Comment saved = commentRepository.save(comment);
 
-         post.setTotalComments(post.getTotalComments() + 1);
-         postRepository.save(post);
+        post.setTotalComments(post.getTotalComments() + 1);
+        postRepository.save(post);
 
         return mapToCommentResponse(saved, false);
     }
@@ -84,12 +91,10 @@ public class PostCommentServiceImpl implements PostCommentService {
 
         User currentUser = securityUtil.getCurrentUser();
 
-        Page<Comment> page = commentRepository
-                .findByPostAndParentCommentIsNull(post, pageable);
+        Page<Comment> page = commentRepository.findByPostAndParentCommentIsNull(post, pageable);
 
         return mapCommentPageWithLikeInfo(page, currentUser);
     }
-
 
     @Transactional(readOnly = true)
     @Override
@@ -106,8 +111,7 @@ public class PostCommentServiceImpl implements PostCommentService {
 
         User currentUser = securityUtil.getCurrentUser();
 
-        Page<Comment> page = commentRepository
-                .findByPostAndParentComment(post, parent, pageable);
+        Page<Comment> page = commentRepository.findByPostAndParentComment(post, parent, pageable);
 
         return mapCommentPageWithLikeInfo(page, currentUser);
     }
@@ -115,12 +119,11 @@ public class PostCommentServiceImpl implements PostCommentService {
     @Transactional
     @Override
     public CommentLikeToggleResponse toggleLikeComment(String postId, String commentId) {
-
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("Comment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         if (!comment.getPost().getId().equals(postId)) {
-            throw new RuntimeException("Comment does not belong to this post");
+            throw new IllegalArgumentException("Comment does not belong to this post");
         }
 
         User currentUser = securityUtil.getCurrentUser();
@@ -132,7 +135,6 @@ public class PostCommentServiceImpl implements PostCommentService {
         );
 
         boolean liked;
-
         if (existing.isPresent()) {
             likeRepository.delete(existing.get());
             comment.setTotalLikes(Math.max(0, comment.getTotalLikes() - 1));
@@ -152,10 +154,59 @@ public class PostCommentServiceImpl implements PostCommentService {
         commentRepository.save(comment);
 
         return CommentLikeToggleResponse.builder()
+                .postId(postId)
                 .commentId(commentId)
                 .liked(liked)
-                .postId(postId)
                 .totalLikes(comment.getTotalLikes())
+                .build();
+    }
+
+
+    @Transactional
+    @Override
+    public CommentPinToggleResponse togglePinComment(String postId, String commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+
+        Post post = comment.getPost();
+        if (post == null || !post.getId().equals(postId)) {
+            throw new IllegalArgumentException("Comment does not belong to this post");
+        }
+
+        User currentUser = securityUtil.getCurrentUser();
+
+        if (!post.getAuthor().getId().equals(currentUser.getId())) {
+            throw new IllegalStateException("Only post owner can pin comments");
+        }
+
+        if (comment.getParentComment() != null) {
+            throw new IllegalStateException("Only top-level comments can be pinned");
+        }
+
+        boolean newPinnedState;
+
+        if (comment.isPinned()) {
+            comment.setPinned(false);
+            newPinnedState = false;
+        } else {
+            long pinnedCount = commentRepository.countByPostAndParentCommentIsNullAndPinnedTrue(post);
+            if (pinnedCount >= MAX_PINNED_COMMENTS) {
+                throw new IllegalStateException("Maximum pinned comments reached");
+            }
+            comment.setPinned(true);
+            newPinnedState = true;
+        }
+
+        commentRepository.save(comment);
+
+        long totalPinned = commentRepository.countByPostAndParentCommentIsNullAndPinnedTrue(post);
+
+        return CommentPinToggleResponse.builder()
+                .postId(postId)
+                .commentId(commentId)
+                .pinned(newPinnedState)
+                .totalPin(totalPinned)
+                .userId(currentUser.getId())
                 .build();
     }
 
@@ -163,11 +214,11 @@ public class PostCommentServiceImpl implements PostCommentService {
     @Override
     public void deleteComment(String postId, String commentId) {
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new RuntimeException("Comment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         Post post = comment.getPost();
         if (post == null || !post.getId().equals(postId)) {
-            throw new RuntimeException("Comment does not belong to this post");
+            throw new IllegalArgumentException("Comment does not belong to this post");
         }
 
         User currentUser = securityUtil.getCurrentUser();
@@ -176,7 +227,7 @@ public class PostCommentServiceImpl implements PostCommentService {
         boolean isOwnerOfPost = post.getAuthor().getId().equals(currentUser.getId());
 
         if (!isOwnerOfComment && !isOwnerOfPost) {
-            throw new RuntimeException("You do not have permission to delete this comment");
+            throw new IllegalStateException("You do not have permission to delete this comment");
         }
 
         long decrement = 1L;
@@ -192,7 +243,6 @@ public class PostCommentServiceImpl implements PostCommentService {
             }
 
             commentRepository.deleteAll(replies);
-
             decrement += replies.size();
         } else {
             Comment parent = comment.getParentComment();
@@ -240,7 +290,6 @@ public class PostCommentServiceImpl implements PostCommentService {
         return PageResponse.of(dtoPage);
     }
 
-
     private CommentResponse mapToCommentResponse(Comment comment, boolean likedByCurrentUser) {
         User author = comment.getAuthor();
 
@@ -258,6 +307,10 @@ public class PostCommentServiceImpl implements PostCommentService {
                 ? comment.getParentComment().getId()
                 : null;
 
+        List<String> mentions = comment.getMentions() != null
+                ? comment.getMentions()
+                : Collections.emptyList();
+
         return CommentResponse.builder()
                 .id(comment.getId())
                 .postId(comment.getPost().getId())
@@ -268,8 +321,29 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .parentCommentId(parentId)
-                .mention(comment.getMention())
+                .mentions(mentions)
                 .isLikedByCurrentUser(likedByCurrentUser)
+                .pinned(comment.isPinned())
+                .isAuthorCommentedPost(comment.getAuthor().getId().equals(comment.getPost().getAuthor().getId()))
                 .build();
+    }
+
+    private List<String> extractMentions(String text) {
+        if (text == null || text.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        Pattern pattern = Pattern.compile("@([A-Za-z0-9_\\.]+)");
+        Matcher matcher = pattern.matcher(text);
+
+        List<String> usernames = new ArrayList<>();
+        while (matcher.find()) {
+            String username = matcher.group(1);
+            if (username != null && !username.isBlank()) {
+                usernames.add(username);
+            }
+        }
+
+        return usernames;
     }
 }
