@@ -183,3 +183,5 @@ export const EMOJI_DEFAULTS = {
 };
 
 export const EMOJI_RECENTS_MAX = 50;
+
+export const API_IDENTIFIER = ''

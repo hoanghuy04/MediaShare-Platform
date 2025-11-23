@@ -18,7 +18,8 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import { messageAPI, userAPI } from '../../services/api';
+import { userAPI } from '../../services/api';
+import { messageAPI } from '../../services/message.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
 import { UserProfile, Conversation, Message, InboxItem, UserSummary } from '../../types';
@@ -27,7 +28,6 @@ import {
   getConversationAvatar,
   calculateUnreadCount,
   formatMessageTime,
-  sortConversationsByRecent,
 } from '../../utils/messageUtils';
 import { messageRequestAPI } from '../../services/api';
 
@@ -40,14 +40,12 @@ export default function MessagesScreen() {
   const [conversationMessages, setConversationMessages] = useState<{
     [conversationId: string]: Message[];
   }>({});
-  const [unreadCounts, setUnreadCounts] = useState<{ [conversationId: string]: number }>({});
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: boolean }>({});
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [followingStrip, setFollowingStrip] = useState<UserSummary[]>([]);
   const [isLoadingFollowing, setIsLoadingFollowing] = useState(false);
   const typingTimeouts = useRef<{ [conversationId: string]: number }>({});
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasInitiallyLoaded = useRef(false);
 
   const {
     data: inboxItems,
@@ -58,6 +56,10 @@ export default function MessagesScreen() {
     limit: 20,
     onError: error => showAlert('Error', error.message),
   });
+
+  useEffect(() => {
+    loadPendingRequestsCount();
+  }, [inboxItems]);
 
   // Debounced refresh to prevent multiple rapid calls
   const debouncedRefresh = React.useCallback(() => {
@@ -70,14 +72,13 @@ export default function MessagesScreen() {
     }, 300);
   }, [refresh]);
 
-  useEffect(() => {
-    // Only load on initial mount
-    if (!hasInitiallyLoaded.current) {
-      hasInitiallyLoaded.current = true;
-      refresh();
-      loadPendingRequestsCount();
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (!hasInitiallyLoaded.current) {
+  //     hasInitiallyLoaded.current = true;
+  //     refresh();
+  //     loadPendingRequestsCount();
+  //   }
+  // }, []);
 
   const loadPendingRequestsCount = async () => {
     try {
@@ -338,6 +339,11 @@ export default function MessagesScreen() {
     // Handle conversation type
     if (item.type === 'CONVERSATION' && item.conversation) {
       const conversation = item.conversation;
+      
+      // Skip group conversations with less than 2 participants
+      if (conversation.type === 'GROUP' && (!conversation.participants || conversation.participants.length < 2)) {
+        return null;
+      }
       const conversationName = getConversationName(conversation, currentUser.id);
       const conversationAvatar = getConversationAvatar(conversation, currentUser.id);
       const lastMessage = conversation.lastMessage;
@@ -350,6 +356,10 @@ export default function MessagesScreen() {
 
       // Display text
       let displayText = lastMessage?.content || 'Chưa có tin nhắn';
+
+      if (conversationName === "ai-assistant") {
+        displayText = lastMessage?.content || 'Chat với AI Assistant';
+      }
       if (isTyping) {
         displayText = 'Đang nhắn tin...';
       }
@@ -556,9 +566,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   username: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     marginRight: 8,
+    textAlign: 'center',
   },
   statusDot: {
     width: 8,
@@ -568,6 +579,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   editButton: {
+    fontSize: 20,
+    fontWeight: 'bold',
     padding: 4,
   },
   searchContainer: {

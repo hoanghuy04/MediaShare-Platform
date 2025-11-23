@@ -78,6 +78,8 @@ export const API_ENDPOINTS = {
   UPDATE_GROUP: (id: string) => `/api/conversations/${id}`,
   ADD_MEMBERS: (id: string) => `/api/conversations/${id}/members`,
   REMOVE_MEMBER: (id: string, userId: string) => `/api/conversations/${id}/members/${userId}`,
+  PROMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/promote`,
+  DEMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/demote`,
   LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
 
   // Message Requests
@@ -99,4 +101,9 @@ export const API_ENDPOINTS = {
   UPLOAD_POST_MEDIA: '/api/files/upload/post-media',
   UPLOAD_POST_MEDIA_BATCH: '/api/files/upload/post-media/batch',
   DELETE_FILE: (fileId: string) => `/api/files/upload/${fileId}`,
+
+  // AI Chat
+  AI_CHAT: '/api/ai/chat',
+  AI_CONVERSATION: '/api/ai/conversation',
+  AI_CLEAR_HISTORY: '/api/ai/conversation/history',
 } as const;

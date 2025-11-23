@@ -12,7 +12,9 @@ import com.hoanghuy04.instagrambackend.repository.CommentRepository;
 import com.hoanghuy04.instagrambackend.service.PostService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.user.UserServiceImpl;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,11 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class CommentServiceImpl implements CommentService {
     
-    private final CommentRepository commentRepository;
-    private final UserService userService;
-    private final PostService postService;
+    CommentRepository commentRepository;
+    UserService userService;
+    PostService postService;
     
     @Transactional
     @Override

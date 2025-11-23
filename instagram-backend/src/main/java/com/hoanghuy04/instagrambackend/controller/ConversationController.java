@@ -4,17 +4,19 @@ import com.hoanghuy04.instagrambackend.dto.request.AddMemberRequest;
 import com.hoanghuy04.instagrambackend.dto.request.CreateGroupRequest;
 import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
-import com.hoanghuy04.instagrambackend.dto.response.ConversationDTO;
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
+import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.entity.message.Conversation;
-import com.hoanghuy04.instagrambackend.entity.message.Message;
+import com.hoanghuy04.instagrambackend.entity.Conversation;
+import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
 import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
-import com.hoanghuy04.instagrambackend.repository.message.ConversationRepository;
-import com.hoanghuy04.instagrambackend.service.message.*;
+import com.hoanghuy04.instagrambackend.repository.ConversationRepository;
+import com.hoanghuy04.instagrambackend.service.conversation.ConversationMessageService;
+import com.hoanghuy04.instagrambackend.service.conversation.ConversationService;
+import com.hoanghuy04.instagrambackend.service.websocket.*;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -54,36 +56,36 @@ public class ConversationController {
 
     @GetMapping("/inbox")
     @Operation(summary = "Get inbox items (conversations + sent message requests)")
-    public ResponseEntity<ApiResponse<PageResponse<InboxItemDTO>>> getInbox(
+    public ResponseEntity<ApiResponse<PageResponse<InboxItemResponse>>> getInbox(
             @RequestParam String userId,
             @PageableDefault(sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("Get inbox items request received for user: {} (page: {}, size: {})",
                 userId, pageable.getPageNumber(), pageable.getPageSize());
 
-        PageResponse<InboxItemDTO> pageResponse = conversationMessageService.getInboxItems(userId, pageable);
+        PageResponse<InboxItemResponse> pageResponse = conversationMessageService.getInboxItems(userId, pageable);
         return ResponseEntity.ok(ApiResponse.success("Inbox retrieved successfully", pageResponse));
     }
 
     @GetMapping("/{conversationId}")
     @Operation(summary = "Get conversation details")
-    public ResponseEntity<ApiResponse<ConversationDTO>> getConversation(
+    public ResponseEntity<ApiResponse<ConversationResponse>> getConversation(
             @PathVariable String conversationId,
             @RequestParam String userId) {
         log.info("Get conversation request received for conversation: {} by user: {}", conversationId, userId);
 
-        ConversationDTO response = conversationMessageService.getConversationAsDTO(conversationId, userId);
+        ConversationResponse response = conversationMessageService.getConversationAsDTO(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/{conversationId}/messages")
     @Operation(summary = "Get messages in a conversation")
-    public ResponseEntity<ApiResponse<PageResponse<MessageDTO>>> getConversationMessages(
+    public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> getConversationMessages(
             @PathVariable String conversationId,
             @RequestParam String userId,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         log.info("Get messages request received for conversation: {} by user: {}", conversationId, userId);
 
-        PageResponse<MessageDTO> response = conversationMessageService.getConversationMessagesAsDTO(
+        PageResponse<MessageResponse> response = conversationMessageService.getConversationMessagesAsDTO(
                 conversationId, userId, pageable
         );
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -101,12 +103,12 @@ public class ConversationController {
 
     @PostMapping("/group")
     @Operation(summary = "Create a new group conversation")
-    public ResponseEntity<ApiResponse<ConversationDTO>> createGroup(
+    public ResponseEntity<ApiResponse<ConversationResponse>> createGroup(
             @Valid @RequestBody CreateGroupRequest request,
             @RequestParam String creatorId) {
         log.info("Create group request received by user: {}, name: {}", creatorId, request.getGroupName());
 
-        ConversationDTO response = conversationMessageService.createGroupAndConvertToDTO(
+        ConversationResponse response = conversationMessageService.createGroupAndConvertToDTO(
                 creatorId,
                 request.getParticipantIds(),
                 request.getGroupName()
@@ -117,7 +119,7 @@ public class ConversationController {
 
     @PutMapping("/{conversationId}")
     @Operation(summary = "Update group conversation information")
-    public ResponseEntity<ApiResponse<ConversationDTO>> updateGroupSimple(
+    public ResponseEntity<ApiResponse<ConversationResponse>> updateGroupSimple(
             @PathVariable String conversationId,
             @Valid @RequestBody UpdateConversationRequest request,
             @RequestParam String userId) {
@@ -131,7 +133,7 @@ public class ConversationController {
         );
 
         // build DTO + resolve URL
-        ConversationDTO dto = conversationMessageService.getConversationAsDTO(conversationId, userId);
+        ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Group updated successfully", dto));
     }
 
@@ -153,12 +155,11 @@ public class ConversationController {
     @Operation(summary = "Remove a member from a group conversation")
     public ResponseEntity<ApiResponse<Void>> removeMember(
             @PathVariable String conversationId,
-            @PathVariable String userId,
-            @RequestParam String removedBy) {
-        log.info("Remove member request received for conversation: {}, member: {}, by user: {}",
-                conversationId, userId, removedBy);
+            @PathVariable String userId) {
+        log.info("Remove member request received for conversation: {}, member: {}",
+                conversationId, userId);
 
-        conversationService.removeMember(conversationId, userId, removedBy);
+        conversationService.removeMember(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Member removed successfully", null));
     }
 
@@ -173,9 +174,31 @@ public class ConversationController {
         return ResponseEntity.ok(ApiResponse.success("Left group successfully", null));
     }
 
+    @PostMapping("/{conversationId}/members/{userId}/promote")
+    @Operation(summary = "Promote a member to admin")
+    public ResponseEntity<ApiResponse<Void>> promoteMemberToAdmin(
+            @PathVariable String conversationId,
+            @PathVariable String userId) {
+        log.info("Promote member {} to admin in conversation {} by user {}", userId, conversationId);
+
+        conversationService.promoteMemberToAdmin(conversationId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Member promoted to admin successfully", null));
+    }
+
+    @PostMapping("/{conversationId}/members/{userId}/demote")
+    @Operation(summary = "Demote an admin to member")
+    public ResponseEntity<ApiResponse<Void>> demoteAdminToMember(
+            @PathVariable String conversationId,
+            @PathVariable String userId) {
+        log.info("Demote admin {} to member in conversation {} by user {}", userId, conversationId);
+
+        conversationService.demoteAdminToMember(conversationId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Admin demoted to member successfully", null));
+    }
+
     @PostMapping("/direct/messages")
     @Operation(summary = "Send a direct message to a user (auto-creates conversation)")
-    public ResponseEntity<ApiResponse<MessageDTO>> sendDirectMessage(
+    public ResponseEntity<ApiResponse<MessageResponse>> sendDirectMessage(
             @Valid @RequestBody SendMessageRequest request,
             @RequestParam String senderId) {
         log.info("Send direct message from user {} to user {}", senderId, request.getReceiverId());
@@ -184,41 +207,26 @@ public class ConversationController {
             throw new com.hoanghuy04.instagrambackend.exception.BadRequestException("receiverId is required for direct messages");
         }
 
-        Message message = conversationMessageService.sendMessage(
+        MessageResponse message = conversationMessageService.sendMessage(
                 senderId,
                 request.getReceiverId(),
-                request.getContent(),
-                request.getMediaUrl()
+                request.getType(),
+                request.getContent()
         );
 
-        webSocketMessageService.pushMessage(message);
-
-        MessageDTO dto = messageMapper.toMessageDTO(message);
-
-        if (dto.getSender() == null) {
-            log.warn("Sender is null in DTO for message {}, manually setting from UserService", message.getId());
-            try {
-                var sender = userService.getUserEntityById(senderId);
-                dto.setSender(messageMapper.toUserSummaryDTO(sender));
-                log.info("Manually set sender {} for message {}", senderId, message.getId());
-            } catch (Exception e) {
-                log.error("Failed to manually set sender for message {}: {}", message.getId(), e.getMessage());
-            }
-        }
-
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Message sent successfully", dto));
+                .body(ApiResponse.success("Message sent successfully", message));
     }
 
     @PostMapping("/{conversationId}/messages")
     @Operation(summary = "Send a message to a conversation")
-    public ResponseEntity<ApiResponse<MessageDTO>> sendMessage(
+    public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
             @PathVariable String conversationId,
             @Valid @RequestBody SendMessageRequest request,
             @RequestParam String senderId) {
         log.info("Send message to conversation {} by user {}", conversationId, senderId);
 
-        Message message;
+        MessageResponse message;
         if (request.getReplyToMessageId() != null && !request.getReplyToMessageId().isBlank()) {
             message = conversationMessageService.replyToMessage(
                     conversationId,
@@ -230,16 +238,16 @@ public class ConversationController {
             message = conversationMessageService.sendMessageToConversation(
                     conversationId,
                     senderId,
-                    request.getContent(),
-                    request.getMediaUrl()
+                    request.getType(),
+                    request.getContent()
             );
         }
 
         webSocketMessageService.pushMessage(message);
 
-        MessageDTO dto = messageMapper.toMessageDTO(message);
+//        MessageResponse dto = messageMapper.toMessageDTO(message);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Message sent successfully", dto));
+                .body(ApiResponse.success("Message sent successfully", message));
     }
 
     @PostMapping("/messages/{messageId}/read")

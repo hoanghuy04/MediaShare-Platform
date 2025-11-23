@@ -1,11 +1,11 @@
 package com.hoanghuy04.instagrambackend.controller;
 
-import com.hoanghuy04.instagrambackend.dto.response.InboxItemDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageDTO;
-import com.hoanghuy04.instagrambackend.dto.response.MessageRequestDTO;
+import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
+import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
+import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
-import com.hoanghuy04.instagrambackend.service.message.MessageRequestService;
+import com.hoanghuy04.instagrambackend.service.messagerequest.MessageRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -38,11 +38,11 @@ public class MessageRequestController {
      */
     @GetMapping
     @Operation(summary = "Get pending message requests")
-    public ResponseEntity<ApiResponse<List<MessageRequestDTO>>> getPendingRequests(
+    public ResponseEntity<ApiResponse<List<MessageRequest>>> getPendingRequests(
             @RequestParam String userId) {
         
         log.info("Get pending message requests for user {}", userId);
-        List<MessageRequestDTO> requests = messageRequestService.getPendingRequests(userId);
+        List<MessageRequest> requests = messageRequestService.getPendingRequests(userId);
         return ResponseEntity.ok(
             ApiResponse.success("Pending requests retrieved successfully", requests)
         );
@@ -76,14 +76,14 @@ public class MessageRequestController {
      */
     @GetMapping("/inbox")
     @Operation(summary = "Get pending inbox items (received requests only)")
-    public ResponseEntity<ApiResponse<PageResponse<InboxItemDTO>>> getPendingInboxItems(
+    public ResponseEntity<ApiResponse<PageResponse<InboxItemResponse>>> getPendingInboxItems(
             @RequestParam String userId,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         
         log.info("Get pending inbox items for user {} (page: {}, size: {})", 
             userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        PageResponse<InboxItemDTO> pageResponse = messageRequestService.getPendingInboxItems(userId, pageable);
+        PageResponse<InboxItemResponse> pageResponse = messageRequestService.getPendingInboxItems(userId, pageable);
         return ResponseEntity.ok(
             ApiResponse.success("Pending inbox items retrieved successfully", pageResponse)
         );
@@ -99,12 +99,12 @@ public class MessageRequestController {
      */
     @GetMapping("/pending-messages")
     @Operation(summary = "Get pending messages for a message request")
-    public ResponseEntity<ApiResponse<List<MessageDTO>>> getPendingMessages(
+    public ResponseEntity<ApiResponse<List<MessageResponse>>> getPendingMessages(
             @RequestParam String senderId,
             @RequestParam String receiverId) {
         
         log.info("Get pending messages from {} to {}", senderId, receiverId);
-        List<MessageDTO> messages = messageRequestService.getPendingMessages(senderId, receiverId);
+        List<MessageResponse> messages = messageRequestService.getPendingMessages(senderId, receiverId);
         return ResponseEntity.ok(
             ApiResponse.success("Pending messages loaded successfully", messages)
         );
@@ -121,12 +121,12 @@ public class MessageRequestController {
      */
     @GetMapping("/{requestId}/pending-messages")
     @Operation(summary = "Get pending messages for a message request by request ID")
-    public ResponseEntity<ApiResponse<List<MessageDTO>>> getPendingMessagesByRequestId(
+    public ResponseEntity<ApiResponse<List<MessageResponse>>> getPendingMessagesByRequestId(
             @PathVariable String requestId,
             @RequestParam String userId) {
         
         log.info("Get pending messages for request {} by user {}", requestId, userId);
-        List<MessageDTO> messages = messageRequestService.getPendingMessagesByRequestId(requestId, userId);
+        List<MessageResponse> messages = messageRequestService.getPendingMessagesByRequestId(requestId, userId);
         return ResponseEntity.ok(
             ApiResponse.success("Pending messages loaded successfully", messages)
         );

@@ -28,7 +28,17 @@ export interface Theme {
   chat: {
     bubbleIn: string;
     bubbleOut: string;
-    bubbleText: string;
+
+    // text color
+    bubbleText: string;      // alias cho bubbleTextOut (compat chỗ khác đang dùng)
+    bubbleTextIn: string;    // text trong bubble nhận
+    bubbleTextOut: string;   // text trong bubble gửi
+
+    // 3 màu gradient cho bubbleOut + nút chính
+    gradientHigh: string;
+    gradientMedium: string;
+    gradientLow: string;
+
     headerBg: string;
     headerText: string;
     tint: string;
@@ -73,7 +83,7 @@ export interface Theme {
 const spacing = {
   xs: 4,
   sm: 8,
-  md: 14, // thu gọn nhịp cho mobile
+  md: 14,
   lg: 20,
   xl: 28,
   xxl: 44,
@@ -136,15 +146,22 @@ export const lightTheme: Theme = {
     warning: colors.warning,
     info: colors.info,
   },
-  // preset chat “hồng” mặc định (có thể override theo conversation.themeColor)
   chat: {
-    bubbleIn: '#F4F5F7',
-    bubbleOut: '#6D85FF',
-    bubbleText: '#0F1115',
-    headerBg: '#FFFFFF',
-    headerText: '#111418',
-    tint: '#F48FB1',
-    fabBg: '#FFFFFF',
+    bubbleIn: colors.chat.light.bubbleIn,
+    bubbleOut: colors.chat.light.bubbleOut,
+
+    bubbleTextIn: colors.chat.light.bubbleTextIn,
+    bubbleTextOut: colors.chat.light.bubbleTextOut,
+    bubbleText: colors.chat.light.bubbleTextOut,
+
+    gradientHigh: colors.chat.light.gradientHigh,
+    gradientMedium: colors.chat.light.gradientMedium,
+    gradientLow: colors.chat.light.gradientLow,
+
+    headerBg: colors.chat.light.headerBg,
+    headerText: colors.chat.light.headerText,
+    tint: colors.chat.light.tint,
+    fabBg: colors.chat.light.fabBg,
   },
   spacing,
   fontSize,
@@ -163,13 +180,21 @@ export const darkTheme: Theme = {
     info: colors.info,
   },
   chat: {
-    bubbleIn: '#22252C',
-    bubbleOut: '#7C4DFF',
-    bubbleText: '#FFFFFF',
-    headerBg: '#121419',
-    headerText: '#FFFFFF',
-    tint: '#A78BFA',
-    fabBg: '#2B2F3A',
+    bubbleIn: colors.chat.dark.bubbleIn,
+    bubbleOut: colors.chat.dark.bubbleOut,
+
+    bubbleTextIn: colors.chat.dark.bubbleTextIn,
+    bubbleTextOut: colors.chat.dark.bubbleTextOut,
+    bubbleText: colors.chat.dark.bubbleTextOut,
+
+    gradientHigh: colors.chat.dark.gradientHigh,
+    gradientMedium: colors.chat.dark.gradientMedium,
+    gradientLow: colors.chat.dark.gradientLow,
+
+    headerBg: colors.chat.dark.headerBg,
+    headerText: colors.chat.dark.headerText,
+    tint: colors.chat.dark.tint,
+    fabBg: colors.chat.dark.fabBg,
   },
   spacing,
   fontSize,
