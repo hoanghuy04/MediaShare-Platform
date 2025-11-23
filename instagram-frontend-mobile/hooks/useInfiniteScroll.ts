@@ -57,7 +57,6 @@ export const useInfiniteScroll = <T>({
         console.log(`Fetching data for page ${pageNum}, limit ${limitRef.current}`);
         const response = await fetchFuncRef.current(pageNum, limitRef.current);
         
-        console.log('API response:', response);
         console.log('Response content:', response.content);
         console.log('Response hasNext:', response.hasNext);
         

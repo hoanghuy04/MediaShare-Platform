@@ -49,6 +49,7 @@ export const API_ENDPOINTS = {
   TOGGLE_LIKE_POST: (id: string) => `api/posts/${id}/like`,
   POST_LIKES: (id: string) => `/api/posts/${id}/likes`,
   USER_POSTS: (userId: string) => `/api/posts/user/${userId}`,
+  POSTS_BY_TYPE: '/api/posts/type',
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',
   REELS: '/api/posts/reels',

@@ -4,20 +4,32 @@ import com.hoanghuy04.instagrambackend.dto.request.UpdateUserRequest;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserStatsResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
+import com.hoanghuy04.instagrambackend.entity.Follow;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.UserProfile;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
+import com.hoanghuy04.instagrambackend.mapper.UserMapper;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.service.FileService;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -28,13 +40,46 @@ import java.util.stream.Collectors;
  * @version 1.0.0
  */
 @Slf4j
+@Builder
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class UserServiceImpl implements UserService {
 
-    private final UserRepository userRepository;
-    private final PostRepository postRepository;
-    private final FollowRepository followRepository;
+    UserRepository userRepository;
+    PostRepository postRepository;
+    FollowRepository followRepository;
+    FileService fileService;
+    UserMapper userMapper;
+
+    @Override
+    public User ensureAiUser() {
+        UserProfile userProfile = UserProfile.builder()
+                .firstName("AI")
+                .lastName("Assistant")
+                .avatar("000000000000000000000000")
+                .build();
+
+        return userRepository.findByUsername("ai-assistant")
+                .or(() -> userRepository.findByEmail("ai@system.local"))
+                .orElseGet(() -> {
+                    try {
+                        User ai = new User();
+                        ai.setUsername("ai-assistant");
+                        ai.setEmail("ai@system.local");
+                        ai.setProfile(userProfile);
+                        ai.setActive(true);
+                        ai.setVerified(true);
+                        return userRepository.save(ai);
+                    } catch (org.springframework.dao.DuplicateKeyException e) {
+                        // Race condition: another thread created it, try to find again
+                        return userRepository.findByUsername("ai-assistant")
+                                .or(() -> userRepository.findByEmail("ai@system.local"))
+                                .orElseThrow(() -> new RuntimeException("Failed to create or find AI user"));
+                    }
+                });
+    }
+
 
     @Transactional(readOnly = true)
     @Override
@@ -44,7 +89,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        return convertToUserResponse(user);
+        System.out.println(userMapper.toUserResponse(user));
+        return userMapper.toUserResponse(user);
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +99,7 @@ public class UserServiceImpl implements UserService {
         log.debug("Getting all users");
 
         Page<UserResponse> page = userRepository.findAll(pageable)
-                .map(this::convertToUserResponse);
+                .map(userMapper::toUserResponse);
 
         return PageResponse.of(page);
     }
@@ -66,7 +112,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Update profile
         UserProfile profile = user.getProfile();
         if (profile == null) {
             profile = new UserProfile();
@@ -87,6 +132,9 @@ public class UserServiceImpl implements UserService {
         if (request.getLocation() != null) {
             profile.setLocation(request.getLocation());
         }
+        if (request.getAvatar() != null) {
+            profile.setAvatar(request.getAvatar());
+        }
 
         user.setProfile(profile);
 
@@ -95,7 +143,7 @@ public class UserServiceImpl implements UserService {
         user = userRepository.save(user);
         log.info("User updated successfully: {}", userId);
 
-        return convertToUserResponse(user);
+        return userMapper.toUserResponse(user);
     }
 
     @Transactional
@@ -119,7 +167,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         return followRepository.findByFollowing(user).stream()
-                .map(follow -> convertToUserResponse(follow.getFollower()))
+                .map(follow -> userMapper.toUserResponse(follow.getFollower()))
                 .collect(Collectors.toList());
     }
 
@@ -132,7 +180,68 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         return followRepository.findByFollower(user).stream()
-                .map(follow -> convertToUserResponse(follow.getFollowing()))
+                .map(follow -> userMapper.toUserResponse(follow.getFollowing()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<UserSummaryResponse> getUserFollowingSummary(String userId, String query, int page, int size) {
+        log.debug("Getting following summary for user {} with query: {}", userId, query);
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        int normalizedPage = Math.max(page, 0);
+
+        List<Follow> followings = followRepository.findByFollowerId(userId);
+        if (followings.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String loweredQuery = query != null ? query.trim().toLowerCase() : "";
+        if (!loweredQuery.isEmpty()) {
+            followings = followings.stream()
+                    .filter(follow -> {
+                        User followed = follow.getFollowing();
+                        if (followed == null) {
+                            return false;
+                        }
+                        String username = followed.getUsername() != null ? followed.getUsername().toLowerCase() : "";
+                        String firstName = followed.getProfile() != null && followed.getProfile().getFirstName() != null
+                                ? followed.getProfile().getFirstName().toLowerCase() : "";
+                        String lastName = followed.getProfile() != null && followed.getProfile().getLastName() != null
+                                ? followed.getProfile().getLastName().toLowerCase() : "";
+                        return username.contains(loweredQuery) ||
+                                firstName.contains(loweredQuery) ||
+                                lastName.contains(loweredQuery);
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        Comparator<Follow> comparator = Comparator
+                .comparing((Follow follow) -> follow.getCreatedAt() != null ? follow.getCreatedAt() : LocalDateTime.MIN)
+                .reversed()
+                .thenComparing(follow -> {
+                    User followed = follow.getFollowing();
+                    return followed != null && followed.getUsername() != null
+                            ? followed.getUsername().toLowerCase()
+                            : "";
+                });
+
+        List<Follow> sorted = followings.stream()
+                .sorted(comparator)
+                .collect(Collectors.toList());
+
+        int start = normalizedPage * normalizedSize;
+        if (start >= sorted.size()) {
+            return new ArrayList<>();
+        }
+        int end = Math.min(start + normalizedSize, sorted.size());
+
+        return sorted.subList(start, end).stream()
+                .map(follow -> userMapper.toUserSummary(follow.getFollowing()))
                 .collect(Collectors.toList());
     }
 
@@ -142,7 +251,7 @@ public class UserServiceImpl implements UserService {
         log.debug("Searching users with query: '{}', page: {}, size: {}", query, pageable.getPageNumber(), pageable.getPageSize());
 
         Page<UserResponse> page = userRepository.searchUsers(query, query, query, pageable)
-                .map(this::convertToUserResponse);
+                .map(userMapper::toUserResponse);
 
         log.debug("Found {} users on page {} of {} (total {} users)",
                 page.getNumberOfElements(),
@@ -180,29 +289,73 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
-    @Transactional(readOnly = true)
-    @Override
-    public User getUserByName(String userName) {
-        return userRepository.findByUsername(userName)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with name: " + userName));
-    }
-
     @Override
     public UserResponse convertToUserResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .profile(user.getProfile())
-                .roles(user.getRoles())
-                .followersCount(user.getFollowers() != null ? user.getFollowers().size() : 0)
-                .followingCount(user.getFollowing() != null ? user.getFollowing().size() : 0)
-                .isPrivate(user.isPrivate())
-                .isVerified(user.isVerified())
-                .isActive(user.isActive())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+        return userMapper.toUserResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<UserSummaryResponse> getMutualFollows(String userId, String query, int page, int size) {
+        log.debug("Getting mutual follows for user {} with query: {}", userId, query);
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // Lấy danh sách following và followers
+        List<Follow> following = followRepository.findByFollowerId(userId);
+        List<Follow> followers = followRepository.findByFollowingId(userId);
+
+        // Tạo Set để giao cắt
+        Set<String> followingIds = following.stream()
+                .map(f -> f.getFollowing().getId())
+                .collect(Collectors.toSet());
+
+        Set<String> followerIds = followers.stream()
+                .map(f -> f.getFollower().getId())
+                .collect(Collectors.toSet());
+
+        // Giao cắt: mutual = vừa là following vừa là follower
+        Set<String> mutualIds = followingIds.stream()
+                .filter(followerIds::contains)
+                .collect(Collectors.toSet());
+
+        if (mutualIds.isEmpty()) {
+            log.debug("No mutual follows found for user {}", userId);
+            return new ArrayList<>();
+        }
+
+        // Load users
+        List<User> mutualUsers = new ArrayList<>();
+        userRepository.findAllById(mutualIds).forEach(mutualUsers::add);
+
+        // Filter theo query nếu có
+        if (query != null && !query.trim().isEmpty()) {
+            String lowerQuery = query.toLowerCase();
+            mutualUsers = mutualUsers.stream()
+                    .filter(u -> {
+                        String username = u.getUsername() != null ? u.getUsername().toLowerCase() : "";
+                        String firstName = u.getProfile() != null && u.getProfile().getFirstName() != null
+                                ? u.getProfile().getFirstName().toLowerCase() : "";
+                        String lastName = u.getProfile() != null && u.getProfile().getLastName() != null
+                                ? u.getProfile().getLastName().toLowerCase() : "";
+                        return username.contains(lowerQuery) ||
+                                firstName.contains(lowerQuery) ||
+                                lastName.contains(lowerQuery);
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // Pagination (manual)
+        int start = page * size;
+        int end = Math.min(start + size, mutualUsers.size());
+        List<User> paginatedUsers = start < mutualUsers.size()
+                ? mutualUsers.subList(start, end)
+                : new ArrayList<>();
+
+        // Map to DTOs
+        return paginatedUsers.stream()
+                .map(userMapper::toUserSummary)
+                .collect(Collectors.toList());
     }
 }
-

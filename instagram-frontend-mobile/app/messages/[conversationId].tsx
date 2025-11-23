@@ -198,7 +198,6 @@ export default function ConversationScreen() {
           try {
             const userProfile = await userAPI.getUserProfile(conversationId);
             setOtherUser(userProfile);
-            console.log('Loaded other user profile:', userProfile);
             
             // No actual conversation ID yet - will be created when first message is sent
             // Keep conversationId as is (it's the userId)

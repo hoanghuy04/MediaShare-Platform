@@ -22,7 +22,6 @@ import { CreatePostRequest } from '../types/post.type';
 // Auth API
 export const authAPI = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
-    console.log('API URL:', apiConfig.apiUrl);
     const response = await axiosInstance.post(API_ENDPOINTS.LOGIN, data);
     return response.data.data;
   },
@@ -83,7 +82,6 @@ export const userAPI = {
     const response = await axiosInstance.get(API_ENDPOINTS.USERS + '/search', {
       params: { query, page, limit },
     });
-    console.log('Search Users Response:', response.data);
 
     return response.data.data;
   },
