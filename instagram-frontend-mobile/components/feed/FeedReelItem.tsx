@@ -6,7 +6,9 @@ import { useRouter } from 'expo-router';
 import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { PostLikesModal } from './PostLikesModal';
-import { postLikeService } from '@/services/post-like.service';
+
+import { MediaCategory } from '../../types/enum.type';
+import { postLikeService } from '../../services/post-like.service';
 
 const { width } = Dimensions.get('window');
 const MEDIA_HEIGHT = width * (16 / 9);
@@ -20,11 +22,18 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
   const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
   const likeButtonScale = useSharedValue(1);
 
-  const videoSource = post.media && post.media.length > 0 ? post.media[0].url : null;
+  const videoFile = post.media.find(m => m.category === MediaCategory.VIDEO);
+  const imageFile = post.media.find(m => m.category === MediaCategory.IMAGE);
 
-  const player = useVideoPlayer(videoSource, player => {
-    player.loop = false;
-    player.muted = isMuted;
+  const activeMedia = videoFile || imageFile;
+  const isVideo = activeMedia?.category === MediaCategory.VIDEO;
+  const mediaUrl = activeMedia?.url || '';
+
+  const player = useVideoPlayer(isVideo ? mediaUrl : '', player => {
+    if (isVideo) {
+      player.loop = false;
+      player.muted = isMuted;
+    }
   });
 
   useEffect(() => {
@@ -168,7 +177,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
       </View>
 
       <View style={styles.mediaContainer}>
-        {videoSource ? (
+        {isVideo ? (
           <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={{ flex: 1 }}>
             <VideoView
               style={styles.video}
@@ -178,16 +187,20 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
             />
           </TouchableOpacity>
         ) : (
-          <View style={[styles.video, styles.noVideoPlaceholder]}>
-            <Text style={styles.noVideoText}>Video loading...</Text>
-          </View>
+          <Image
+            source={{ uri: mediaUrl }}
+            style={styles.video}
+            resizeMode="contain"
+          />
         )}
 
-        <TouchableOpacity style={styles.muteBtn} onPress={toggleMute}>
-          <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={14} color="#fff" />
-        </TouchableOpacity>
+        {isVideo && (
+          <TouchableOpacity style={styles.muteBtn} onPress={toggleMute}>
+            <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={14} color="#fff" />
+          </TouchableOpacity>
+        )}
 
-        {showOverlay && (
+        {isVideo && showOverlay && (
           <View style={styles.centerOverlay}>
             <TouchableOpacity style={styles.watchMorePill} onPress={handleWatchMore}>
               <MaterialCommunityIcons

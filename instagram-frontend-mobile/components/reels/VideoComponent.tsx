@@ -58,21 +58,25 @@ const VideoComponent = ({
   const { width: screenWidth } = useWindowDimensions();
 
   const videoFile = data.media.find(m => m.category === MediaCategory.VIDEO);
-  const videoUrl = videoFile ? videoFile.url : '';
+  const imageFile = data.media.find(m => m.category === MediaCategory.IMAGE);
+
+  const activeMedia = videoFile || imageFile;
+  const isVideo = activeMedia?.category === MediaCategory.VIDEO;
+  const mediaUrl = activeMedia?.url || '';
 
   const thumbnailFile = data.media.find(m => m.category === MediaCategory.IMAGE);
-  const thumbnailUrl = thumbnailFile ? thumbnailFile.url : videoUrl;
+  const thumbnailUrl = thumbnailFile ? thumbnailFile.url : mediaUrl;
 
-  if (!videoUrl) return null;
-
-  const player = useVideoPlayer(videoUrl, p => {
-    p.loop = true;
-    p.timeUpdateEventInterval = 0.1;
-    p.muted = !isVisible || isMuted;
+  const player = useVideoPlayer(isVideo ? mediaUrl : '', p => {
+    if (isVideo) {
+      p.loop = true;
+      p.timeUpdateEventInterval = 0.1;
+      p.muted = !isVisible || isMuted;
+    }
   });
 
   useEffect(() => {
-    if (!player) return;
+    if (!player || !isVideo) return;
 
     if (isVisible && !isSeeking) {
       player.play();
@@ -81,10 +85,10 @@ const VideoComponent = ({
       player.pause();
       if (!isVisible) player.muted = true;
     }
-  }, [player, isVisible, isSeeking, isMuted]);
+  }, [player, isVisible, isSeeking, isMuted, isVideo]);
 
   useEffect(() => {
-    if (!player) return;
+    if (!player || !isVideo) return;
 
     const subscription = player.addListener('timeUpdate', () => {
       if (!isSeeking && player.duration > 0) {
@@ -103,9 +107,10 @@ const VideoComponent = ({
     return () => {
       subscription.remove();
     };
-  }, [player, isSeeking, animatedProgress]);
+  }, [player, isSeeking, animatedProgress, isVideo]);
 
   const onSlidingStart = () => {
+    if (!isVideo) return;
     setIsSeeking(true);
     setProgress(currentProgressRef.current);
     animatedProgress.stopAnimation();
@@ -113,6 +118,7 @@ const VideoComponent = ({
   };
 
   const onValueChange = (value: number) => {
+    if (!isVideo) return;
     animatedProgress.setValue(value);
     setProgress(value);
 
@@ -124,6 +130,7 @@ const VideoComponent = ({
   };
 
   const onSlidingComplete = (value: number) => {
+    if (!isVideo) return;
     if (player.duration > 0) {
       const newTime = value * player.duration;
       player.currentTime = newTime;
@@ -132,6 +139,7 @@ const VideoComponent = ({
   };
 
   const toggleMute = () => {
+    if (!isVideo) return;
     onToggleMute?.();
     setShowMuteIcon(true);
 
@@ -155,11 +163,15 @@ const VideoComponent = ({
       onDoubleTap?.({ x: locationX, y: locationY });
     } else {
       singleTapTimer.current = setTimeout(() => {
-        toggleMute();
+        if (isVideo) {
+          toggleMute();
+        }
         singleTapTimer.current = null;
       }, 300);
     }
   };
+
+  if (!mediaUrl) return null;
 
   const tooltipWidth = 100;
   const sliderWidth = screenWidth;
@@ -175,14 +187,22 @@ const VideoComponent = ({
       <Reanimated.View style={styles.container}>
         <Pressable onPress={handlePress} style={StyleSheet.absoluteFill}>
           <View style={styles.videoCard}>
-            <VideoView
-              player={player}
-              style={styles.video}
-              contentFit="contain"    // 👈 luôn luôn contain
-              nativeControls={false}
-            />
+            {isVideo ? (
+              <VideoView
+                player={player}
+                style={styles.video}
+                contentFit="contain"
+                nativeControls={false}
+              />
+            ) : (
+              <Image
+                source={{ uri: mediaUrl }}
+                style={styles.video}
+                contentFit="contain"
+              />
+            )}
 
-            {showMuteIcon && (
+            {isVideo && showMuteIcon && (
               <View style={styles.muteIconContainer}>
                 <Animated.View
                   style={{
@@ -209,7 +229,7 @@ const VideoComponent = ({
         </Pressable>
       </Reanimated.View>
 
-      {isSeeking && (
+      {isVideo && isSeeking && (
         <View style={[styles.previewContainer, { left: leftPos }]}>
           <View style={styles.previewVideoWrapper}>
             <Image
@@ -222,20 +242,22 @@ const VideoComponent = ({
         </View>
       )}
 
-      <View style={styles.sliderContainer}>
-        <AnimatedSlider
-          style={{ width: '100%', height: 40 }}
-          minimumValue={0}
-          maximumValue={1}
-          value={animatedProgress}
-          minimumTrackTintColor="#FFFFFF"
-          maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
-          thumbTintColor="transparent"
-          onSlidingStart={onSlidingStart}
-          onSlidingComplete={onSlidingComplete}
-          onValueChange={onValueChange}
-        />
-      </View>
+      {isVideo && (
+        <View style={styles.sliderContainer}>
+          <AnimatedSlider
+            style={{ width: '100%', height: 40 }}
+            minimumValue={0}
+            maximumValue={1}
+            value={animatedProgress}
+            minimumTrackTintColor="#FFFFFF"
+            maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
+            thumbTintColor="transparent"
+            onSlidingStart={onSlidingStart}
+            onSlidingComplete={onSlidingComplete}
+            onValueChange={onValueChange}
+          />
+        </View>
+      )}
     </>
   );
 };
