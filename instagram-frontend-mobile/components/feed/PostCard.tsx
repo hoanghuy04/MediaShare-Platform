@@ -21,6 +21,7 @@ import { isVideoFormatSupported } from '@utils/videoUtils';
 import apiConfig from '@config/apiConfig';
 import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
 import { PostLikesModal } from './PostLikesModal';
+import { PostCommentsModal } from './PostCommentsModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
@@ -59,11 +60,28 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [videoStatus, setVideoStatus] = useState<any>({});
   const [videoError, setVideoError] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isLiked, setIsLiked] = useState(post.likedByCurrentUser);
+  const [totalLike, setTotalLike] = useState(post.totalLike);
+  const [isProcessingLike, setIsProcessingLike] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const videoRef = useRef<Video>(null);
   const likeButtonScale = useSharedValue(1);
+
+  // Sync state when post changes (from API refresh)
+  useEffect(() => {
+    console.log('[PostCard] Syncing state from props:', {
+      postId: post.id,
+      likedByCurrentUser: post.likedByCurrentUser,
+      totalLike: post.totalLike,
+      currentIsLiked: isLiked,
+      currentTotalLike: totalLike,
+    });
+    setIsLiked(post.likedByCurrentUser);
+    setTotalLike(post.totalLike);
+  }, [post.id, post.likedByCurrentUser, post.totalLike]);
 
   // Create separate scale values for each media item
   const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({}); 
@@ -130,18 +148,57 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleLike = async () => {
-    if (post.likedByCurrentUser) {
+    if (isProcessingLike) return;
+    setIsProcessingLike(true);
+
+    const prevLiked = isLiked;
+    const prevTotal = totalLike;
+
+    // Optimistic update
+    const nextLiked = !prevLiked;
+    const nextTotal = Math.max(0, nextLiked ? prevTotal + 1 : prevTotal - 1);
+
+    setIsLiked(nextLiked);
+    setTotalLike(nextTotal);
+
+    // Animation
+    if (nextLiked) {
+      likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
+        likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
+      });
+    } else {
       likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
         likeButtonScale.value = withSpring(0.8, { damping: 8, stiffness: 600 }, () => {
           likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
         });
       });
-    } else {
-      likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
-        likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
-      });
     }
-    await onLike?.(post.id);
+
+    try {
+      const response = await postLikeService.toggleLikePost(post.id);
+      console.log('[PostCard] Toggle like response:', {
+        postId: post.id,
+        response,
+        prevLiked,
+        nextLiked,
+        prevTotal,
+        nextTotal,
+      });
+      
+      if (response?.liked !== undefined) {
+        setIsLiked(response.liked);
+        if (response.liked !== nextLiked) {
+          console.log('[PostCard] Response.liked mismatch! Adjusting totalLike');
+          setTotalLike(prev => response.liked ? prev + 1 : Math.max(0, prev - 1));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      setIsLiked(prevLiked);
+      setTotalLike(prevTotal);
+    } finally {
+      setIsProcessingLike(false);
+    }
   };
 
   const likeButtonAnimatedStyle = useAnimatedStyle(() => ({
@@ -334,18 +391,18 @@ export const PostCard: React.FC<PostCardProps> = ({
           >
             <Animated.View style={likeButtonAnimatedStyle}>
               <Ionicons
-                name={post.likedByCurrentUser ? 'heart' : 'heart-outline'}
+                name={isLiked ? 'heart' : 'heart-outline'}
                 size={28}
-                color={post.likedByCurrentUser ? theme.colors.like : theme.colors.text}
+                color={isLiked ? theme.colors.like : theme.colors.text}
               />
             </Animated.View>
             <Text style={[styles.actionCount, { color: theme.colors.text }]}>
-              {formatNumber(post.totalLike)}
+              {formatNumber(totalLike)}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => onComment?.(post.id)}
+            onPress={() => setShowCommentsModal(true)}
             style={styles.actionButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -387,7 +444,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       </Animated.View>
 
       {/* Likes Info */}
-      {post.totalLike > 0 && (
+      {totalLike > 0 && (
         <Animated.View style={uiAnimatedStyle}>
         <TouchableOpacity 
           style={styles.likesInfo}
@@ -398,12 +455,12 @@ export const PostCard: React.FC<PostCardProps> = ({
             {firstLiker ? (
               <>
                 <Text style={styles.boldText}>{firstLiker.username}</Text>
-                {post.totalLike > 1 && (
-                  <Text> và {formatNumber(post.totalLike - 1)} người khác đã thích</Text>
+                {totalLike > 1 && (
+                  <Text> và {formatNumber(totalLike - 1)} người khác đã thích</Text>
                 )}
               </>
             ) : (
-              <Text style={styles.boldText}>{formatNumber(post.totalLike)} lượt thích</Text>
+              <Text style={styles.boldText}>{formatNumber(totalLike)} lượt thích</Text>
             )}
           </Text>
         </TouchableOpacity>
@@ -438,6 +495,14 @@ export const PostCard: React.FC<PostCardProps> = ({
         visible={showLikesModal}
         postId={post.id}
         onClose={() => setShowLikesModal(false)}
+      />
+
+      {/* Comments Modal */}
+      <PostCommentsModal
+        visible={showCommentsModal}
+        postId={post.id}
+        postAuthorId={post.author.id}
+        onClose={() => setShowCommentsModal(false)}
       />
     </View>
   );
@@ -663,7 +728,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// Separate component for image with zoom to avoid hooks in conditional
 const ImageWithZoom: React.FC<{
   media: any;
   index: number;

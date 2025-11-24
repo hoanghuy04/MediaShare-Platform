@@ -13,6 +13,7 @@ import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
 import { FeedHeader } from '@components/feed/FeedHeader';
 import { FeedList } from '@components/feed/FeedList';
 import { UploadProgressWidget } from '@components/feed/UploadProgressWidget';
+import { PostCardSkeleton } from '@components/feed/PostCardSkeleton';
 
 import { userAPI } from '@services/api';
 import { postService } from '../../services/post.service';
@@ -106,58 +107,11 @@ export default function FeedScreen() {
   };
   const handleUploadFinished = () => refresh();
 
-  const handleLike = async (id: string) => {
-    try {
-      if (!user?.id) {
-        showAlert('Error', 'Please login to like posts');
-        return;
-      }
-      
-      const post = posts.find(p => p.id === id);
-      if (!post) return;
-      
-      const wasLiked = post.likedByCurrentUser;
-      const oldLikeCount = post.totalLike;
-      
-      console.log('Before like:', { wasLiked, oldLikeCount });
-      
-      // Optimistic update
-      const newLiked = !wasLiked;
-      const newLikeCount = newLiked ? oldLikeCount + 1 : Math.max(0, oldLikeCount - 1);
-      
-      updateItem(id, (item) => ({
-        ...item,
-        likedByCurrentUser: newLiked,
-        totalLike: newLikeCount,
-      }));
-      
-      console.log('After optimistic update:', { newLiked, newLikeCount });
+  // ❌ REMOVED - PostCard now manages like state internally via PostsContext
+  // const handleLike = async (id: string) => { ... }
 
-      const response = await postLikeService.toggleLikePost(id);
-      
-      
-      if (response.liked !== newLiked) {
-        console.warn('Backend state differs from optimistic update, syncing...');
-        updateItem(id, (item) => ({
-          ...item,
-          likedByCurrentUser: response.liked,
-        }));
-      }
-    } catch (e: any) {
-      console.error('Error liking post:', e);
-      const post = posts.find(p => p.id === id);
-      if (post) {
-        updateItem(id, (item) => ({
-          ...item,
-          likedByCurrentUser: post.likedByCurrentUser,
-          totalLike: post.totalLike,
-        }));
-      }
-      showAlert('Error', e.message);
-    }
-  };
   const handleComment = (id: string) => {
-    showAlert('Comments', 'Comment feature coming soon');
+    // PostCard now handles this internally with CommentsModal
   };
   const handleShare = () => showAlert('Share', 'Coming soon');
   const handleBookmark = () => showAlert('Saved', 'Saved to collection');
@@ -199,8 +153,8 @@ export default function FeedScreen() {
         hasMore={hasMore}
         onRefresh={handleRefresh}
         onLoadMore={loadMore}
-        onLike={handleLike}
-        onComment={handleComment}
+        onLike={undefined}
+        onComment={undefined}
         onShare={handleShare}
         onBookmark={handleBookmark}
         onFollow={handleFollow}
