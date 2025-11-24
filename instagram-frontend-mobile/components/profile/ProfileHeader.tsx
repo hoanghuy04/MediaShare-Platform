@@ -7,6 +7,7 @@ import { useTheme } from '@hooks/useTheme';
 import { Avatar } from '../common/Avatar';
 import { formatNumber } from '@utils/formatters';
 import { FollowButton } from '../common/FollowButton';
+import { MessageButton } from '../common/MessageButton';
 
 interface ProfileHeaderProps {
   profile: UserResponse;
@@ -141,16 +142,12 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               style={{ flex: 1 }}
             />
 
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.primaryButton,
-                { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-              ]}
+            <MessageButton
+              userId={profile.id}
               onPress={onMessage}
-            >
-              <Text style={[styles.buttonText, { color: theme.colors.text }]}>Nhắn tin</Text>
-            </TouchableOpacity>
+              size="medium"
+              style={{ flex: 1 }}
+            />
 
             <TouchableOpacity
               style={[

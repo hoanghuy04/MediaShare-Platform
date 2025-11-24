@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { authAPI } from '@services/auth.service';
+import { userService } from '@services/user.service';
 import { secureStorage, storage } from '@services/storage';
 import { User, LoginRequest, RegisterRequest } from '@types';
 

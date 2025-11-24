@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SettingsRow } from './SettingsRow';
-import { Conversation, UserProfile } from '../../../types';
+import { Conversation, UserResponse } from '../../../types';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
   isGroup: boolean;
   conversation: Conversation | undefined;
-  otherUser: UserProfile | null;
+  otherUser: UserResponse | null;
   themeColors: {
     text: string;
     textSecondary: string;

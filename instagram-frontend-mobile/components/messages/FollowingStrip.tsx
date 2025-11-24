@@ -10,17 +10,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { Avatar } from '../common/Avatar';
-import { UserSummary } from '../../types';
+import { UserSummaryResponse } from '../../types';
 
 interface FollowingStripProps {
-  users: UserSummary[];
+  users: UserSummaryResponse[];
   onPressUser?: (userId: string) => void;
 }
 
 export const FollowingStrip: React.FC<FollowingStripProps> = ({ users, onPressUser }) => {
   const { theme } = useTheme();
 
-  const renderItem: ListRenderItem<UserSummary> = ({ item }) => {
+  const renderItem: ListRenderItem<UserSummaryResponse> = ({ item }) => {
     const displayName =
       item.username && item.username.length > 12
         ? `${item.username.slice(0, 11)}…`
@@ -33,7 +33,7 @@ export const FollowingStrip: React.FC<FollowingStripProps> = ({ users, onPressUs
         activeOpacity={0.75}
       >
         <View style={styles.avatarWrapper}>
-          <Avatar uri={item.avatar} name={item.username} size={36} />
+          <Avatar uri={item.profile?.avatar} name={item.username} size={36} />
           {item.isVerified && (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark" size={10} color="#2563EB" />

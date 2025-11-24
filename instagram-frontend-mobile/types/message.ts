@@ -1,4 +1,3 @@
-import { UserProfile } from './user';
 import { MessageType } from './enum.type';
 
 // User summary for message sender (lightweight)

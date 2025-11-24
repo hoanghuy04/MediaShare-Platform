@@ -199,7 +199,7 @@ public class UserServiceImpl implements UserService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<UserSummaryResponse> getMutualFollows(String userId, String query, int page, int size) {
+    public List<UserResponse> getMutualFollows(String userId, String query, int page, int size) {
         log.debug("Getting mutual follows for user {} with query: {}", userId, query);
 
         userRepository.findById(userId)
@@ -258,7 +258,7 @@ public class UserServiceImpl implements UserService {
 
         // Map to DTOs
         return paginatedUsers.stream()
-                .map(userMapper::toUserSummary)
+                .map(userMapper::toUserResponse)
                 .collect(Collectors.toList());
     }
 }

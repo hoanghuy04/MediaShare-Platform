@@ -9,10 +9,9 @@ import { ProfileHeader } from '@components/profile/ProfileHeader';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { userAPI } from '@services/api';
 import { postService } from '../../services/post.service';
-import { UserProfile, Post } from '@types';
+import { UserResponse, Post } from '@types';
 import { showAlert } from '@utils/helpers';
 import { Ionicons } from '@expo/vector-icons';
-import { messageAPI } from '../../services/api';
 import { userService } from '../../services/user.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,7 +24,7 @@ export default function UserProfileScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('posts');
 
@@ -70,20 +69,6 @@ export default function UserProfileScreen() {
       router.back();
     } finally {
       setIsLoading(false);
-    }
-  };
-
-
-  const handleMessage = async () => {
-    // Navigate directly to conversation using the user's ID as conversationId
-    const convId = await messageAPI.resolveDirectByPeer(id);
-    if (convId) {
-      router.push({ pathname: '/messages/[conversationId]', params: { conversationId: convId } });
-    } else {
-      router.push({
-        pathname: '/messages/[conversationId]',
-        params: { conversationId: id, isNewConversation: 'true', direction: 'sent', senderId: currentUser.id, receiverId: id },
-      });
     }
   };
 
@@ -211,7 +196,6 @@ export default function UserProfileScreen() {
             <ProfileHeader
               profile={profileWithPosts}
               isOwnProfile={isOwnProfile}
-              onMessage={handleMessage}
             />
             {renderTabMenu()}
           </>

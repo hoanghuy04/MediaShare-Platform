@@ -1,6 +1,6 @@
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
-import { UserResponse, UpdateUserRequest, UserStatsResponse, FollowToggleResponse, FollowerUserResponse, SimpleUserResponse } from '../types/user';
+import { UserResponse, UpdateUserRequest, UserStatsResponse, FollowToggleResponse, FollowerUserResponse, SimpleUserResponse, UserSummaryResponse } from '../types/user';
 import { PaginatedResponse } from '../types';
 
 export const userService = {
@@ -39,12 +39,12 @@ export const userService = {
   /**
    * Get user followers
    */
-  getUserFollowers: async (userId: string): Promise<UserResponse[]> => {
+  getUserFollowers: async (userId: string): Promise<PaginatedResponse<UserResponse>> => {
     const response = await axiosInstance.get(`${API_ENDPOINTS.USERS}/${userId}/followers`);
     return response.data.data;
   },
 
-  getUserFollowing: async (userId: string): Promise<UserResponse[]> => {
+  getUserFollowing: async (userId: string): Promise<PaginatedResponse<UserResponse>> => {
     const response = await axiosInstance.get(`${API_ENDPOINTS.USERS}/${userId}/following`);
     return response.data.data;
   },
@@ -108,5 +108,53 @@ export const userService = {
 
   removeFollower: async (followerId: string): Promise<void> => {
     await axiosInstance.delete(API_ENDPOINTS.REMOVE_FOLLOWER(followerId));
+  },
+
+  getMutualFollows: async (
+    userId: string,
+    query = '',
+    page = 0,
+    size = 20
+  ): Promise<UserSummaryResponse[]> => {
+    const mapToSummary = (user: UserResponse): UserSummaryResponse => ({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      profile: user.profile,
+      isVerified: !!user.isVerified,
+      followingByCurrentUser: user.followingByCurrentUser ?? false,
+    });
+
+    try {
+      const response = await axiosInstance.get(API_ENDPOINTS.MUTUAL_FOLLOWS(userId), {
+        params: { query, page, size },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
+      const [followers, following]: [UserResponse[], UserResponse[]] = await Promise.all([
+        userAPI.getFollowers(userId, 0, 100),
+        userAPI.getFollowing(userId, 0, 100),
+      ]);
+
+      const followerIds = new Set(followers.map(u => u.id));
+      let mutuals = following.filter(u => followerIds.has(u.id));
+
+      if (query.trim()) {
+        const lowerQuery = query.toLowerCase();
+        mutuals = mutuals.filter(user => {
+          const username = user.username?.toLowerCase() || '';
+          const firstName = user.profile?.firstName?.toLowerCase() || '';
+          const lastName = user.profile?.lastName?.toLowerCase() || '';
+          return (
+            username.includes(lowerQuery) ||
+            firstName.includes(lowerQuery) ||
+            lastName.includes(lowerQuery)
+          );
+        });
+      }
+
+      return mutuals.map(mapToSummary);
+    }
   },
 };

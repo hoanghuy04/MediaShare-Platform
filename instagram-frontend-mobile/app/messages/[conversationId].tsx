@@ -29,11 +29,10 @@ import { WallpaperWrapper } from '../../components/messages/WallpaperWrapper';
 import { ScrollToBottomButton } from '../../components/messages/ScrollToBottomButton';
 import { TypingDock } from '../../components/messages/TypingDock';
 import { ReadReceiptLabel } from '../../components/messages/ReadReceiptLabel';
-import { userAPI } from '../../services/api';
 import { messageRequestAPI } from '../../services/message-request.service';
 import { aiAPI } from '../../services/ai.service';
 import { messageAPI } from '../../services/message.service';
-import { Conversation, Message, UserProfile } from '../../types';
+import { Conversation, Message, UserResponse } from '../../types';
 import { showAlert } from '../../utils/helpers';
 import {
   MutualUserPicker,
@@ -43,6 +42,7 @@ import { GroupInfoSheet } from '../../components/messages/GroupInfoSheet';
 import { ConversationHeader } from '../../components/messages/ConversationHeader';
 import { ConversationMeta } from '../../components/messages/ConversationMeta';
 import { AddMembersModal } from '../../components/messages/AddMembersModal';
+import { userService } from '../../services/user.service';
 
 const hexToRgba = (hex?: string, alpha = 1) => {
   if (!hex) return `rgba(0,0,0,${alpha})`;
@@ -95,7 +95,7 @@ export default function ConversationScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
+  const [otherUser, setOtherUser] = useState<UserResponse | null>(null);
   const [peerUserId, setPeerUserId] = useState<string | null>(
     wantsPendingRoute ? routeConversationId : null
   );
@@ -238,7 +238,7 @@ export default function ConversationScreen() {
         setActualConversationId(null);
         setPeerUserId(targetId);
         if (!otherUser || otherUser.id !== targetId) {
-          const profile = await userAPI.getUserProfile(targetId);
+          const profile = await userService.getUserById(targetId);
           setOtherUser(profile);
         }
         let pendingMessages: Message[];

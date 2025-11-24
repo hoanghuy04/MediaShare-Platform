@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SimpleUserResponse } from '../../types/user';
 import { Avatar } from '../common/Avatar';
+import { MessageButton } from '../common/MessageButton';
 import { Theme } from '../../styles/theme';
 
 interface FollowingItemProps {
@@ -32,12 +33,11 @@ export const FollowingItem: React.FC<FollowingItemProps> = ({
 
             <View style={styles.actions}>
                 {!isCurrentUser && (
-                    <TouchableOpacity
-                        style={[styles.messageButton, { backgroundColor: theme.colors.inputBackground }]}
-                        onPress={() => { }}
-                    >
-                        <Text style={[styles.messageButtonText, { color: theme.colors.text }]}>Nhắn tin</Text>
-                    </TouchableOpacity>
+                    <MessageButton
+                        userId={item.id}
+                        size="small"
+                        backgroundColor={theme.colors.inputBackground}
+                    />
                 )}
 
                 <TouchableOpacity style={styles.menuButton}>
@@ -75,15 +75,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-    },
-    messageButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 8,
-    },
-    messageButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
     },
     menuButton: {
         padding: 4,

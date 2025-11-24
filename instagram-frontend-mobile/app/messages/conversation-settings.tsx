@@ -17,11 +17,12 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useConversation, useConversationActions } from '../../context/ConversationContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { userAPI } from '../../services/api';
+// import { userAPI } from '../../services/api';
+import { userService } from '../../services/user.service';
 import { messageAPI } from '../../services/message.service';
 import { fileService } from '../../services/file.service';
 import { mediaService } from '../../services/media';
-import { Conversation, UserProfile } from '../../types';
+import { Conversation, UserResponse } from '../../types';
 import { showAlert } from '../../utils/helpers';
 import { SettingsHeader } from '../../components/messages/settings/SettingsHeader';
 import { SettingsTopSection } from '../../components/messages/settings/SettingsTopSection';
@@ -42,7 +43,7 @@ export default function ConversationSettingsScreen() {
   const routeUserId = normalize(params.userId);
   const routeConversationId = normalize(params.conversationId);
 
-  const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
+  const [otherUser, setOtherUser] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -94,7 +95,7 @@ export default function ConversationSettingsScreen() {
 
       // Nếu có routeUserId (direct message không có conversation), load user profile
       if (routeUserId) {
-        const profile = await userAPI.getUserProfile(routeUserId);
+        const profile = await userService.getUserById(routeUserId);
         setOtherUser(profile);
         return;
       }
@@ -365,10 +366,10 @@ export default function ConversationSettingsScreen() {
             }}
             onOpenThemePicker={() => {
               if (!routeConversationId) return;
-              router.push({
-                pathname: '/messages/theme-picker',
-                params: { conversationId: routeConversationId },
-              });
+              // router.push({
+              //   pathname: '/messages/theme-picker',
+              //   params: { conversationId: routeConversationId },
+              // });
             }}
             onOpenMembers={() => {
               if (!routeConversationId) return;

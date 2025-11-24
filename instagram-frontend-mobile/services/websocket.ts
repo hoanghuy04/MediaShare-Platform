@@ -1,6 +1,6 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { Message, UserProfile } from '../types';
+import { Message } from '../types';
 
 export interface ChatMessage {
   id?: string;

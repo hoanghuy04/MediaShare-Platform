@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useConversation } from '../../context/ConversationContext';
 import { messageAPI } from '../../services/message.service';
 import { Avatar } from '../../components/common/Avatar';
+import { MessageButton } from '../../components/common/MessageButton';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { showAlert } from '../../utils/helpers';
 import type { Conversation } from '../../types';
@@ -215,28 +216,11 @@ export default function GroupMembersScreen() {
 
       {!isMe && (
         <>
-          <TouchableOpacity
-            style={[
-              styles.msgBtn,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-              },
-            ]}
-            onPress={() =>
-              router.push({
-                pathname: '/messages/[conversationId]',
-                params: { conversationId: p?.userId },
-              })
-            }
-            activeOpacity={0.85}
-          >
-            <Text
-              style={[styles.msgBtnText, { color: theme.colors.text }]}
-            >
-              Nhắn tin
-            </Text>
-          </TouchableOpacity>
+          <MessageButton
+            userId={p.userId}
+            size="small"
+            style={{ marginRight: 8 }}
+          />
 
           <TouchableOpacity
             style={styles.kebab}

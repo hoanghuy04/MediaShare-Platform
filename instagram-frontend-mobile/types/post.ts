@@ -1,8 +1,8 @@
-import { UserProfile } from './user';
+import { UserSummaryResponse } from './user';
 
 export interface Post {
   id: string;
-  author: UserProfile;
+  author: UserSummaryResponse;
   caption: string;
   media: Media[];
   likesCount: number;

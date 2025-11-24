@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
-import { userAPI } from '../../services/api';
+import { userService } from '../../services/user.service';
 import { SelectedChips, SelectedChipUser } from './SelectedChips';
 import { UserRow, UserRowItem } from './UserRow';
 import { showAlert } from '../../utils/helpers';
@@ -95,7 +95,7 @@ export const MutualUserPicker: React.FC<MutualUserPickerProps> = ({
 
       try {
         const start = Date.now();
-        const response = await userAPI.getMutualFollows(currentUserId, debouncedQuery, pageToLoad, PAGE_SIZE);
+        const response = await userService.getMutualFollows(currentUserId, debouncedQuery, pageToLoad, PAGE_SIZE);
         const normalized = response
           .map(normalizeResponse)
           .filter(user => !excludeSet.has(user.id));

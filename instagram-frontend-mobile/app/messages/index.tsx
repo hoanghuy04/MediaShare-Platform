@@ -18,12 +18,12 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import { userAPI } from '../../services/api';
+import { userService } from '../../services/user.service';
 import { messageAPI } from '../../services/message.service';
 import { messageRequestAPI } from '../../services/message-request.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
-import { UserProfile, Conversation, Message, InboxItem, UserSummary } from '../../types';
+import { Conversation, Message, InboxItem, UserResponse } from '../../types';
 import {
   getConversationName,
   getConversationAvatar,
@@ -42,7 +42,7 @@ export default function MessagesScreen() {
   }>({});
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: boolean }>({});
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  const [followingStrip, setFollowingStrip] = useState<UserSummary[]>([]);
+  const [followingStrip, setFollowingStrip] = useState<UserResponse[]>([]);
   const [isLoadingFollowing, setIsLoadingFollowing] = useState(false);
   const typingTimeouts = useRef<{ [conversationId: string]: number }>({});
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -94,8 +94,12 @@ export default function MessagesScreen() {
     }
     try {
       setIsLoadingFollowing(true);
-      const data = await userAPI.getFollowingSummary(currentUser.id, { page: 0, size: 20 });
-      setFollowingStrip(data || []);
+      const response = await userService.getUserFollowing(currentUser.id);
+      console.log("________________________________getUserFollowing__________: ", response);
+      console.log("________________________________currentUser.id__________: ", currentUser.id);
+      
+      // Extract content from PageResponse
+      setFollowingStrip(response?.content || []);
     } catch (error) {
       console.warn('loadFollowingStrip error', error);
     } finally {
@@ -130,7 +134,7 @@ export default function MessagesScreen() {
             createdAt: message.timestamp,
             isDeleted: false,
           };
-          
+
           // Avoid duplicates
           const isDuplicate = existing.some(m => m.id === newMessage.id);
           if (isDuplicate) return prev;
@@ -180,7 +184,7 @@ export default function MessagesScreen() {
     };
 
     const handleReadReceipt = (messageId: string, readerId: string, conversationId?: string) => {
-      
+
       if (!conversationId) return;
 
       // Update local message state
@@ -193,7 +197,7 @@ export default function MessagesScreen() {
               : { ...m, readBy: [...(m.readBy || []), readerId] }
             : m
         );
-        
+
         return {
           ...prev,
           [conversationId]: updated,
@@ -338,7 +342,7 @@ export default function MessagesScreen() {
               activeOpacity={0.75}
             >
               <Avatar
-                uri={item.avatar}
+                uri={item.profile?.avatar}
                 name={item.username}
                 size={70}
                 style={styles.followingAvatar}
@@ -386,7 +390,7 @@ export default function MessagesScreen() {
     // Handle conversation type
     if (item.type === 'CONVERSATION' && item.conversation) {
       const conversation = item.conversation;
-      
+
       // Skip group conversations with less than 2 participants
       if (conversation.type === 'GROUP' && (!conversation.participants || conversation.participants.length < 2)) {
         return null;
@@ -403,8 +407,8 @@ export default function MessagesScreen() {
 
       // Display text - prioritize real-time messages from WebSocket
       const realtimeMessages = conversationMessages[conversation.id] || [];
-      const latestMessage = realtimeMessages.length > 0 
-        ? realtimeMessages[realtimeMessages.length - 1] 
+      const latestMessage = realtimeMessages.length > 0
+        ? realtimeMessages[realtimeMessages.length - 1]
         : lastMessage;
 
       let displayText = lastMessage?.content || 'Chưa có tin nhắn';

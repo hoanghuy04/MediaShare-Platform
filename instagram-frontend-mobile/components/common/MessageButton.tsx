@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TouchableOpacity,
   Text,
@@ -7,11 +7,16 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../hooks/useAuth';
+import { messageAPI } from '../../services/message.service';
+import { showAlert } from '../../utils/helpers';
 
 interface MessageButtonProps {
   label?: string;
-  onPress: () => void;
+  userId: string; // ID của user cần nhắn tin
+  onPress?: () => void; // Optional custom handler
   loading?: boolean;
   size?: 'small' | 'medium' | 'large';
   backgroundColor?: string;
@@ -22,8 +27,9 @@ interface MessageButtonProps {
 
 export const MessageButton: React.FC<MessageButtonProps> = ({
   label = 'Nhắn tin',
+  userId,
   onPress,
-  loading = false,
+  loading: externalLoading = false,
   size = 'medium',
   backgroundColor,
   textColor,
@@ -31,6 +37,51 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
   textStyle,
 }) => {
   const { theme } = useTheme();
+  const router = useRouter();
+  const { user: currentUser } = useAuth();
+  const [internalLoading, setInternalLoading] = useState(false);
+  
+  const loading = externalLoading || internalLoading;
+
+  const handlePress = async () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+
+    if (!currentUser?.id || !userId) {
+      showAlert('Lỗi', 'Không thể gửi tin nhắn');
+      return;
+    }
+
+    try {
+      setInternalLoading(true);
+      // Resolve or create conversation
+      const convId = await messageAPI.resolveDirectByPeer(userId);
+      if (convId) {
+        router.push({
+          pathname: '/messages/[conversationId]',
+          params: { conversationId: convId },
+        });
+      } else {
+        router.push({
+          pathname: '/messages/[conversationId]',
+          params: {
+            conversationId: userId,
+            isNewConversation: 'true',
+            direction: 'sent',
+            senderId: currentUser.id,
+            receiverId: userId,
+          },
+        });
+      }
+    } catch (error: any) {
+      console.error('Error opening message:', error);
+      showAlert('Lỗi', error.message || 'Không thể mở tin nhắn');
+    } finally {
+      setInternalLoading(false);
+    }
+  };
 
   // --- Copy from FollowButton ---
   const getPadding = () => {
@@ -62,7 +113,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       disabled={loading}
       activeOpacity={0.7}
       style={[
