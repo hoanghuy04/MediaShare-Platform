@@ -69,10 +69,9 @@ public interface ConversationMessageService {
      * - For legacy messages: marks all messages between sender and receiver as read
      *
      * @param messageId the message ID
-     * @param userId the user ID who reads the message
      */
     @Transactional
-    void markAsRead(String messageId, String userId);
+    void markAsRead(String messageId);
 
     /**
      * Delete a message for a user (soft delete).

@@ -7,28 +7,31 @@ import React, {
 } from 'react';
 import {
   View,
-  FlatList,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Text,
-  TouchableOpacity,
-  ImageBackground,
-  ActivityIndicator,
+  FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useConversation } from '../../context/ConversationContext';
 import { MessageType } from '../../types/enum.type';
 import { fileService } from '../../services/file.service';
 import { ChatMessage } from '../../components/messages/ChatMessage';
 import { MessageInput } from '../../components/messages/MessageInput';
-import { TypingIndicator } from '../../components/messages/TypingIndicator';
-import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { userAPI, messageRequestAPI, aiAPI } from '../../services/api';
+import { MessageList } from '../../components/messages/MessageList';
+import { WallpaperWrapper } from '../../components/messages/WallpaperWrapper';
+import { ScrollToBottomButton } from '../../components/messages/ScrollToBottomButton';
+import { TypingDock } from '../../components/messages/TypingDock';
+import { ReadReceiptLabel } from '../../components/messages/ReadReceiptLabel';
+import { userAPI } from '../../services/api';
+import { messageRequestAPI } from '../../services/message-request.service';
+import { aiAPI } from '../../services/ai.service';
 import { messageAPI } from '../../services/message.service';
 import { Conversation, Message, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
@@ -101,10 +104,13 @@ export default function ConversationScreen() {
   const [isNewConversation, setIsNewConversation] =
     useState(wantsPendingRoute);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [conversationDetails, setConversationDetails] =
-    useState<Conversation | null>(null);
   const [isGroupInfoVisible, setGroupInfoVisible] = useState(false);
   const [isAddMembersVisible, setAddMembersVisible] = useState(false);
+
+  // ConversationContext
+  const {
+    conversation: conversationDetails,
+  } = useConversation(actualConversationId || routeConversationId);
   const [pendingMembers, setPendingMembers] = useState<
     Record<string, MutualUserOption>
   >({});
@@ -231,7 +237,6 @@ export default function ConversationScreen() {
         setIsNewConversation(true);
         setActualConversationId(null);
         setPeerUserId(targetId);
-        setConversationDetails(null);
         if (!otherUser || otherUser.id !== targetId) {
           const profile = await userAPI.getUserProfile(targetId);
           setOtherUser(profile);
@@ -291,43 +296,11 @@ export default function ConversationScreen() {
       }
       setIsLoading(true);
       try {
-        const conversation = await messageAPI.getConversation(convId);
-
-        setActualConversationId(conversation.id);
+        setActualConversationId(convId);
         setIsNewConversation(false);
-        setConversationDetails(conversation);
-
-        if (
-          conversation.type === 'DIRECT' &&
-          conversation.participants?.length
-        ) {
-          const other =
-            conversation.participants.find(
-              p => p.userId !== user?.id
-            ) || conversation.participants[0];
-          if (other) {
-            setPeerUserId(other.userId);
-            setOtherUser(prev =>
-              prev?.id === other.userId
-                ? prev
-                : {
-                  id: other.userId,
-                  username: other.username,
-                  email: '',
-                  profile: { avatar: other.avatar },
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                  isVerified: other.isVerified,
-                }
-            );
-          }
-        } else {
-          setPeerUserId(null);
-          setOtherUser(null);
-        }
 
         const res = await messageAPI.getMessages(
-          conversation.id,
+          convId,
           0,
           20
         );
@@ -431,22 +404,24 @@ export default function ConversationScreen() {
   useEffect(() => {
     // CHAT packet
     const onMsg = (packet: any) => {
-      // Ưu tiên lọc theo conversationId cho cả direct & group
+      if (packet.type !== 'CHAT') return;
+      if (!packet.senderId) return;
+
       const matchesConv =
         !!packet.conversationId &&
         !!actualConversationId &&
         packet.conversationId === actualConversationId;
 
-      const peerId =
-        otherUser?.id || peerUserId || routeConversationId;
+      const peerId = otherUser?.id || peerUserId || routeConversationId;
       const matchesPeer =
         !matchesConv &&
+        !isGroupConversation &&
         peerId &&
         (packet.senderId === peerId || packet.receiverId === peerId);
 
-      if (packet.type !== 'CHAT' || (!matchesConv && !matchesPeer))
+      if (!matchesConv && !matchesPeer) {
         return;
-      if (!packet.senderId) return;
+      }
 
       const incoming: Message = {
         id: packet.id || '',
@@ -456,11 +431,10 @@ export default function ConversationScreen() {
           avatar: packet.senderProfileImage,
           isVerified: false,
         },
-        conversationId: packet.conversationId,
+        conversationId: packet.conversationId || actualConversationId || undefined,
         content: packet.content || '',
         type: packet.contentType || MessageType.TEXT,
-        readBy:
-          packet.status === 'READ' ? [user?.id || ''] : [],
+        readBy: packet.status === 'READ' ? [user?.id || ''] : [],
         createdAt: packet.timestamp,
         isDeleted: false,
       };
@@ -469,15 +443,11 @@ export default function ConversationScreen() {
         const exists = prev.some(m => m.id === incoming.id);
         if (exists) return prev;
 
-        // replace optimistic message (self)
         if (packet.senderId === user?.id) {
-          const hasOptimistic = prev.some(m =>
-            m.id.startsWith('temp-')
-          );
+          const hasOptimistic = prev.some(m => m.id.startsWith('temp-'));
           if (hasOptimistic) {
             const replaced = prev.map(m =>
-              m.id.startsWith('temp-') &&
-                m.content === incoming.content
+              m.id.startsWith('temp-') && m.content === incoming.content
                 ? incoming
                 : m
             );
@@ -488,12 +458,6 @@ export default function ConversationScreen() {
         return sortAsc([...prev, incoming]);
       });
 
-      // direct: khi đang pending, server trả về conversationId thì chuyển sang thread thật
-      if (isNewConversation && packet.conversationId) {
-        transitionToConversation(packet.conversationId);
-      }
-
-      // auto gửi read-receipt khi đang mở thread tương ứng & msg từ người khác
       if (
         !isNewConversation &&
         packet.conversationId === actualConversationId &&
@@ -504,18 +468,8 @@ export default function ConversationScreen() {
       }
     };
 
-    // READ RECEIPT packet (đã hỗ trợ group)
-    const onRr = (
-      messageId: string,
-      readerId: string,
-      convId?: string
-    ) => {
-      // Nếu server gửi kèm conversationId thì chỉ nhận khi trùng
-      if (
-        actualConversationId &&
-        convId &&
-        convId !== actualConversationId
-      ) {
+    const onRr = (messageId: string, readerId: string, convId?: string) => {
+      if (actualConversationId && convId && convId !== actualConversationId) {
         return;
       }
 
@@ -530,29 +484,18 @@ export default function ConversationScreen() {
       );
     };
 
-    // TYPING packet (đã hỗ trợ group)
-    const onTp = (
-      isTypingFlag: boolean,
-      uid: string,
-      convId?: string
-    ) => {
-      // Bắt buộc cùng conversation
-      if (
-        actualConversationId &&
-        convId &&
-        convId !== actualConversationId
-      ) {
+    const onTp = (isTypingFlag: boolean, uid: string, convId?: string) => {
+      if (!uid || uid === user?.id) return;
+
+      if (actualConversationId && convId && convId !== actualConversationId) {
         return;
       }
 
-      // Không show khi chính mình gõ
-      if (!uid || uid === user?.id) return;
-
-      // Direct: fallback theo peer nếu convId không có
-      if (!isGroupConversation) {
-        const peer =
-          otherUser?.id || peerUserId || routeConversationId;
-        if (!peer || uid !== peer) return;
+      if (!isGroupConversation && !convId) {
+        const peer = otherUser?.id || peerUserId || routeConversationId;
+        if (!peer || uid !== peer) {
+          return;
+        }
       }
 
       setTypingUsers(prev =>
@@ -564,9 +507,15 @@ export default function ConversationScreen() {
       );
     };
 
-    onMessage(onMsg);
-    onReadReceipt(onRr as any);
-    onTyping(onTp as any);
+    const offMessage = onMessage(onMsg);
+    const offReadReceipt = onReadReceipt(onRr as any);
+    const offTyping = onTyping(onTp as any);
+
+    return () => {
+      offMessage();
+      offReadReceipt();
+      offTyping();
+    };
   }, [
     actualConversationId,
     isNewConversation,
@@ -582,6 +531,40 @@ export default function ConversationScreen() {
     transitionToConversation,
     user?.id,
   ]);
+
+
+  useEffect(() => {
+    if (!conversationDetails) return;
+
+    if (
+      conversationDetails.type === 'DIRECT' &&
+      conversationDetails.participants?.length
+    ) {
+      const other =
+        conversationDetails.participants.find(
+          p => p.userId !== user?.id
+        ) || conversationDetails.participants[0];
+      if (other) {
+        setPeerUserId(other.userId);
+        setOtherUser(prev =>
+          prev?.id === other.userId
+            ? prev
+            : {
+              id: other.userId,
+              username: other.username,
+              email: '',
+              profile: { avatar: other.avatar },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              isVerified: other.isVerified,
+            }
+        );
+      }
+    } else {
+      setPeerUserId(null);
+      setOtherUser(null);
+    }
+  }, [conversationDetails, user?.id]);
 
   // Initial load
   useEffect(() => {
@@ -599,7 +582,6 @@ export default function ConversationScreen() {
     loadPendingThread,
   ]);
 
-  // Auto send prompt to AI
   useEffect(() => {
     if (!textPrompt) return;
     if (!isAiAssistant) return;
@@ -776,7 +758,6 @@ export default function ConversationScreen() {
     }
   };
 
-  // Gửi media message (IMAGE/VIDEO)
   const handleSendMedia = async (type: MessageType, localUri: string) => {
     const targetUserId =
       otherUser?.id || peerUserId || routeConversationId;
@@ -872,7 +853,6 @@ export default function ConversationScreen() {
     }
   };
 
-  // Cluster flags
   const CLUSTER_MS = 2 * 60 * 1000;
   const getClusterFlags = useCallback(
     (index: number) => {
@@ -914,6 +894,29 @@ export default function ConversationScreen() {
     },
     [messages]
   );
+
+  const handleHeaderAddMembers = useCallback(() => {
+    if (isGroupConversation) {
+      setPendingMembers({});
+      setAddMembersVisible(true);
+      return;
+    }
+
+    const seedUserId = otherUser?.id || peerUserId || undefined;
+
+    if (seedUserId) {
+      router.push({
+        pathname: '/messages/create-group',
+        params: { seedUserId },
+      });
+    } else {
+      // fallback: mở màn create-group trống
+      router.push({
+        pathname: '/messages/create-group',
+      });
+    }
+  }, [isGroupConversation, otherUser?.id, peerUserId, router]);
+
 
   const renderMessage = ({
     item,
@@ -960,21 +963,11 @@ export default function ConversationScreen() {
           onPressReply={handleScrollToMessage}
           palette={bubblePalette}
         />
-        {hasPeerSeen && (
-          <Text
-            style={[
-              styles.readReceiptLabel,
-              { color: theme.colors.textSecondary },
-            ]}
-          >
-            Đã xem
-          </Text>
-        )}
+        <ReadReceiptLabel visible={hasPeerSeen} />
       </View>
     );
   };
 
-  // Header title / subtitle giống Messenger
   const title = useMemo(() => {
     if (isGroupConversation) {
       if (conversationDetails?.name) {
@@ -1018,52 +1011,22 @@ export default function ConversationScreen() {
     : undefined;
 
   const messageList = (
-    <FlatList
-      ref={flatListRef}
-      data={messages}
-      renderItem={renderMessage}
-      keyExtractor={item => item.id}
-      contentContainerStyle={styles.messagesList}
-      keyboardShouldPersistTaps="handled"
-      onScroll={handleListScroll}
-      scrollEventThrottle={16}
-      inverted={false}
+    <MessageList
+      messages={messages}
+      renderMessage={renderMessage}
       onEndReached={loadMoreMessages}
-      onEndReachedThreshold={0.5}
-      ListHeaderComponent={
-        <>
-          {isLoadingMore && (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primary}
-              />
-              <Text
-                style={[
-                  styles.loadingText,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                Đang tải tin nhắn cũ hơn...
-              </Text>
-            </View>
-          )}
-          {canUseRealtime &&
-            connectionStatus !== 'connected' && (
-              <ConnectionStatus
-                status={connectionStatus}
-                onRetry={() => { }}
-              />
-            )}
-        </>
-      }
-      ListFooterComponent={<View style={styles.listFooter} />}
+      onScroll={handleListScroll}
+      isLoadingMore={isLoadingMore}
+      canUseRealtime={canUseRealtime}
+      connectionStatus={connectionStatus}
+      theme={theme}
+      flatListRef={flatListRef}
     />
   );
 
   if (isLoading) {
     return (
-      <View
+      <SafeAreaView
         style={[
           styles.container,
           { backgroundColor: theme.colors.background },
@@ -1096,265 +1059,183 @@ export default function ConversationScreen() {
             }
           }}
           onOpenInfo={() => setGroupInfoVisible(true)}
-          onAddMembers={
-            isGroupConversation
-              ? () => {
-                setPendingMembers({});
-                setAddMembersVisible(true);
-              }
-              : undefined
-          }
+          onAddMembers={handleHeaderAddMembers}
         />
         <LoadingSpinner />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <SafeAreaView
       style={[
         styles.container,
         { backgroundColor: theme.colors.background },
       ]}
     >
-      <ConversationHeader
-        headerBg={hexToRgba(chatPalette.headerBg, 0.92)}
-        headerTextColor={chatPalette.headerText}
-        title={title}
-        subtitle={subtitle}
-        avatarSrc={avatarSrc}
-        isGroupConversation={isGroupConversation}
-        connectionStatus={connectionStatus}
-        onBack={() => router.back()}
-        onOpenSettings={() => {
-          const isGroup = conversationDetails?.type === 'GROUP';
-          if (isGroup) {
-            router.push({
-              pathname: '/messages/conversation-settings',
-              params: {
-                conversationId:
-                  actualConversationId || routeConversationId || '',
-              },
-            });
-          } else {
-            router.push({
-              pathname: '/messages/conversation-settings',
-              params: { userId: otherUser?.id || peerUserId || '' },
-            });
-          }
-        }}
-        onOpenInfo={() => setGroupInfoVisible(true)}
-        onAddMembers={
-          isGroupConversation
-            ? () => {
-              setPendingMembers({});
-              setAddMembersVisible(true);
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ConversationHeader
+          headerBg={hexToRgba(chatPalette.headerBg, 0.92)}
+          headerTextColor={chatPalette.headerText}
+          title={title}
+          subtitle={subtitle}
+          avatarSrc={avatarSrc}
+          isGroupConversation={isGroupConversation}
+          connectionStatus={connectionStatus}
+          onBack={() => router.back()}
+          onOpenSettings={() => {
+            const isGroup = conversationDetails?.type === 'GROUP';
+            if (isGroup) {
+              router.push({
+                pathname: '/messages/conversation-settings',
+                params: {
+                  conversationId:
+                    actualConversationId || routeConversationId || '',
+                },
+              });
+            } else {
+              router.push({
+                pathname: '/messages/conversation-settings',
+                params: { userId: otherUser?.id || peerUserId || '' },
+              });
             }
-            : undefined
-        }
-      />
+          }}
+          onOpenInfo={() => setGroupInfoVisible(true)}
+          onAddMembers={handleHeaderAddMembers}
+        />
 
-      <ConversationMeta
-        wantsPendingRoute={wantsPendingRoute}
-        messages={messages}
-        otherUser={otherUser}
-        isGroupConversation={isGroupConversation}
-        theme={theme}
-        conversationDetails={conversationDetails}
-        onOpenSettings={() => {
-          if (isGroupConversation && actualConversationId) {
-            router.push({
-              pathname: '/messages/conversation-settings',
-              params: { conversationId: actualConversationId },
-            });
-          }
-        }}
-      />
+        <ConversationMeta
+          wantsPendingRoute={wantsPendingRoute}
+          messages={messages}
+          otherUser={otherUser}
+          isGroupConversation={isGroupConversation}
+          theme={theme}
+          conversationDetails={conversationDetails}
+          onOpenSettings={() => {
+            if (isGroupConversation && actualConversationId) {
+              router.push({
+                pathname: '/messages/conversation-settings',
+                params: { conversationId: actualConversationId },
+              });
+            }
+          }}
+        />
 
-      <View style={styles.messagesWrapper}>
-        {conversationDetails?.wallpaperUrl ? (
-          <ImageBackground
-            source={{ uri: conversationDetails.wallpaperUrl }}
-            style={styles.wallpaperBackground}
-            blurRadius={0}
+        <View style={styles.messagesWrapper}>
+          <WallpaperWrapper
+            wallpaperUrl={conversationDetails?.wallpaperUrl}
+            overlayColor={wallpaperOverlay}
           >
-            <View
-              style={[
-                styles.wallpaperOverlay,
-                { backgroundColor: wallpaperOverlay },
-              ]}
-            />
             {messageList}
-          </ImageBackground>
-        ) : (
-          messageList
-        )}
+          </WallpaperWrapper>
 
-        {showScrollToBottom && (
-          <TouchableOpacity
-            style={[
-              styles.scrollFab,
-              { backgroundColor: chatPalette.fabBg },
-            ]}
+          <ScrollToBottomButton
+            visible={showScrollToBottom}
             onPress={scrollToBottom}
-          >
-            <Ionicons
-              name="chevron-down"
-              size={22}
-              color={theme.colors.text}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {typingDisplayNames.length > 0 && (
-        <View style={styles.typingDock}>
-          <TypingIndicator
-            isVisible
-            multipleUsers={typingDisplayNames}
+            backgroundColor={chatPalette.fabBg}
+            iconColor={theme.colors.text}
           />
         </View>
-      )}
 
-      <MessageInput
-        onSend={handleSendMessage}
-        onSendToAI={sendToAI}
-        onSendMedia={handleSendMedia}
-        onTyping={
-          typingChannelId ? () => sendTyping(typingChannelId) : undefined
-        }
-        onStopTyping={
-          typingChannelId
-            ? () => sendStopTyping(typingChannelId)
-            : undefined
-        }
-        placeholder="Nhắn tin..."
-        themeColor={chatPalette.bubbleOut}
-      />
+        <TypingDock typingDisplayNames={typingDisplayNames} />
 
-      <GroupInfoSheet
-        visible={isGroupInfoVisible}
-        conversation={conversationDetails || undefined}
-        currentUserId={user?.id || ''}
-        onClose={() => setGroupInfoVisible(false)}
-        onAddMembers={() => {
-          setPendingMembers({});
-          setAddMembersVisible(true);
-          setGroupInfoVisible(false);
-        }}
-        onLeaveGroup={async () => {
-          if (!actualConversationId || !user?.id) return;
-          try {
-            await messageAPI.leaveGroup(actualConversationId, user.id);
-            showAlert('Thông báo', 'Bạn đã rời nhóm');
-            router.replace('/messages');
-          } catch (e: any) {
-            showAlert(
-              'Lỗi',
-              e?.response?.data?.message || 'Không thể rời nhóm'
-            );
+        <MessageInput
+          onSend={handleSendMessage}
+          onSendToAI={sendToAI}
+          onSendMedia={handleSendMedia}
+          onTyping={
+            typingChannelId
+              ? () => sendTyping(typingChannelId, true) // true = conversationId
+              : undefined
           }
-        }}
-      />
-
-      <AddMembersModal
-        visible={isAddMembersVisible}
-        theme={theme}
-        currentUserId={user?.id || ''} // quan trọng để MutualUserPicker lọc theo người hiện tại
-        pendingMembers={pendingMembers}
-        setPendingMembers={setPendingMembers}
-        existingMemberIds={existingMemberIds}
-        isAddingMembers={isAddingMembers}
-        onClose={() => setAddMembersVisible(false)}
-        onConfirm={async userIds => {
-          if (!actualConversationId || !user?.id) return;
-          if (!userIds.length) {
-            showAlert(
-              'Thông báo',
-              'Vui lòng chọn ít nhất một thành viên'
-            );
-            return;
+          onStopTyping={
+            typingChannelId
+              ? () => sendStopTyping(typingChannelId, true) // true = conversationId
+              : undefined
           }
-          try {
-            setIsAddingMembers(true);
-            await messageAPI.addGroupMembers(
-              actualConversationId,
-              user.id,
-              userIds
-            );
-            showAlert('Thành công', 'Đã thêm thành viên mới');
-            setAddMembersVisible(false);
+          placeholder="Nhắn tin..."
+          themeColor={chatPalette.bubbleOut}
+        />
+
+        <GroupInfoSheet
+          visible={isGroupInfoVisible}
+          conversation={conversationDetails || undefined}
+          currentUserId={user?.id || ''}
+          onClose={() => setGroupInfoVisible(false)}
+          onAddMembers={() => {
             setPendingMembers({});
-            await loadExistingThread(actualConversationId);
-          } catch (e: any) {
-            showAlert(
-              'Lỗi',
-              e?.response?.data?.message ||
-              'Không thể thêm thành viên'
-            );
-          } finally {
-            setIsAddingMembers(false);
-          }
-        }}
-      />
-    </KeyboardAvoidingView>
+            setAddMembersVisible(true);
+            setGroupInfoVisible(false);
+          }}
+          onLeaveGroup={async () => {
+            if (!actualConversationId || !user?.id) return;
+            try {
+              await messageAPI.leaveGroup(actualConversationId);
+              showAlert('Thông báo', 'Bạn đã rời nhóm');
+              router.replace('/messages');
+            } catch (e: any) {
+              showAlert(
+                'Lỗi',
+                e?.response?.data?.message || 'Không thể rời nhóm'
+              );
+            }
+          }}
+        />
+
+        <AddMembersModal
+          visible={isAddMembersVisible}
+          theme={theme}
+          currentUserId={user?.id || ''} // quan trọng để MutualUserPicker lọc theo người hiện tại
+          pendingMembers={pendingMembers}
+          setPendingMembers={setPendingMembers}
+          existingMemberIds={existingMemberIds}
+          isAddingMembers={isAddingMembers}
+          onClose={() => setAddMembersVisible(false)}
+          onConfirm={async userIds => {
+            if (!actualConversationId || !user?.id) return;
+            if (!userIds.length) {
+              showAlert(
+                'Thông báo',
+                'Vui lòng chọn ít nhất một thành viên'
+              );
+              return;
+            }
+            try {
+              setIsAddingMembers(true);
+              await messageAPI.addGroupMembers(
+                actualConversationId,
+                userIds
+              );
+              showAlert('Thành công', 'Đã thêm thành viên mới');
+              setAddMembersVisible(false);
+              setPendingMembers({});
+              await loadExistingThread(actualConversationId);
+            } catch (e: any) {
+              showAlert(
+                'Lỗi',
+                e?.response?.data?.message ||
+                'Không thể thêm thành viên'
+              );
+            } finally {
+              setIsAddingMembers(false);
+            }
+          }}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   messagesWrapper: { flex: 1, position: 'relative' },
-  wallpaperBackground: { flex: 1 },
-  wallpaperOverlay: { ...StyleSheet.absoluteFillObject },
-  messagesList: {
-    paddingRight: 6,
-    paddingLeft: 36,
-    paddingTop: 8,
-    paddingBottom: 64,
-  },
-  listFooter: { height: 40 },
-  scrollFab: {
-    position: 'absolute',
-    right: '50%',
-    transform: [{ translateX: 22 }],
-    bottom: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.18,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-      },
-      android: { elevation: 6 },
-    }),
-  },
-  typingDock: { paddingHorizontal: 16, paddingVertical: 4 },
-  readReceiptLabel: {
-    fontSize: 11,
-    marginTop: 2,
-    marginRight: 16,
-    textAlign: 'right',
-  },
   systemMessageContainer: {
     alignItems: 'center',
     marginVertical: 6,
     paddingHorizontal: 16,
   },
   systemMessageText: { fontSize: 12, textAlign: 'center' },
-  loadingMore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-  },
 });

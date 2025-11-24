@@ -6,6 +6,7 @@ import com.hoanghuy04.instagrambackend.dto.request.MessageRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.service.messagerequest.MessageRequestService;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,18 +30,18 @@ import java.util.List;
 public class MessageRequestController {
     
     private final MessageRequestService messageRequestService;
-    
+    private final SecurityUtil securityUtil;
+
     /**
      * Get all pending message requests for a user.
      *
-     * @param userId the user ID to get requests for
      * @return List of pending message requests
      */
     @GetMapping
     @Operation(summary = "Get pending message requests")
-    public ResponseEntity<ApiResponse<List<MessageRequest>>> getPendingRequests(
-            @RequestParam String userId) {
-        
+    public ResponseEntity<ApiResponse<List<MessageRequest>>> getPendingRequests() {
+
+        String userId = securityUtil.getCurrentUserId();
         log.info("Get pending message requests for user {}", userId);
         List<MessageRequest> requests = messageRequestService.getPendingRequests(userId);
         return ResponseEntity.ok(
@@ -51,14 +52,13 @@ public class MessageRequestController {
     /**
      * Get count of pending message requests for a user.
      *
-     * @param userId the user ID to count requests for
      * @return Count of pending requests
      */
     @GetMapping("/count")
     @Operation(summary = "Get pending message requests count")
-    public ResponseEntity<ApiResponse<Integer>> getPendingRequestsCount(
-            @RequestParam String userId) {
-        
+    public ResponseEntity<ApiResponse<Integer>> getPendingRequestsCount() {
+
+        String userId = securityUtil.getCurrentUserId();
         log.info("Get pending message requests count for user {}", userId);
         int count = messageRequestService.getPendingRequestsCount(userId);
         return ResponseEntity.ok(
@@ -70,17 +70,16 @@ public class MessageRequestController {
      * Get pending inbox items (received requests only) for a user.
      * Used for the "Pending Messages" tab - shows requests that others sent to the user.
      *
-     * @param userId the user ID (receiver)
      * @param pageable pagination information
      * @return PageResponse of InboxItemDTO
      */
     @GetMapping("/inbox")
     @Operation(summary = "Get pending inbox items (received requests only)")
     public ResponseEntity<ApiResponse<PageResponse<InboxItemResponse>>> getPendingInboxItems(
-            @RequestParam String userId,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        
-        log.info("Get pending inbox items for user {} (page: {}, size: {})", 
+
+        String userId = securityUtil.getCurrentUserId();
+        log.info("Get pending inbox items for user {} (page: {}, size: {})",
             userId, pageable.getPageNumber(), pageable.getPageSize());
         
         PageResponse<InboxItemResponse> pageResponse = messageRequestService.getPendingInboxItems(userId, pageable);
@@ -93,16 +92,15 @@ public class MessageRequestController {
      * Get all pending messages for a message request between sender and receiver.
      * This is used when the sender wants to view their sent messages that haven't been accepted yet.
      *
-     * @param senderId the sender user ID
      * @param receiverId the receiver user ID
      * @return List of pending messages
      */
     @GetMapping("/pending-messages")
     @Operation(summary = "Get pending messages for a message request")
     public ResponseEntity<ApiResponse<List<MessageResponse>>> getPendingMessages(
-            @RequestParam String senderId,
             @RequestParam String receiverId) {
-        
+
+        String senderId = securityUtil.getCurrentUserId();
         log.info("Get pending messages from {} to {}", senderId, receiverId);
         List<MessageResponse> messages = messageRequestService.getPendingMessages(senderId, receiverId);
         return ResponseEntity.ok(
@@ -116,15 +114,14 @@ public class MessageRequestController {
      * This is more stable than passing senderId/receiverId separately.
      *
      * @param requestId the message request ID
-     * @param userId the user ID viewing the messages (for context and authorization)
      * @return List of pending messages
      */
     @GetMapping("/{requestId}/pending-messages")
     @Operation(summary = "Get pending messages for a message request by request ID")
     public ResponseEntity<ApiResponse<List<MessageResponse>>> getPendingMessagesByRequestId(
-            @PathVariable String requestId,
-            @RequestParam String userId) {
-        
+            @PathVariable String requestId) {
+
+        String userId = securityUtil.getCurrentUserId();
         log.info("Get pending messages for request {} by user {}", requestId, userId);
         List<MessageResponse> messages = messageRequestService.getPendingMessagesByRequestId(requestId, userId);
         return ResponseEntity.ok(

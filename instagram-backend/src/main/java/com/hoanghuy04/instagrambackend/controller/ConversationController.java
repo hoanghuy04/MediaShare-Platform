@@ -18,6 +18,7 @@ import com.hoanghuy04.instagrambackend.service.conversation.ConversationMessageS
 import com.hoanghuy04.instagrambackend.service.conversation.ConversationService;
 import com.hoanghuy04.instagrambackend.service.websocket.*;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,14 +52,14 @@ public class ConversationController {
     private final WebSocketMessageService webSocketMessageService;
     private final MessageMapper messageMapper;
     private final UserService userService;
-
     private final ConversationRepository conversationRepository;
+    private final SecurityUtil securityUtil;
 
     @GetMapping("/inbox")
     @Operation(summary = "Get inbox items (conversations + sent message requests)")
     public ResponseEntity<ApiResponse<PageResponse<InboxItemResponse>>> getInbox(
-            @RequestParam String userId,
             @PageableDefault(sort = "updatedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Get inbox items request received for user: {} (page: {}, size: {})",
                 userId, pageable.getPageNumber(), pageable.getPageSize());
 
@@ -69,8 +70,8 @@ public class ConversationController {
     @GetMapping("/{conversationId}")
     @Operation(summary = "Get conversation details")
     public ResponseEntity<ApiResponse<ConversationResponse>> getConversation(
-            @PathVariable String conversationId,
-            @RequestParam String userId) {
+            @PathVariable String conversationId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Get conversation request received for conversation: {} by user: {}", conversationId, userId);
 
         ConversationResponse response = conversationMessageService.getConversationAsDTO(conversationId, userId);
@@ -81,8 +82,8 @@ public class ConversationController {
     @Operation(summary = "Get messages in a conversation")
     public ResponseEntity<ApiResponse<PageResponse<MessageResponse>>> getConversationMessages(
             @PathVariable String conversationId,
-            @RequestParam String userId,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Get messages request received for conversation: {} by user: {}", conversationId, userId);
 
         PageResponse<MessageResponse> response = conversationMessageService.getConversationMessagesAsDTO(
@@ -94,8 +95,8 @@ public class ConversationController {
     @GetMapping("/direct/by-user/{peerId}")
     @Operation(summary = "Resolve DIRECT conversation by peer; 200 nếu có, 404 nếu chưa")
     public ResponseEntity<ApiResponse<String>> resolveDirect(
-            @PathVariable String peerId,
-            @RequestParam String userId) {     // X-User-ID interceptor vẫn gắn, nhưng mình cho phép query param rõ ràng
+            @PathVariable String peerId) {
+        String userId = securityUtil.getCurrentUserId();
         String key = conversationService.directKeyOf(userId, peerId);
         Conversation found = conversationRepository.findByTypeAndDirectKey(ConversationType.DIRECT, key).orElse(null);
         return ResponseEntity.ok(ApiResponse.success(found != null ? found.getId() : null));
@@ -104,8 +105,8 @@ public class ConversationController {
     @PostMapping("/group")
     @Operation(summary = "Create a new group conversation")
     public ResponseEntity<ApiResponse<ConversationResponse>> createGroup(
-            @Valid @RequestBody CreateGroupRequest request,
-            @RequestParam String creatorId) {
+            @Valid @RequestBody CreateGroupRequest request) {
+        String creatorId = securityUtil.getCurrentUserId();
         log.info("Create group request received by user: {}, name: {}", creatorId, request.getGroupName());
 
         ConversationResponse response = conversationMessageService.createGroupAndConvertToDTO(
@@ -121,8 +122,8 @@ public class ConversationController {
     @Operation(summary = "Update group conversation information")
     public ResponseEntity<ApiResponse<ConversationResponse>> updateGroupSimple(
             @PathVariable String conversationId,
-            @Valid @RequestBody UpdateConversationRequest request,
-            @RequestParam String userId) {
+            @Valid @RequestBody UpdateConversationRequest request) {
+        String userId = securityUtil.getCurrentUserId();
 
         // dùng service mới
         conversationService.updateGroupInfo(
@@ -141,8 +142,8 @@ public class ConversationController {
     @Operation(summary = "Add members to a group conversation")
     public ResponseEntity<ApiResponse<Void>> addMembers(
             @PathVariable String conversationId,
-            @Valid @RequestBody AddMemberRequest request,
-            @RequestParam String addedBy) {
+            @Valid @RequestBody AddMemberRequest request) {
+        String addedBy = securityUtil.getCurrentUserId();
         log.info("Add members request received for conversation: {} by user: {}", conversationId, addedBy);
 
         for (String userId : request.getUserIds()) {
@@ -156,8 +157,9 @@ public class ConversationController {
     public ResponseEntity<ApiResponse<Void>> removeMember(
             @PathVariable String conversationId,
             @PathVariable String userId) {
-        log.info("Remove member request received for conversation: {}, member: {}",
-                conversationId, userId);
+        String removedBy = securityUtil.getCurrentUserId();
+        log.info("Remove member request received for conversation: {}, member: {}, removed by: {}",
+                conversationId, userId, removedBy);
 
         conversationService.removeMember(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Member removed successfully", null));
@@ -166,8 +168,8 @@ public class ConversationController {
     @PostMapping("/{conversationId}/leave")
     @Operation(summary = "Leave a group conversation")
     public ResponseEntity<ApiResponse<Void>> leaveGroup(
-            @PathVariable String conversationId,
-            @RequestParam String userId) {
+            @PathVariable String conversationId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Leave group request received for conversation: {} by user: {}", conversationId, userId);
 
         conversationService.leaveGroup(conversationId, userId);
@@ -179,7 +181,8 @@ public class ConversationController {
     public ResponseEntity<ApiResponse<Void>> promoteMemberToAdmin(
             @PathVariable String conversationId,
             @PathVariable String userId) {
-        log.info("Promote member {} to admin in conversation {} by user {}", userId, conversationId);
+        String promotedBy = securityUtil.getCurrentUserId();
+        log.info("Promote member {} to admin in conversation {} by user {}", userId, conversationId, promotedBy);
 
         conversationService.promoteMemberToAdmin(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Member promoted to admin successfully", null));
@@ -190,7 +193,8 @@ public class ConversationController {
     public ResponseEntity<ApiResponse<Void>> demoteAdminToMember(
             @PathVariable String conversationId,
             @PathVariable String userId) {
-        log.info("Demote admin {} to member in conversation {} by user {}", userId, conversationId);
+        String demotedBy = securityUtil.getCurrentUserId();
+        log.info("Demote admin {} to member in conversation {} by user {}", userId, conversationId, demotedBy);
 
         conversationService.demoteAdminToMember(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Admin demoted to member successfully", null));
@@ -199,8 +203,8 @@ public class ConversationController {
     @PostMapping("/direct/messages")
     @Operation(summary = "Send a direct message to a user (auto-creates conversation)")
     public ResponseEntity<ApiResponse<MessageResponse>> sendDirectMessage(
-            @Valid @RequestBody SendMessageRequest request,
-            @RequestParam String senderId) {
+            @Valid @RequestBody SendMessageRequest request) {
+        String senderId = securityUtil.getCurrentUserId();
         log.info("Send direct message from user {} to user {}", senderId, request.getReceiverId());
 
         if (request.getReceiverId() == null || request.getReceiverId().isBlank()) {
@@ -222,8 +226,8 @@ public class ConversationController {
     @Operation(summary = "Send a message to a conversation")
     public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
             @PathVariable String conversationId,
-            @Valid @RequestBody SendMessageRequest request,
-            @RequestParam String senderId) {
+            @Valid @RequestBody SendMessageRequest request) {
+        String senderId = securityUtil.getCurrentUserId();
         log.info("Send message to conversation {} by user {}", conversationId, senderId);
 
         MessageResponse message;
@@ -245,7 +249,6 @@ public class ConversationController {
 
         webSocketMessageService.pushMessage(message);
 
-//        MessageResponse dto = messageMapper.toMessageDTO(message);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Message sent successfully", message));
     }
@@ -253,19 +256,16 @@ public class ConversationController {
     @PostMapping("/messages/{messageId}/read")
     @Operation(summary = "Mark message as read (marks all in conversation)")
     public ResponseEntity<ApiResponse<Void>> markMessageAsRead(
-            @PathVariable String messageId,
-            @RequestParam String userId) {
-        log.info("Mark message {} as read by user {}", messageId, userId);
-
-        conversationMessageService.markAsRead(messageId, userId);
+            @PathVariable String messageId) {
+        conversationMessageService.markAsRead(messageId);
         return ResponseEntity.ok(ApiResponse.success("Message marked as read", null));
     }
 
     @DeleteMapping("/messages/{messageId}")
     @Operation(summary = "Delete a message for user (soft delete)")
     public ResponseEntity<ApiResponse<Void>> deleteMessage(
-            @PathVariable String messageId,
-            @RequestParam String userId) {
+            @PathVariable String messageId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Delete message {} for user {}", messageId, userId);
 
         conversationMessageService.deleteMessageForUser(messageId, userId);
@@ -275,8 +275,8 @@ public class ConversationController {
     @DeleteMapping("/{conversationId}")
     @Operation(summary = "Delete a conversation for a user (soft delete)")
     public ResponseEntity<ApiResponse<Void>> deleteConversation(
-            @PathVariable String conversationId,
-            @RequestParam String userId) {
+            @PathVariable String conversationId) {
+        String userId = securityUtil.getCurrentUserId();
         log.info("Delete conversation request received for conversation: {} by user: {}", conversationId, userId);
 
         conversationMessageService.deleteConversationForUser(conversationId, userId);

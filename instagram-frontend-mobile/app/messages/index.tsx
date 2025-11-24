@@ -7,11 +7,11 @@ import {
   TextInput,
   FlatList,
   StatusBar,
-  SafeAreaView,
   Image,
   ScrollView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
@@ -20,6 +20,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { userAPI } from '../../services/api';
 import { messageAPI } from '../../services/message.service';
+import { messageRequestAPI } from '../../services/message-request.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
 import { UserProfile, Conversation, Message, InboxItem, UserSummary } from '../../types';
@@ -29,7 +30,6 @@ import {
   calculateUnreadCount,
   formatMessageTime,
 } from '../../utils/messageUtils';
-import { messageRequestAPI } from '../../services/api';
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
@@ -67,7 +67,6 @@ export default function MessagesScreen() {
       clearTimeout(refreshTimeoutRef.current);
     }
     refreshTimeoutRef.current = setTimeout(() => {
-      console.log('Debounced refresh triggered');
       refresh();
     }, 300);
   }, [refresh]);
@@ -111,17 +110,48 @@ export default function MessagesScreen() {
   // Set up WebSocket listener for real-time message updates
   useEffect(() => {
     const handleWebSocketMessage = (message: any) => {
-      console.log('Messages screen received WebSocket message:', message);
 
       if (message.type === 'CHAT' && message.conversationId) {
-        // Use debounced refresh to prevent multiple rapid calls
+        // Update last message in inbox immediately for better UX
+        setConversationMessages(prev => {
+          const existing = prev[message.conversationId] || [];
+          const newMessage: Message = {
+            id: message.id || `temp-${Date.now()}`,
+            sender: {
+              id: message.senderId,
+              username: message.senderUsername || '',
+              avatar: message.senderProfileImage,
+              isVerified: false,
+            },
+            conversationId: message.conversationId,
+            content: message.content || '',
+            type: message.contentType || 'TEXT',
+            readBy: message.status === 'READ' ? [currentUser?.id || ''] : [],
+            createdAt: message.timestamp,
+            isDeleted: false,
+          };
+          
+          // Avoid duplicates
+          const isDuplicate = existing.some(m => m.id === newMessage.id);
+          if (isDuplicate) return prev;
+
+          return {
+            ...prev,
+            [message.conversationId]: [...existing, newMessage],
+          };
+        });
+
+        // Use debounced refresh to update conversation list order
         debouncedRefresh();
       }
     };
 
-    const handleTyping = (isTyping: boolean, conversationId: string) => {
-      console.log('Typing indicator:', { isTyping, conversationId });
+    const handleTyping = (isTyping: boolean, userId: string, conversationId?: string) => {
 
+      // Only handle typing if conversationId is provided
+      if (!conversationId) return;
+
+      // Clear existing timeout for this conversation
       if (typingTimeouts.current[conversationId]) {
         clearTimeout(typingTimeouts.current[conversationId]);
         delete typingTimeouts.current[conversationId];
@@ -133,13 +163,14 @@ export default function MessagesScreen() {
           [conversationId]: true,
         }));
 
+        // Auto-clear typing indicator after 3 seconds
         typingTimeouts.current[conversationId] = setTimeout(() => {
           setTypingUsers(prev => ({
             ...prev,
             [conversationId]: false,
           }));
           delete typingTimeouts.current[conversationId];
-        }, 3000);
+        }, 3000) as any;
       } else {
         setTypingUsers(prev => ({
           ...prev,
@@ -148,15 +179,34 @@ export default function MessagesScreen() {
       }
     };
 
-    const handleReadReceipt = (messageId: string, conversationId: string) => {
-      console.log('Read receipt:', { messageId, conversationId });
-      // Use debounced refresh to prevent multiple rapid calls
+    const handleReadReceipt = (messageId: string, readerId: string, conversationId?: string) => {
+      
+      if (!conversationId) return;
+
+      // Update local message state
+      setConversationMessages(prev => {
+        const messages = prev[conversationId] || [];
+        const updated = messages.map(m =>
+          m.id === messageId
+            ? m.readBy?.includes(readerId)
+              ? m
+              : { ...m, readBy: [...(m.readBy || []), readerId] }
+            : m
+        );
+        
+        return {
+          ...prev,
+          [conversationId]: updated,
+        };
+      });
+
+      // Use debounced refresh to update UI
       debouncedRefresh();
     };
 
     onMessage(handleWebSocketMessage);
-    onTyping(handleTyping);
-    onReadReceipt(handleReadReceipt);
+    onTyping(handleTyping as any);
+    onReadReceipt(handleReadReceipt as any);
 
     return () => {
       Object.values(typingTimeouts.current).forEach(timeout => clearTimeout(timeout));
@@ -166,12 +216,11 @@ export default function MessagesScreen() {
         refreshTimeoutRef.current = null;
       }
     };
-  }, [onMessage, onTyping, onReadReceipt, debouncedRefresh]);
+  }, [onMessage, onTyping, onReadReceipt, debouncedRefresh, currentUser?.id]);
 
   // Refresh data when screen comes into focus (debounced)
   useFocusEffect(
     React.useCallback(() => {
-      console.log('Messages screen focused, refreshing...');
       debouncedRefresh();
     }, [debouncedRefresh])
   );
@@ -205,7 +254,6 @@ export default function MessagesScreen() {
 
   const handleLongPress = (conversation: Conversation) => {
     // TODO: Show options (delete, mute, etc.)
-    console.log('Long press on conversation:', conversation.id);
   };
 
   const renderHeader = () => (
@@ -332,7 +380,6 @@ export default function MessagesScreen() {
 
   // Render inbox item (conversation or message request)
   const renderInboxItem = ({ item }: { item: InboxItem }) => {
-    console.log('item', item);
 
     if (!currentUser) return null;
 
@@ -354,7 +401,12 @@ export default function MessagesScreen() {
       const unreadCount = calculateUnreadCount(messages, currentUser.id);
       const isUnread = unreadCount > 0;
 
-      // Display text
+      // Display text - prioritize real-time messages from WebSocket
+      const realtimeMessages = conversationMessages[conversation.id] || [];
+      const latestMessage = realtimeMessages.length > 0 
+        ? realtimeMessages[realtimeMessages.length - 1] 
+        : lastMessage;
+
       let displayText = lastMessage?.content || 'Chưa có tin nhắn';
 
       if (conversationName === "ai-assistant") {

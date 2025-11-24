@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { useConversation } from '../../context/ConversationContext';
 import { messageAPI } from '../../services/message.service';
 import { Avatar } from '../../components/common/Avatar';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -19,6 +20,7 @@ import { showAlert } from '../../utils/helpers';
 import type { Conversation } from '../../types';
 import { AddMembersModal } from '../../components/messages/AddMembersModal';
 import { MutualUserOption } from '../../components/messages/MutualUserPicker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Participant = Conversation['participants'][number] & {
   role?: 'ADMIN' | 'MEMBER';
@@ -33,9 +35,15 @@ export default function GroupMembersScreen() {
     ? params.conversationId[0]
     : params.conversationId;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  // ConversationContext
+  const {
+    conversation,
+    status: conversationStatus,
+    loading: isLoading,
+    refresh: refreshConversation,
+  } = useConversation(conversationId);
   const [menuTarget, setMenuTarget] = useState<Participant | null>(null);
 
   // state cho AddMembersModal
@@ -64,24 +72,6 @@ export default function GroupMembersScreen() {
     [conversation?.participants]
   );
 
-  const load = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const conv = await messageAPI.getConversation(conversationId);
-      setConversation(conv);
-    } catch (e) {
-      console.error(e);
-      showAlert('Lỗi', 'Không thể tải danh sách thành viên');
-      router.back();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [conversationId, router]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
   const openMenu = (p: Participant) => {
     setMenuTarget(p);
     setMenuVisible(true);
@@ -97,7 +87,7 @@ export default function GroupMembersScreen() {
       await messageAPI.removeGroupMember(conversationId, uid);
       showAlert('Thành công', 'Đã xóa người dùng khỏi nhóm');
       closeMenu();
-      load();
+      await refreshConversation();
     } catch (e: any) {
       showAlert(
         'Lỗi',
@@ -112,7 +102,7 @@ export default function GroupMembersScreen() {
       await messageAPI.promoteGroupAdmin(conversationId, uid);
       showAlert('Thành công', 'Đã chỉ định quản trị viên');
       closeMenu();
-      load();
+      await refreshConversation();
     } catch (e: any) {
       showAlert(
         'Lỗi',
@@ -127,7 +117,7 @@ export default function GroupMembersScreen() {
       await messageAPI.demoteGroupAdmin(conversationId, uid);
       showAlert('Thành công', 'Đã gỡ vai trò quản trị viên');
       closeMenu();
-      load();
+      await refreshConversation();
     } catch (e: any) {
       showAlert(
         'Lỗi',
@@ -144,11 +134,11 @@ export default function GroupMembersScreen() {
     }
     try {
       setIsAddingMembers(true);
-      await messageAPI.addGroupMembers(conversationId, currentUser.id, userIds);
+      await messageAPI.addGroupMembers(conversationId, userIds);
       showAlert('Thành công', 'Đã thêm thành viên mới');
       setAddMembersVisible(false);
       setPendingMembers({});
-      await load();
+      await refreshConversation();
     } catch (e: any) {
       showAlert(
         'Lỗi',
@@ -423,7 +413,7 @@ export default function GroupMembersScreen() {
   }
 
   return (
-    <View
+    <SafeAreaView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
     >
       {Header}
@@ -469,7 +459,7 @@ export default function GroupMembersScreen() {
         onClose={() => setAddMembersVisible(false)}
         onConfirm={handleAddMembersConfirm}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
