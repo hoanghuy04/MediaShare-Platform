@@ -406,11 +406,14 @@ export default function ConversationScreen() {
   useEffect(() => {
     // CHAT packet
     const onMsg = (packet: any) => {
-      console.log('📨 WebSocket packet received:', {
+      console.log('📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨 WebSocket packet received:', {
         type: packet.type,
+        messageType: packet.contentType || " ",
         conversationId: packet.conversationId,
         senderId: packet.senderId,
         receiverId: packet.receiverId,
+        content: packet.content,
+        mediaUrl: packet.mediaUrl,
         currentConvId: actualConversationId,
         isGroup: isGroupConversation,
       });
@@ -418,18 +421,15 @@ export default function ConversationScreen() {
       if (packet.type !== 'CHAT') return;
       if (!packet.senderId) return;
 
-      // Ưu tiên lọc theo conversationId (cho cả direct & group)
       const matchesConv =
         !!packet.conversationId &&
         !!actualConversationId &&
         packet.conversationId === actualConversationId;
 
-      // Fallback: check theo peerId (chỉ dùng cho direct chat khi chưa có conversationId)
-      const peerId =
-        otherUser?.id || peerUserId || routeConversationId;
+      const peerId = otherUser?.id || peerUserId || routeConversationId;
       const matchesPeer =
         !matchesConv &&
-        !isGroupConversation && // Chỉ fallback cho direct chat
+        !isGroupConversation &&
         peerId &&
         (packet.senderId === peerId || packet.receiverId === peerId);
 
@@ -448,12 +448,10 @@ export default function ConversationScreen() {
           avatar: packet.senderProfileImage,
           isVerified: false,
         },
-        // Tự động set conversationId nếu backend không gửi kèm
         conversationId: packet.conversationId || actualConversationId || undefined,
         content: packet.content || '',
         type: packet.contentType || MessageType.TEXT,
-        readBy:
-          packet.status === 'READ' ? [user?.id || ''] : [],
+        readBy: packet.status === 'READ' ? [user?.id || ''] : [],
         createdAt: packet.timestamp,
         isDeleted: false,
       };
@@ -462,15 +460,11 @@ export default function ConversationScreen() {
         const exists = prev.some(m => m.id === incoming.id);
         if (exists) return prev;
 
-        // replace optimistic message (self)
         if (packet.senderId === user?.id) {
-          const hasOptimistic = prev.some(m =>
-            m.id.startsWith('temp-')
-          );
+          const hasOptimistic = prev.some(m => m.id.startsWith('temp-'));
           if (hasOptimistic) {
             const replaced = prev.map(m =>
-              m.id.startsWith('temp-') &&
-                m.content === incoming.content
+              m.id.startsWith('temp-') && m.content === incoming.content
                 ? incoming
                 : m
             );
@@ -481,12 +475,6 @@ export default function ConversationScreen() {
         return sortAsc([...prev, incoming]);
       });
 
-      // direct: khi đang pending, server trả về conversationId thì chuyển sang thread thật
-      if (isNewConversation && packet.conversationId) {
-        transitionToConversation(packet.conversationId);
-      }
-
-      // auto gửi read-receipt khi đang mở thread tương ứng & msg từ người khác
       if (
         !isNewConversation &&
         packet.conversationId === actualConversationId &&
@@ -497,12 +485,7 @@ export default function ConversationScreen() {
       }
     };
 
-    // READ RECEIPT packet (đã hỗ trợ group)
-    const onRr = (
-      messageId: string,
-      readerId: string,
-      convId?: string
-    ) => {
+    const onRr = (messageId: string, readerId: string, convId?: string) => {
       console.log('👁️ Read receipt received:', {
         messageId,
         readerId,
@@ -510,12 +493,7 @@ export default function ConversationScreen() {
         currentConvId: actualConversationId,
       });
 
-      // Nếu server gửi kèm conversationId thì chỉ nhận khi trùng
-      if (
-        actualConversationId &&
-        convId &&
-        convId !== actualConversationId
-      ) {
+      if (actualConversationId && convId && convId !== actualConversationId) {
         console.log('❌ Read receipt không match conversation, bỏ qua');
         return;
       }
@@ -531,12 +509,7 @@ export default function ConversationScreen() {
       );
     };
 
-    // TYPING packet (đã hỗ trợ group)
-    const onTp = (
-      isTypingFlag: boolean,
-      uid: string,
-      convId?: string
-    ) => {
+    const onTp = (isTypingFlag: boolean, uid: string, convId?: string) => {
       console.log('⌨️ Typing indicator received:', {
         isTyping: isTypingFlag,
         userId: uid,
@@ -545,23 +518,15 @@ export default function ConversationScreen() {
         isGroup: isGroupConversation,
       });
 
-      // Không show khi chính mình gõ
       if (!uid || uid === user?.id) return;
 
-      // Bắt buộc cùng conversation
-      if (
-        actualConversationId &&
-        convId &&
-        convId !== actualConversationId
-      ) {
+      if (actualConversationId && convId && convId !== actualConversationId) {
         console.log('❌ Typing indicator không match conversation, bỏ qua');
         return;
       }
 
-      // Direct: fallback theo peer nếu convId không có
       if (!isGroupConversation && !convId) {
-        const peer =
-          otherUser?.id || peerUserId || routeConversationId;
+        const peer = otherUser?.id || peerUserId || routeConversationId;
         if (!peer || uid !== peer) {
           console.log('❌ Typing indicator không match peer, bỏ qua');
           return;
@@ -579,9 +544,17 @@ export default function ConversationScreen() {
       );
     };
 
-    onMessage(onMsg);
-    onReadReceipt(onRr as any);
-    onTyping(onTp as any);
+    // 💡 LƯU unsubscribe
+    const offMessage = onMessage(onMsg);
+    const offReadReceipt = onReadReceipt(onRr as any);
+    const offTyping = onTyping(onTp as any);
+
+    // 🧹 Cleanup: HỦY lắng nghe khi unmount hoặc deps thay đổi
+    return () => {
+      offMessage();
+      offReadReceipt();
+      offTyping();
+    };
   }, [
     actualConversationId,
     isNewConversation,
@@ -597,6 +570,7 @@ export default function ConversationScreen() {
     transitionToConversation,
     user?.id,
   ]);
+
 
   // Sync otherUser và peerUserId từ conversationDetails
   useEffect(() => {
@@ -964,6 +938,31 @@ export default function ConversationScreen() {
     [messages]
   );
 
+  const handleHeaderAddMembers = useCallback(() => {
+    // Nếu là GROUP → mở modal thêm thành viên (giữ behavior cũ)
+    if (isGroupConversation) {
+      setPendingMembers({});
+      setAddMembersVisible(true);
+      return;
+    }
+
+    // Nếu là DIRECT → chuyển sang màn create-group, seed user hiện tại
+    const seedUserId = otherUser?.id || peerUserId || undefined;
+
+    if (seedUserId) {
+      router.push({
+        pathname: '/messages/create-group',
+        params: { seedUserId },
+      });
+    } else {
+      // fallback: mở màn create-group trống
+      router.push({
+        pathname: '/messages/create-group',
+      });
+    }
+  }, [isGroupConversation, otherUser?.id, peerUserId, router]);
+
+
   const renderMessage = ({
     item,
     index,
@@ -1148,14 +1147,15 @@ export default function ConversationScreen() {
             }
           }}
           onOpenInfo={() => setGroupInfoVisible(true)}
-          onAddMembers={
-            isGroupConversation
-              ? () => {
-                setPendingMembers({});
-                setAddMembersVisible(true);
-              }
-              : undefined
-          }
+          onAddMembers={handleHeaderAddMembers}
+        // onAddMembers={
+        //   isGroupConversation
+        //     ? () => {
+        //       setPendingMembers({});
+        //       setAddMembersVisible(true);
+        //     }
+        //     : undefined
+        // }
         />
         <LoadingSpinner />
       </SafeAreaView>
@@ -1170,8 +1170,8 @@ export default function ConversationScreen() {
       ]}
     >
       <KeyboardAvoidingView
-         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1 }}  
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
       >
         <ConversationHeader
           headerBg={hexToRgba(chatPalette.headerBg, 0.92)}
@@ -1200,14 +1200,15 @@ export default function ConversationScreen() {
             }
           }}
           onOpenInfo={() => setGroupInfoVisible(true)}
-          onAddMembers={
-            isGroupConversation
-              ? () => {
-                setPendingMembers({});
-                setAddMembersVisible(true);
-              }
-              : undefined
-          }
+          onAddMembers={handleHeaderAddMembers}
+        // onAddMembers={
+        //   isGroupConversation
+        //     ? () => {
+        //       setPendingMembers({});
+        //       setAddMembersVisible(true);
+        //     }
+        //     : undefined
+        // }
         />
 
         <ConversationMeta
