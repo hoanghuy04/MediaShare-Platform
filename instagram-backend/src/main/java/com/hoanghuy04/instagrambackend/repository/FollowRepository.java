@@ -11,13 +11,13 @@ import java.util.Optional;
 /**
  * Repository interface for Follow entity operations.
  * Provides CRUD operations and custom queries for follow relationship management.
- * 
+ *
  * @author Instagram Backend Team
  * @version 1.0.0
  */
 @Repository
 public interface FollowRepository extends MongoRepository<Follow, String> {
-    
+
     /**
      * Find a follow relationship between two users.
      *
@@ -26,7 +26,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return Optional containing the follow relationship if found
      */
     Optional<Follow> findByFollowerAndFollowing(User follower, User following);
-    
+
     /**
      * Find a follow relationship by follower ID and following ID.
      *
@@ -35,7 +35,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return Optional containing the follow relationship if found
      */
     Optional<Follow> findByFollowerIdAndFollowingId(String followerId, String followingId);
-    
+
     /**
      * Find all followers of a user.
      *
@@ -43,7 +43,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return List of follow relationships representing followers
      */
     List<Follow> findByFollowing(User following);
-    
+
     /**
      * Find all users that a user is following.
      *
@@ -51,7 +51,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return List of follow relationships representing following
      */
     List<Follow> findByFollower(User follower);
-    
+
     /**
      * Check if a user is following another user.
      *
@@ -60,7 +60,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return true if the follow relationship exists, false otherwise
      */
     boolean existsByFollowerAndFollowing(User follower, User following);
-    
+
     /**
      * Count followers of a user.
      *
@@ -68,7 +68,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return number of followers
      */
     long countByFollowing(User following);
-    
+
     /**
      * Count users that a user is following.
      *
@@ -76,7 +76,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @return number of users being followed
      */
     long countByFollower(User follower);
-    
+
     /**
      * Delete a follow relationship.
      *
@@ -84,7 +84,7 @@ public interface FollowRepository extends MongoRepository<Follow, String> {
      * @param following the user being followed
      */
     void deleteByFollowerAndFollowing(User follower, User following);
-    
+
     /**
      * Check if a follow relationship exists by follower ID and following ID.
      *

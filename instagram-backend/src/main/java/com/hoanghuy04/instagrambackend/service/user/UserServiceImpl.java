@@ -111,7 +111,6 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Update profile
         UserProfile profile = user.getProfile();
         if (profile == null) {
             profile = new UserProfile();
@@ -131,6 +130,9 @@ public class UserServiceImpl implements UserService {
         }
         if (request.getLocation() != null) {
             profile.setLocation(request.getLocation());
+        }
+        if (request.getAvatar() != null) {
+            profile.setAvatar(request.getAvatar());
         }
 
         user.setProfile(profile);
@@ -284,13 +286,6 @@ public class UserServiceImpl implements UserService {
     public User getUserEntityById(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public User getUserByName(String userName) {
-        return userRepository.findByUsername(userName)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with name: " + userName));
     }
 
     @Override

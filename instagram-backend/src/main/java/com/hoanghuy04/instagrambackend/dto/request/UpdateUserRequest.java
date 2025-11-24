@@ -30,6 +30,8 @@ public class UpdateUserRequest {
     
     @Size(max = 100, message = "Location must not exceed 100 characters")
     private String location;
+
+    private String avatar;
     
     private boolean isPrivate;
 }

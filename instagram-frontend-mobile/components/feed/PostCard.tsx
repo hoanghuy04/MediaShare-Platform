@@ -8,6 +8,7 @@ import {
   Dimensions,
   ScrollView,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -20,9 +21,10 @@ import { isVideoFormatSupported } from '@utils/videoUtils';
 import apiConfig from '@config/apiConfig';
 import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
 import { PostLikesModal } from './PostLikesModal';
+import { PostCommentsModal } from './PostCommentsModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
@@ -58,15 +60,45 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [videoStatus, setVideoStatus] = useState<any>({});
   const [videoError, setVideoError] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isLiked, setIsLiked] = useState(post.likedByCurrentUser);
+  const [totalLike, setTotalLike] = useState(post.totalLike);
+  const [isProcessingLike, setIsProcessingLike] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const videoRef = useRef<Video>(null);
   const likeButtonScale = useSharedValue(1);
 
-  // Animated values for zoom
-  const scale = useSharedValue(1);
-  const baseScale = useSharedValue(1);
+  // Sync state when post changes (from API refresh)
+  useEffect(() => {
+    console.log('[PostCard] Syncing state from props:', {
+      postId: post.id,
+      likedByCurrentUser: post.likedByCurrentUser,
+      totalLike: post.totalLike,
+      currentIsLiked: isLiked,
+      currentTotalLike: totalLike,
+    });
+    setIsLiked(post.likedByCurrentUser);
+    setTotalLike(post.totalLike);
+  }, [post.id, post.likedByCurrentUser, post.totalLike]);
+
+  // Create separate scale values for each media item
+  const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({}); 
+  const baseScaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({});
   const uiOpacity = useSharedValue(1);
+
+  // Get or create scale values for a specific media index
+  const getScaleForIndex = (index: number) => {
+    if (!scaleValues.current[index]) {
+      scaleValues.current[index] = useSharedValue(1);
+      baseScaleValues.current[index] = useSharedValue(1);
+    }
+    return {
+      scale: scaleValues.current[index],
+      baseScale: baseScaleValues.current[index],
+    };
+  };
 
   useEffect(() => {
     if (post.totalLike > 0) {
@@ -89,6 +121,16 @@ export const PostCard: React.FC<PostCardProps> = ({
     router.push(`/users/${post.author.id}`);
   };
 
+  const handleMediaPress = async () => {
+    if (disableNavigation) return;
+    setIsNavigating(true);
+    await new Promise(resolve => setTimeout(resolve, 100)); 
+    router.push({
+      pathname: '/profile/posts',
+      params: { userId: post.author.id, postId: post.id },
+    });
+  };
+
   const handleMediaScroll = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / SCREEN_WIDTH);
@@ -106,50 +148,61 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleLike = async () => {
-    if (post.likedByCurrentUser) {
-      // Unlike - broken heart animation
+    if (isProcessingLike) return;
+    setIsProcessingLike(true);
+
+    const prevLiked = isLiked;
+    const prevTotal = totalLike;
+
+    // Optimistic update
+    const nextLiked = !prevLiked;
+    const nextTotal = Math.max(0, nextLiked ? prevTotal + 1 : prevTotal - 1);
+
+    setIsLiked(nextLiked);
+    setTotalLike(nextTotal);
+
+    // Animation
+    if (nextLiked) {
+      likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
+        likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
+      });
+    } else {
       likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
         likeButtonScale.value = withSpring(0.8, { damping: 8, stiffness: 600 }, () => {
           likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
         });
       });
-    } else {
-      // Like - bounce animation (faster)
-      likeButtonScale.value = withSpring(1.4, { damping: 8, stiffness: 600 }, () => {
-        likeButtonScale.value = withSpring(1, { damping: 8, stiffness: 400 });
-      });
     }
-    await onLike?.(post.id);
+
+    try {
+      const response = await postLikeService.toggleLikePost(post.id);
+      console.log('[PostCard] Toggle like response:', {
+        postId: post.id,
+        response,
+        prevLiked,
+        nextLiked,
+        prevTotal,
+        nextTotal,
+      });
+      
+      if (response?.liked !== undefined) {
+        setIsLiked(response.liked);
+        if (response.liked !== nextLiked) {
+          console.log('[PostCard] Response.liked mismatch! Adjusting totalLike');
+          setTotalLike(prev => response.liked ? prev + 1 : Math.max(0, prev - 1));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      setIsLiked(prevLiked);
+      setTotalLike(prevTotal);
+    } finally {
+      setIsProcessingLike(false);
+    }
   };
 
   const likeButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeButtonScale.value }],
-  }));
-
-  // Pinch gesture for zoom
-  const pinchGesture = Gesture.Pinch()
-    .onStart(() => {
-      baseScale.value = scale.value;
-    })
-    .onUpdate((e) => {
-      scale.value = baseScale.value * e.scale;
-      // Limit between 1x and 3x
-      if (scale.value < 1) scale.value = 1;
-      if (scale.value > 3) scale.value = 3;
-      // Hide UI when zooming
-      uiOpacity.value = scale.value > 1.1 ? 0 : 1;
-    })
-    .onEnd(() => {
-      // Reset to original size with smooth timing animation (no bounce)
-      scale.value = withTiming(1, { duration: 200 });
-      baseScale.value = 1;
-      uiOpacity.value = withTiming(1, { duration: 200 });
-    });
-
-  // Animated style
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    zIndex: scale.value > 1.1 ? 9999 : 1,
   }));
 
   const uiAnimatedStyle = useAnimatedStyle(() => ({
@@ -178,9 +231,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const renderMedia = (media: any, index: number) => {
     if (isVideo(media)) {
-      // Check if video format is supported or if it's a mock URL
       if (!isVideoFormatSupported(media.url) || videoError) {
-        // Fallback to image when video format is not supported or fails to load
         return (
           <View style={styles.mediaContainer}>
             <Image source={{ uri: media.url }} style={styles.media} resizeMode="cover" />
@@ -241,48 +292,26 @@ export const PostCard: React.FC<PostCardProps> = ({
         </View>
       );
     } else {
-      return (
-        <View style={{ position: 'relative' }}>
-          <GestureDetector gesture={pinchGesture}>
-            <Animated.Image
-              source={{ uri: media.url }}
-              style={[
-                styles.media,
-                animatedStyle,
-              ]}
-              resizeMode="cover"
-              onError={error => {
-                console.error('Image load error:', error.nativeEvent.error);
-                setImageLoadError(true);
-              }}
-              onLoad={() => {
-                setImageLoadError(false);
-              }}
-            />
-          </GestureDetector>
-        </View>
-      );
+      return <ImageWithZoom media={media} index={index} uiOpacity={uiOpacity} />;
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
       <Animated.View style={[styles.header, uiAnimatedStyle]}>
-        <TouchableOpacity onPress={handleUserPress} style={styles.userInfo}>
-          <Avatar uri={post.author.profile?.avatar} name={post.author.username} size={32} />
-          <Text style={[styles.username, { color: theme.colors.text }]}>
-            {post.author.username}
-          </Text>
+        <View style={styles.userInfo}>
+          <TouchableOpacity onPress={handleUserPress} style={styles.userInfoLeft}>
+            <Avatar uri={post.author.profile?.avatar} name={post.author.username} size={32} />
+            <Text style={[styles.username, { color: theme.colors.text }]}>
+              {post.author.username}
+            </Text>
+          </TouchableOpacity>
           {showFollowButton && (
-            <>
-              <Text style={[styles.dot, { color: theme.colors.text }]}> • </Text>
-              <TouchableOpacity onPress={() => onFollow?.(post.author.id)}>
-                <Text style={[styles.followText, { color: theme.colors.primary }]}>Theo dõi</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity onPress={() => onFollow?.(post.author.id)}>
+              <Text style={[styles.followText, { color: theme.colors.primary }]}>• Theo dõi</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
 
         <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.text} />
@@ -343,6 +372,12 @@ export const PostCard: React.FC<PostCardProps> = ({
               </View>
             </View>
           )}
+          {/* Loading overlay */}
+          {isNavigating && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          )}
         </View>
       )}
 
@@ -356,18 +391,18 @@ export const PostCard: React.FC<PostCardProps> = ({
           >
             <Animated.View style={likeButtonAnimatedStyle}>
               <Ionicons
-                name={post.likedByCurrentUser ? 'heart' : 'heart-outline'}
+                name={isLiked ? 'heart' : 'heart-outline'}
                 size={28}
-                color={post.likedByCurrentUser ? theme.colors.like : theme.colors.text}
+                color={isLiked ? theme.colors.like : theme.colors.text}
               />
             </Animated.View>
             <Text style={[styles.actionCount, { color: theme.colors.text }]}>
-              {formatNumber(post.totalLike)}
+              {formatNumber(totalLike)}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => onComment?.(post.id)}
+            onPress={() => setShowCommentsModal(true)}
             style={styles.actionButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -384,7 +419,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           >
             <Ionicons name="paper-plane-outline" size={26} color={theme.colors.text} />
             <Text style={[styles.actionCount, { color: theme.colors.text }]}>
-              {formatNumber(post.totalShare || 0)}
+              {formatNumber((post as any).totalShare || 0)}
             </Text>
           </TouchableOpacity>
         </View>
@@ -395,13 +430,13 @@ export const PostCard: React.FC<PostCardProps> = ({
         >
           <View style={styles.bookmarkContainer}>
             <Ionicons
-              name={post.isSaved ? 'bookmark' : 'bookmark-outline'}
+              name={(post as any).isSaved ? 'bookmark' : 'bookmark-outline'}
               size={26}
               color={theme.colors.text}
             />
-            {(post.bookmarksCount || 0) > 0 && (
+            {((post as any).bookmarksCount || 0) > 0 && (
               <Text style={[styles.actionCount, { color: theme.colors.text }]}>
-                {formatNumber(post.bookmarksCount || 0)}
+                {formatNumber((post as any).bookmarksCount || 0)}
               </Text>
             )}
           </View>
@@ -409,7 +444,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       </Animated.View>
 
       {/* Likes Info */}
-      {post.totalLike > 0 && (
+      {totalLike > 0 && (
         <Animated.View style={uiAnimatedStyle}>
         <TouchableOpacity 
           style={styles.likesInfo}
@@ -420,12 +455,12 @@ export const PostCard: React.FC<PostCardProps> = ({
             {firstLiker ? (
               <>
                 <Text style={styles.boldText}>{firstLiker.username}</Text>
-                {post.totalLike > 1 && (
-                  <Text> và {formatNumber(post.totalLike - 1)} người khác đã thích</Text>
+                {totalLike > 1 && (
+                  <Text> và {formatNumber(totalLike - 1)} người khác đã thích</Text>
                 )}
               </>
             ) : (
-              <Text style={styles.boldText}>{formatNumber(post.totalLike)} lượt thích</Text>
+              <Text style={styles.boldText}>{formatNumber(totalLike)} lượt thích</Text>
             )}
           </Text>
         </TouchableOpacity>
@@ -461,6 +496,14 @@ export const PostCard: React.FC<PostCardProps> = ({
         postId={post.id}
         onClose={() => setShowLikesModal(false)}
       />
+
+      {/* Comments Modal */}
+      <PostCommentsModal
+        visible={showCommentsModal}
+        postId={post.id}
+        postAuthorId={post.author.id}
+        onClose={() => setShowCommentsModal(false)}
+      />
     </View>
   );
 };
@@ -480,6 +523,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 8,
+  },
+  userInfoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   username: {
     marginLeft: 8,
@@ -498,6 +547,7 @@ const styles = StyleSheet.create({
   },
   singleMediaContainer: {
     position: 'relative',
+    overflow: 'hidden',
   },
   carouselContainer: {
     position: 'relative',
@@ -509,6 +559,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH * MEDIA_ASPECT_RATIO,
     position: 'relative',
+    overflow: 'hidden',
   },
   media: {
     width: SCREEN_WIDTH,
@@ -607,9 +658,6 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: '600',
   },
-  dot: {
-    fontSize: 11,
-  },
   imageErrorContainer: {
     position: 'absolute',
     top: 0,
@@ -667,4 +715,68 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
 });
+
+const ImageWithZoom: React.FC<{
+  media: any;
+  index: number;
+  uiOpacity: SharedValue<number>;
+}> = ({ media, index, uiOpacity }) => {
+  const scale = useSharedValue(1);
+  const baseScale = useSharedValue(1);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      baseScale.value = scale.value;
+    })
+    .onUpdate((e) => {
+      scale.value = baseScale.value * e.scale;
+      if (scale.value < 1) scale.value = 1;
+      if (scale.value > 3) scale.value = 3;
+      uiOpacity.value = scale.value > 1.1 ? 0 : 1;
+    })
+    .onEnd(() => {
+      scale.value = withTiming(1, { duration: 200 });
+      baseScale.value = 1;
+      uiOpacity.value = withTiming(1, { duration: 200 });
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <GestureDetector gesture={pinchGesture}>
+      <Animated.Image
+        source={{ uri: media.url }}
+        style={[
+          {
+            width: SCREEN_WIDTH,
+            height: SCREEN_WIDTH * MEDIA_ASPECT_RATIO,
+          },
+          animatedStyle,
+        ]}
+        resizeMode="cover"
+        onError={error => {
+          console.error('Image load error:', error.nativeEvent.error);
+          setImageLoadError(true);
+        }}
+        onLoad={() => {
+          setImageLoadError(false);
+        }}
+      />
+    </GestureDetector>
+  );
+};

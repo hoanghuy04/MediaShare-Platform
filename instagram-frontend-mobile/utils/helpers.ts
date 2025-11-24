@@ -72,27 +72,34 @@ export const generateId = (): string => {
 };
 
 export const getInitials = (name: string): string => {
+  if (!name || name.trim() === '') {
+    return 'U';
+  }
   const names = name.trim().split(' ');
   if (names.length === 1) {
-    return names[0].substring(0, 2).toUpperCase();
+    return names[0].substring(0, 1).toUpperCase();
   }
   return (names[0][0] + names[names.length - 1][0]).toUpperCase();
 };
 
-export const getRandomColor = (): string => {
+export const getRandomColor = (seed?: string): string => {
   const colors = [
-    '#FF6B6B',
-    '#4ECDC4',
-    '#45B7D1',
-    '#FFA07A',
-    '#98D8C8',
-    '#F7DC6F',
-    '#BB8FCE',
-    '#85C1E2',
-    '#F8B739',
-    '#52B788',
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788',
+    '#E63946', '#A8DADC', '#457B9D', '#E76F51', '#2A9D8F'
   ];
-  return colors[Math.floor(Math.random() * colors.length)];
+  
+  if (!seed) {
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+  
+  // Generate consistent color based on seed (name)
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
 };
 
 export const shuffleArray = <T>(array: T[]): T[] => {

@@ -8,7 +8,9 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { useTheme } from '@hooks/useTheme';
+import { useAuth } from '@hooks/useAuth';
 import { PostCard } from './PostCard';
+import { PostCardSkeleton } from './PostCardSkeleton';
 import { FeedReelItem } from './FeedReelItem';
 import { CaughtUpNotice } from './CaughtUpNotice';
 import { SuggestedAccountCard } from './SuggestedAccountCard';
@@ -58,6 +60,7 @@ export const FeedList: React.FC<FeedListProps> = ({
   showStories = true,
 }) => {
   const { theme } = useTheme();
+  const { user: currentUser } = useAuth();
   const [viewableItemId, setViewableItemId] = useState<string | null>(null);
 
   const viewabilityConfig = useRef({
@@ -82,6 +85,7 @@ export const FeedList: React.FC<FeedListProps> = ({
     const showCaughtUpAfterThis = showCaughtUp && index === 2;
     const showSuggestedAfterThis = suggestedAccount && index === 4;
     const isVisible = viewableItemId === item.id;
+    const isOwnPost = currentUser?.id === item.author.id;
 
     return (
       <>
@@ -94,7 +98,7 @@ export const FeedList: React.FC<FeedListProps> = ({
         ) : (
           <PostCard
             post={item}
-            showFollowButton={false}
+            showFollowButton={!isOwnPost}
             onLike={onLike}
             onComment={onComment}
             onShare={onShare}
@@ -130,7 +134,15 @@ export const FeedList: React.FC<FeedListProps> = ({
   };
 
   const renderEmpty = () => {
-    if (isLoading) return <LoadingSpinner />;
+    if (isLoading) {
+      return (
+        <View>
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+        </View>
+      );
+    }
     return (
       <EmptyState
         icon="images-outline"

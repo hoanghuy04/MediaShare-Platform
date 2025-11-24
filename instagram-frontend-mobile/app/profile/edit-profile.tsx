@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@hooks/useTheme';
@@ -24,7 +25,7 @@ import { UpdateUserRequest } from '@/types/user';
 export default function EditProfileScreen() {
   const { theme } = useTheme();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -38,6 +39,14 @@ export default function EditProfileScreen() {
     isPrivate: user?.isPrivate || false,
   });
 
+  useEffect(() => {
+    if (user?.profile?.avatar && user.profile.avatar.trim() !== '') {
+      setAvatarUri(user.profile.avatar);
+    } else {
+      setAvatarUri(null);
+    }
+  }, [user?.profile?.avatar]);
+
   const handleSave = async () => {
     if (!user?.id) return;
 
@@ -46,7 +55,7 @@ export default function EditProfileScreen() {
       await userService.updateUser(user.id, formData);
       const refreshedUser = await userService.getUserById(user.id);
       if (refreshedUser) {
-        Object.assign(user, refreshedUser);
+        updateUser(refreshedUser);
       }
       showAlert('Thành công', 'Đã cập nhật thông tin cá nhân');
       router.back();
@@ -61,6 +70,21 @@ export default function EditProfileScreen() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const getAvatarBackgroundColor = (name: string) => {
+    const colors = [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+      '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788',
+      '#E63946', '#A8DADC', '#457B9D', '#E76F51', '#2A9D8F'
+    ];
+    const index = (name.charCodeAt(0) + name.length) % colors.length;
+    return colors[index];
+  };
+
+  const getInitials = () => {
+    const firstName = formData.firstName || user?.profile?.firstName || user?.username || 'U';
+    return firstName.charAt(0).toUpperCase();
+  };
+
   const handlePickAvatar = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -70,7 +94,7 @@ export default function EditProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -81,7 +105,6 @@ export default function EditProfileScreen() {
         setUploadingAvatar(true);
         
         try {
-          // Upload avatar
           const formData = new FormData();
           const filename = asset.uri.split('/').pop() || `avatar_${Date.now()}.jpg`;
           const fileExtension = filename.split('.').pop()?.toLowerCase() || 'jpg';
@@ -99,15 +122,13 @@ export default function EditProfileScreen() {
 
           const uploadedFile = await fileService.uploadFile(formData, 'PROFILE');
           
-          // Update user profile with new avatar
           if (user?.id) {
-            await userService.updateUser(user.id, { avatar: uploadedFile.url });
+            await userService.updateUser(user.id, { avatar: uploadedFile.id });
             setAvatarUri(uploadedFile.url);
             
-            // Reload user data
             const refreshedUser = await userService.getUserById(user.id);
             if (refreshedUser) {
-              Object.assign(user, refreshedUser);
+              updateUser(refreshedUser);
             }
             
             showAlert('Thành công', 'Đã cập nhật ảnh đại diện');
@@ -124,8 +145,7 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="close" size={28} color={theme.colors.text} />
@@ -150,11 +170,14 @@ export default function EditProfileScreen() {
         {/* Avatar Section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            {avatarUri ? (
+            {avatarUri && avatarUri.trim() !== '' ? (
               <Image source={{ uri: avatarUri }} style={styles.avatar} />
             ) : (
-              <View style={[styles.avatar, { backgroundColor: theme.colors.surface }]}>
-                <Ionicons name="person" size={40} color={theme.colors.textSecondary} />
+              <View style={[
+                styles.avatar, 
+                { backgroundColor: getAvatarBackgroundColor(formData.firstName || user?.username || 'User') }
+              ]}>
+                <Text style={styles.avatarInitial}>{getInitials()}</Text>
               </View>
             )}
             {uploadingAvatar && (
@@ -172,45 +195,49 @@ export default function EditProfileScreen() {
 
         {/* Form Fields */}
         <View style={styles.formSection}>
+          {/* Username - Read only, first */}
           <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>Tên</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Username</Text>
             <TextInput
-              style={[styles.input, { color: theme.colors.text }]}
-              value={formData.firstName}
-              onChangeText={text => updateField('firstName', text)}
-              placeholder="Minh Hữu"
-              placeholderTextColor={theme.colors.textSecondary}
-            />
-          </View>
-
-          <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>Tên người dùng</Text>
-            <TextInput
-              style={[styles.input, { color: theme.colors.text }]}
+              style={[styles.input, { color: theme.colors.textSecondary }]}
               value={user?.username}
               editable={false}
               placeholderTextColor={theme.colors.textSecondary}
             />
           </View>
 
+          {/* First Name */}
           <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>Danh xưng</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>First Name</Text>
             <TextInput
               style={[styles.input, { color: theme.colors.text }]}
-              value={formData.lastName}
-              onChangeText={text => updateField('lastName', text)}
-              placeholder="Danh xưng"
+              value={formData.firstName}
+              onChangeText={text => updateField('firstName', text)}
+              placeholder="First Name"
               placeholderTextColor={theme.colors.textSecondary}
             />
           </View>
 
+          {/* Last Name */}
           <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>Tiểu sử</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Last Name</Text>
+            <TextInput
+              style={[styles.input, { color: theme.colors.text }]}
+              value={formData.lastName}
+              onChangeText={text => updateField('lastName', text)}
+              placeholder="Last Name"
+              placeholderTextColor={theme.colors.textSecondary}
+            />
+          </View>
+
+          {/* Bio */}
+          <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Bio</Text>
             <TextInput
               style={[styles.input, styles.textArea, { color: theme.colors.text }]}
               value={formData.bio}
               onChangeText={text => updateField('bio', text)}
-              placeholder="call me mhiu or hiuu"
+              placeholder="Tell your story..."
               placeholderTextColor={theme.colors.textSecondary}
               multiline
               numberOfLines={3}
@@ -218,26 +245,28 @@ export default function EditProfileScreen() {
             />
           </View>
 
+          {/* Website */}
           <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>Liên kết</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Website</Text>
             <TextInput
               style={[styles.input, { color: theme.colors.text }]}
               value={formData.website}
               onChangeText={text => updateField('website', text)}
-              placeholder="Thêm liên kết"
+              placeholder="Add link"
               placeholderTextColor={theme.colors.textSecondary}
               autoCapitalize="none"
               keyboardType="url"
             />
           </View>
 
+          {/* Location */}
           <View style={[styles.inputGroup, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.label, { color: theme.colors.text }]}>Vị trí</Text>
+            <Text style={[styles.label, { color: theme.colors.text }]}>Location</Text>
             <TextInput
               style={[styles.input, { color: theme.colors.text }]}
               value={formData.location}
               onChangeText={text => updateField('location', text)}
-              placeholder="Thêm vị trí"
+              placeholder="Add location"
               placeholderTextColor={theme.colors.textSecondary}
             />
           </View>
@@ -284,7 +313,7 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -297,8 +326,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
-    paddingBottom: 12,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   headerButton: {
@@ -324,6 +352,11 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarInitial: {
+    fontSize: 36,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   uploadingOverlay: {
     position: 'absolute',

@@ -37,7 +37,6 @@ export const userAPI = {
     const response = await axiosInstance.get(API_ENDPOINTS.USERS + '/search', {
       params: { query, page, limit },
     });
-    console.log('Search Users Response:', response.data);
 
     return response.data.data;
   },
