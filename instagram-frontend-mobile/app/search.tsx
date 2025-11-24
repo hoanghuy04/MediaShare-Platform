@@ -18,10 +18,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../hooks/useTheme';
 import { useDebounce } from '../hooks/useDebounce';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
-import { userAPI } from '../services/api';
+// import { userAPI } from '../services/api';
+import { userService } from '../services/user.service';
 import { postService } from '../services/post.service';
 import { showAlert } from '../utils/helpers';
-import { UserProfile, Post } from '../types';
+import { UserResponse, Post } from '../types';
 import { Avatar } from '../components/common/Avatar';
 import { storage } from '../services/storage';
 
@@ -43,7 +44,7 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [apiUnavailable, setApiUnavailable] = useState(false);
   const [searchResults, setSearchResults] = useState<{
-    users: UserProfile[];
+    users: UserResponse[];
     posts: Post[];
     reels: Post[];
   }>({
@@ -108,7 +109,7 @@ export default function SearchScreen() {
     setHasSearched(true);
     try {
       // Search users (this endpoint exists)
-      const usersResponse = await userAPI.searchUsers(query, 0, 5);
+      const usersResponse = await userService.searchUsers(query, 0, 5);
 
       // Search posts (with fallback)
       const postsResponse = await postService.searchPosts(query, 0, 20);
@@ -171,7 +172,12 @@ export default function SearchScreen() {
   };
 
   const handlePostPress = (postId: string) => {
-    router.push(`/posts/${postId}`);
+    router.push(
+      {
+        pathname: `/profile/posts`,
+        params: { postId }
+      }
+    );
   };
 
   const renderRecentSearches = () => (

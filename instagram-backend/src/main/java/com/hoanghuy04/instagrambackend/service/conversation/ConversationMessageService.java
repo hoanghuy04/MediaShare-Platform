@@ -27,7 +27,7 @@ public interface ConversationMessageService {
      *
      * @param conversationId the conversation ID
      * @param senderId the sender user ID
-     * @param type the message type (TEXT, IMAGE, VIDEO, POST_SHARE)
+     * @param type the message type (TEXT, IMAGE, VIDEO, AUDIO, POST_SHARE)
      * @param content the message content (meaning depends on type)
      * @return Message entity
      */
@@ -40,7 +40,7 @@ public interface ConversationMessageService {
      *
      * @param senderId the sender ID
      * @param receiverId the receiver ID
-     * @param type the message type (TEXT, IMAGE, VIDEO, POST_SHARE)
+     * @param type the message type (TEXT, IMAGE, VIDEO, AUDIO, POST_SHARE)
      * @param content the message content (meaning depends on type)
      * @return Message entity
      */

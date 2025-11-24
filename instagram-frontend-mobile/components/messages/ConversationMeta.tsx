@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { UserProfile, Message } from '../../types';
+import { UserResponse, Message } from '../../types';
 import { Theme } from '../../hooks/useTheme';
 
 const hexToRgba = (hex?: string, alpha = 1) => {
@@ -26,7 +26,7 @@ const hexToRgba = (hex?: string, alpha = 1) => {
 interface Props {
   wantsPendingRoute: boolean;
   messages: Message[];
-  otherUser: UserProfile | null;
+  otherUser: UserResponse | null;
   isGroupConversation?: boolean;
   theme: Theme;
   conversationDetails?: any;

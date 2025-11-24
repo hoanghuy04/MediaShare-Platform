@@ -17,10 +17,12 @@ import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useConversation, useConversationActions } from '../../context/ConversationContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { userAPI } from '../../services/api';
+// import { userAPI } from '../../services/api';
+import { userService } from '../../services/user.service';
 import { messageAPI } from '../../services/message.service';
 import { fileService } from '../../services/file.service';
-import { Conversation, UserProfile } from '../../types';
+import { mediaService } from '../../services/media';
+import { Conversation, UserResponse } from '../../types';
 import { showAlert } from '../../utils/helpers';
 import { SettingsHeader } from '../../components/messages/settings/SettingsHeader';
 import { SettingsTopSection } from '../../components/messages/settings/SettingsTopSection';
@@ -28,9 +30,9 @@ import { SettingsQuickActions } from '../../components/messages/settings/Setting
 import { SettingsRow } from '../../components/messages/settings/SettingsRow';
 import { SettingsList } from '../../components/messages/settings/SettingsList';
 import { SettingsMenuDropdown } from '../../components/messages/settings/SettingsMenuDropdown';
-import { SettingsEditActionSheet } from '../../components/messages/settings/SettingsEditActionSheet';
 import { SettingsRenameModal } from '../../components/messages/settings/SettingsRenameModal';
-import { SettingsAvatarSheet } from '../../components/messages/settings/SettingsAvatarSheet';
+import { SettingsEditDropdown } from '../../components/messages/settings/SettingsEditDropdown';
+import { SettingsEditGroup } from '../../components/messages/settings/SettingsEditGroup';
 
 export default function ConversationSettingsScreen() {
   const { theme } = useTheme();
@@ -41,7 +43,7 @@ export default function ConversationSettingsScreen() {
   const routeUserId = normalize(params.userId);
   const routeConversationId = normalize(params.conversationId);
 
-  const [otherUser, setOtherUser] = useState<UserProfile | null>(null);
+  const [otherUser, setOtherUser] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -67,16 +69,24 @@ export default function ConversationSettingsScreen() {
     });
   };
   const closeMenu = () => setMenuVisible(false);
-
-  // Action sheet chỉnh sửa nhóm (Đổi tên / Đổi avatar)
-  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const editButtonRef = useRef<TouchableOpacity | null>(null);
+  const [editMenuVisible, setEditMenuVisible] = useState(false);
+  const [editMenuPos, setEditMenuPos] = useState<{ top: number; left: number }>({ top: 120, left: 12 });
+  const openEditMenu = () => {
+    if (!isGroup) return;
+    editButtonRef.current?.measureInWindow?.((x, y, _w, h) => {
+      setEditMenuPos({ top: y + h + 8, left: x });
+      setEditMenuVisible(true);
+    });
+  };
+  const closeEditMenu = () => setEditMenuVisible(false);
 
   // Modal đổi tên
   const [renameVisible, setRenameVisible] = useState(false);
   const [renameValue, setRenameValue] = useState('');
 
   // Action sheet đổi avatar
-  const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
 
   // ----- load data -----
   const loadData = useCallback(async () => {
@@ -85,7 +95,7 @@ export default function ConversationSettingsScreen() {
 
       // Nếu có routeUserId (direct message không có conversation), load user profile
       if (routeUserId) {
-        const profile = await userAPI.getUserProfile(routeUserId);
+        const profile = await userService.getUserById(routeUserId);
         setOtherUser(profile);
         return;
       }
@@ -146,7 +156,7 @@ export default function ConversationSettingsScreen() {
     otherUser?.username === 'ai-assistant' ||
     otherUser?.username === 'AI Assistant';
 
-  const gradientColors = [
+  const gradientColors: [string, string, string] = [
     (theme.chat as any).gradientHigh ?? theme.chat.bubbleOut,
     (theme.chat as any).gradientMedium ?? theme.chat.bubbleOut,
     (theme.chat as any).gradientLow ?? theme.chat.bubbleOut,
@@ -162,10 +172,9 @@ export default function ConversationSettingsScreen() {
     }
     try {
       setSaving(true);
-      const updated = await messageAPI.updateConversation(routeConversationId, { name: trimmed });
+        const updated = await messageAPI.updateConversation(routeConversationId, { name: trimmed });
       setConversation(updated);
-      setRenameVisible(false);
-      setActionSheetVisible(false);
+        setRenameVisible(false);
     } catch (e: any) {
       console.error(e);
       Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể đổi tên nhóm');
@@ -196,8 +205,6 @@ export default function ConversationSettingsScreen() {
         const uploaded = await fileService.uploadFile(form, 'PROFILE');
         const updated = await messageAPI.updateConversation(routeConversationId, { avatar: uploaded.id });
         setConversation(updated);
-        setAvatarSheetVisible(false);
-        setActionSheetVisible(false);
       } catch (e: any) {
         console.error(e);
         Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể đổi ảnh nhóm');
@@ -214,8 +221,6 @@ export default function ConversationSettingsScreen() {
       setSaving(true);
       const updated = await messageAPI.updateConversation(routeConversationId, { avatar: '__REMOVE__' });
       setConversation(updated);
-      setAvatarSheetVisible(false);
-      setActionSheetVisible(false);
     } catch (e: any) {
       console.error(e);
       Alert.alert('Lỗi', e?.response?.data?.message || 'Không thể gỡ ảnh nhóm');
@@ -242,18 +247,14 @@ export default function ConversationSettingsScreen() {
   }, [doUploadAndSetAvatar]);
 
   const takePhoto = useCallback(async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Quyền truy cập', 'Vui lòng cho phép dùng Camera.');
-      return;
-    }
-    const res = await ImagePicker.launchCameraAsync({
-      quality: 0.9,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-    if (!res.canceled) {
-      await doUploadAndSetAvatar(res.assets[0].uri);
+    try {
+      const photo = await mediaService.takePhoto();
+      if (photo?.uri) {
+        await doUploadAndSetAvatar(photo.uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Lỗi', 'Không thể chụp ảnh. Vui lòng thử lại.');
     }
   }, [doUploadAndSetAvatar]);
 
@@ -341,18 +342,17 @@ export default function ConversationSettingsScreen() {
             isGroup={isGroup}
             isAI={isAI}
             gradientColors={gradientColors}
-            onViewProfileOrEditGroup={
-              !isGroup
-                ? () => otherUser?.id && router.push(`/users/${otherUser.id}`)
-                : () => {
-                    setRenameValue(conversation?.name || '');
-                    setActionSheetVisible(true);
-                  }
-            }
+          onViewProfileOrEditGroup={
+            !isGroup
+              ? () => otherUser?.id && router.push(`/users/${otherUser.id}`)
+              : () => {}
+          }
+          onOpenEditMenu={openEditMenu}
             onSearch={() => showAlert('Thông báo', 'Tính năng đang phát triển.')}
             onToggleNotification={() => showAlert('Thông báo', 'Tính năng đang phát triển.')}
             onOpenMenu={openMenu}
             menuButtonRef={menuButtonRef}
+          editButtonRef={editButtonRef}
             textColor={theme.colors.text}
           />
 
@@ -366,15 +366,21 @@ export default function ConversationSettingsScreen() {
             }}
             onOpenThemePicker={() => {
               if (!routeConversationId) return;
-              router.push({
-                pathname: '/messages/theme-picker',
-                params: { conversationId: routeConversationId },
-              });
+              // router.push({
+              //   pathname: '/messages/theme-picker',
+              //   params: { conversationId: routeConversationId },
+              // });
             }}
             onOpenMembers={() => {
               if (!routeConversationId) return;
               router.push({
                 pathname: '/messages/group-members',
+                params: { conversationId: routeConversationId },
+              });
+            }}
+            onOpenPrivacy={() => {
+              router.push({
+                pathname: '/messages/privacy-security',
                 params: { conversationId: routeConversationId },
               });
             }}
@@ -422,18 +428,17 @@ export default function ConversationSettingsScreen() {
           onReport={() => showAlert('Thông báo', 'Tính năng đang phát triển')}
           themeColors={{ text: theme.colors.text }}
         />
-
-        <SettingsEditActionSheet
-          visible={actionSheetVisible}
-          onClose={() => setActionSheetVisible(false)}
+        <SettingsEditDropdown
+          visible={editMenuVisible}
+          position={editMenuPos}
+          onClose={closeEditMenu}
+          onRemove={handleAvatarRemove}
           onRename={() => {
-            setActionSheetVisible(false);
+            setRenameValue(conversation?.name || '');
             setRenameVisible(true);
           }}
-          onChangeAvatar={() => {
-            setActionSheetVisible(false);
-            setAvatarSheetVisible(true);
-          }}
+          onChangeAvatar={() => setAvatarModalVisible(true)}
+          themeColors={{ text: theme.colors.text, surface: theme.colors.surface }}
         />
 
         <SettingsRenameModal
@@ -446,13 +451,17 @@ export default function ConversationSettingsScreen() {
           onSave={handleRenameSave}
         />
 
-        <SettingsAvatarSheet
-          visible={avatarSheetVisible}
-          saving={saving}
-          onClose={() => setAvatarSheetVisible(false)}
-          onRemove={handleAvatarRemove}
-          onTakePhoto={takePhoto}
-          onPickFromLibrary={pickFromLibrary}
+        <SettingsEditGroup
+          visible={avatarModalVisible}
+          onClose={() => setAvatarModalVisible(false)}
+          onTakePhoto={() => {
+            setAvatarModalVisible(false);
+            takePhoto();
+          }}
+          onPickFromLibrary={() => {
+            setAvatarModalVisible(false);
+            pickFromLibrary();
+          }}
         />
       </SafeAreaView>
     </View>

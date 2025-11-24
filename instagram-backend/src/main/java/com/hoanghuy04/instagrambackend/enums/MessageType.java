@@ -6,6 +6,7 @@ package com.hoanghuy04.instagrambackend.enums;
  * - TEXT: content is the actual text message
  * - IMAGE: content is the mediaFileId of an image
  * - VIDEO: content is the mediaFileId of a video
+ * - AUDIO: content is the mediaFileId of an audio clip
  * - POST_SHARE: content is the postId of a shared post
  *
  * @author Instagram Backend Team
@@ -26,6 +27,11 @@ public enum MessageType {
      * Video message - content contains the mediaFileId
      */
     VIDEO,
+
+    /**
+     * Audio/voice message - content contains the mediaFileId
+     */
+    AUDIO,
     
     /**
      * Shared post - content contains the postId

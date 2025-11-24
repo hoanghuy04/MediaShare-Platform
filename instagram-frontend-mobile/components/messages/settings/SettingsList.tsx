@@ -1,19 +1,20 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SettingsRow } from './SettingsRow';
-import { Conversation, UserProfile } from '../../../types';
+import { Conversation, UserResponse } from '../../../types';
 import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
   isGroup: boolean;
   conversation: Conversation | undefined;
-  otherUser: UserProfile | null;
+  otherUser: UserResponse | null;
   themeColors: {
     text: string;
     textSecondary: string;
   };
   onOpenThemePicker: () => void;
   onOpenMembers: () => void;
+  onOpenPrivacy: () => void;
   onCreateGroupFromDirect: () => void;
   onCreateGroupFromGroup: () => void;
 };
@@ -25,6 +26,7 @@ export const SettingsList: React.FC<Props> = ({
   themeColors,
   onOpenThemePicker,
   onOpenMembers,
+  onOpenPrivacy,
   onCreateGroupFromDirect,
   onCreateGroupFromGroup,
 }) => {
@@ -89,6 +91,7 @@ export const SettingsList: React.FC<Props> = ({
         left={<Ionicons name="lock-closed-outline" size={24} color={themeColors.text} />}
         title="Quyền riêng tư và an toàn"
         textColor={themeColors.text}
+        onPress={onOpenPrivacy}
         textSecondaryColor={themeColors.textSecondary}
       />
 

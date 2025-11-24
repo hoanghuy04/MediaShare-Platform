@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
  * - TEXT: content is the actual text message
  * - IMAGE: content is the mediaFileId of an image
  * - VIDEO: content is the mediaFileId of a video
+ * - AUDIO: content is the mediaFileId of an audio clip
  * - POST_SHARE: content is the postId of a shared post
  * 
  * @author Instagram Backend Team
@@ -40,7 +41,7 @@ public class SendMessageRequest {
     private String conversationId;
     
     /**
-     * Type of the message (TEXT, IMAGE, VIDEO, POST_SHARE)
+     * Type of the message (TEXT, IMAGE, VIDEO, AUDIO, POST_SHARE)
      */
     @NotNull(message = "Message type is required")
     @Builder.Default
@@ -49,7 +50,7 @@ public class SendMessageRequest {
     /**
      * Content of the message. Meaning depends on type:
      * - TEXT: actual text content
-     * - IMAGE/VIDEO: mediaFileId
+     * - IMAGE/VIDEO/AUDIO: mediaFileId
      * - POST_SHARE: postId
      */
     @NotBlank(message = "Message content is required")

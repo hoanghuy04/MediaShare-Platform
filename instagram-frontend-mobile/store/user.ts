@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { UserProfile } from '@types';
+import { UserResponse } from '@types';
 
 interface UserStore {
-  currentUserProfile: UserProfile | null;
-  visitedProfiles: Record<string, UserProfile>;
-  setCurrentUserProfile: (profile: UserProfile | null) => void;
-  addVisitedProfile: (profile: UserProfile) => void;
+  currentUserProfile: UserResponse | null;
+  visitedProfiles: Record<string, UserResponse>;
+  setCurrentUserProfile: (profile: UserResponse | null) => void;
+  addVisitedProfile: (profile: UserResponse) => void;
   clearVisitedProfiles: () => void;
 }
 

@@ -1,10 +1,10 @@
-import { UserProfile } from './user';
+import { UserSummaryResponse } from './user';
 
 export interface Comment {
   id: string;
   postId: string;
   parentCommentId?: string | null;
-  author: UserProfile;
+  author: UserSummaryResponse;
   text: string;
   mention?: string;
   likesCount: number;

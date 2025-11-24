@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { Avatar } from '../../../components/common/Avatar';
-import { Conversation, UserProfile } from '../../../types';
+import { Conversation, UserResponse } from '../../../types';
 
 type Props = {
   isGroup: boolean;
   conversation: Conversation | undefined;
-  otherUser: UserProfile | null;
+  otherUser: UserResponse | null;
   themeColors: {
     text: string;
     textSecondary: string;

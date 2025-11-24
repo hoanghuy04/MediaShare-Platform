@@ -130,14 +130,14 @@ public class UserController {
      */
     @GetMapping("/{userId}/mutual-follows")
     @Operation(summary = "Get mutual follows for a user")
-    public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getMutualFollows(
+    public ResponseEntity<ApiResponse<List<UserResponse>>> getMutualFollows(
             @PathVariable String userId,
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
         log.info("Get mutual follows for user {} with query: {}", userId, query);
-        List<UserSummaryResponse> mutuals = userService.getMutualFollows(userId, query, page, size);
+        List<UserResponse> mutuals = userService.getMutualFollows(userId, query, page, size);
         return ResponseEntity.ok(
             ApiResponse.success("Mutual follows retrieved successfully", mutuals)
         );

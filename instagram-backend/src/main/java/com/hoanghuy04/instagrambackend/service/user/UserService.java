@@ -97,5 +97,5 @@ public interface UserService {
      * @return List of UserSummaryDTO representing mutual follows
      */
     @Transactional(readOnly = true)
-    List<UserSummaryResponse> getMutualFollows(String userId, String query, int page, int size);
+    List<UserResponse> getMutualFollows(String userId, String query, int page, int size);
 }

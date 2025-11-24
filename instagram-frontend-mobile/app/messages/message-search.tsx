@@ -15,11 +15,12 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useDebounce } from '../../hooks/useDebounce';
-import { userAPI } from '../../services/api';
+import { userService } from '../../services/user.service';
+import { messageAPI } from '../../services/message.service';
 import { aiAPI } from '../../services/ai.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
-import { UserProfile } from '../../types';
+import { UserResponse } from '../../types';
 import { storage } from '../../services/storage';
 
 const RECENT_SEARCHES_KEY = 'message_recent_searches';
@@ -32,9 +33,9 @@ export default function MessageSearchScreen() {
   const isSendingToAI = useRef(false);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [recentSearches, setRecentSearches] = useState<UserProfile[]>([]);
-  const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [recentSearches, setRecentSearches] = useState<UserResponse[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<UserResponse[]>([]);
+  const [searchResults, setSearchResults] = useState<UserResponse[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isEditingRecent, setIsEditingRecent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +67,7 @@ export default function MessageSearchScreen() {
     }
   };
 
-  const saveRecentSearches = async (searches: UserProfile[]) => {
+  const saveRecentSearches = async (searches: UserResponse[]) => {
     try {
       await storage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
     } catch (error) {
@@ -79,9 +80,9 @@ export default function MessageSearchScreen() {
     
     setIsLoading(true);
     try {
-      const following = await userAPI.getFollowing(currentUser.id, 0, 50);
+      const following = await userService.getUserFollowing(currentUser.id);
       if (following) {
-        setSuggestedUsers(following);
+        setSuggestedUsers(following.content || []);
       }
     } catch (error) {
       console.error('Error loading suggested users:', error);
@@ -95,9 +96,9 @@ export default function MessageSearchScreen() {
     
     setIsSearching(true);
     try {
-      const following = await userAPI.getFollowing(currentUser.id, 0, 100);
+      const following = await userService.getUserFollowing(currentUser.id);
       if (following) {
-        const filtered = following.filter(user => 
+        const filtered = following.content.filter(user => 
           user.username.toLowerCase().includes(query.toLowerCase()) ||
           user.profile?.firstName?.toLowerCase().includes(query.toLowerCase()) ||
           user.profile?.lastName?.toLowerCase().includes(query.toLowerCase())
@@ -112,17 +113,42 @@ export default function MessageSearchScreen() {
     }
   };
 
-  const handleUserPress = async (user: UserProfile) => {
+  const handleUserPress = async (user: UserResponse) => {
     // Add to recent searches
     const updatedRecent = [user, ...recentSearches.filter(u => u.id !== user.id)].slice(0, 10);
     setRecentSearches(updatedRecent);
     await saveRecentSearches(updatedRecent);
     
-    // Navigate to conversation
-    router.push(`/messages/${user.id}`);
+    try {
+      // Resolve or create conversation with the user
+      const convId = await messageAPI.resolveDirectByPeer(user.id);
+      
+      if (convId) {
+        // Existing conversation found
+        router.push({
+          pathname: '/messages/[conversationId]',
+          params: { conversationId: convId },
+        });
+      } else {
+        // No conversation exists, navigate with user info to create new one
+        router.push({
+          pathname: '/messages/[conversationId]',
+          params: {
+            conversationId: user.id,
+            isNewConversation: 'true',
+            direction: 'sent',
+            senderId: currentUser?.id || '',
+            receiverId: user.id,
+          },
+        });
+      }
+    } catch (error: any) {
+      console.error('Error opening conversation:', error);
+      showAlert('Lỗi', 'Không thể mở cuộc trò chuyện');
+    }
   };
 
-  const handleRemoveRecent = async (userToRemove: UserProfile) => {
+  const handleRemoveRecent = async (userToRemove: UserResponse) => {
     const updatedRecent = recentSearches.filter(user => user.id !== userToRemove.id);
     setRecentSearches(updatedRecent);
     await saveRecentSearches(updatedRecent);
@@ -207,7 +233,7 @@ export default function MessageSearchScreen() {
     </View>
   );
 
-  const renderUserItem = ({ item }: { item: UserProfile }) => (
+  const renderUserItem = ({ item }: { item: UserResponse }) => (
     <TouchableOpacity
       style={styles.userItem}
       onPress={() => handleUserPress(item)}

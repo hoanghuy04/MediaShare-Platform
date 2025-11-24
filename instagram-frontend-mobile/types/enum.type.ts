@@ -7,6 +7,7 @@ export enum PostType {
 export enum MediaCategory {
   IMAGE = 'IMAGE',
   VIDEO = 'VIDEO',
+  AUDIO = 'AUDIO',
 }
 
 export enum MediaUsage {
@@ -25,5 +26,6 @@ export enum MessageType {
   TEXT = 'TEXT',
   IMAGE = 'IMAGE',
   VIDEO = 'VIDEO',
+  AUDIO = 'AUDIO',
   POST_SHARE = 'POST_SHARE',
 }

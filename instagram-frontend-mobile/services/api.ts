@@ -1,140 +1,137 @@
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
 import {
-  UserProfile,
-  UpdateProfileRequest,
+  UserResponse,
+  UpdateUserRequest,
   Post,
   Comment,
   CreateCommentRequest,
   Notification,
   PaginatedResponse,
-  UserSummary,
+  UserSummaryResponse,
+  UserStatsResponse,
 } from '../types';
 import { CreatePostRequest } from '../types/post.type';
 
 
 // User API
-export const userAPI = {
-  getUserProfile: async (userId: string): Promise<UserProfile> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.USER_PROFILE(userId));
-    return response.data.data;
-  },
+// export const userAPI = {
+//   getUserProfile: async (userId: string): Promise<UserResponse> => {
+//     const response = await axiosInstance.get(API_ENDPOINTS.USER_PROFILE(userId));
+//     return response.data.data;
+//   },
 
-  updateProfile: async (userId: string, data: UpdateProfileRequest): Promise<UserProfile> => {
-    const response = await axiosInstance.put(API_ENDPOINTS.UPDATE_PROFILE(userId), data);
-    return response.data.data;
-  },
+//   updateProfile: async (userId: string, data: UpdateUserRequest): Promise<UserResponse> => {
+//     const response = await axiosInstance.put(API_ENDPOINTS.UPDATE_PROFILE(userId), data);
+//     return response.data.data;
+//   },
 
-  deleteUser: async (userId: string): Promise<void> => {
-    await axiosInstance.delete(API_ENDPOINTS.DELETE_USER(userId));
-  },
+//   deleteUser: async (userId: string): Promise<void> => {
+//     await axiosInstance.delete(API_ENDPOINTS.DELETE_USER(userId));
+//   },
 
-  searchUsers: async (
-    query: string,
-    page = 0,
-    limit = 20
-  ): Promise<PaginatedResponse<UserProfile>> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.USERS + '/search', {
-      params: { query, page, limit },
-    });
+//   searchUsers: async (
+//     query: string,
+//     page = 0,
+//     limit = 20
+//   ): Promise<PaginatedResponse<UserResponse>> => {
+//     const response = await axiosInstance.get(API_ENDPOINTS.USERS + '/search', {
+//       params: { query, page, limit },
+//     });
 
-    return response.data.data;
-  },
+//     return response.data.data;
+//   },
 
-  followUser: async (userId: string): Promise<void> => {
-    await axiosInstance.post(API_ENDPOINTS.FOLLOW(userId));
-  },
+//   followUser: async (userId: string): Promise<void> => {
+//     await axiosInstance.post(API_ENDPOINTS.FOLLOW(userId));
+//   },
 
-  unfollowUser: async (userId: string): Promise<void> => {
-    await axiosInstance.delete(API_ENDPOINTS.UNFOLLOW(userId));
-  },
+//   unfollowUser: async (userId: string): Promise<void> => {
+//     await axiosInstance.delete(API_ENDPOINTS.UNFOLLOW(userId));
+//   },
 
-  isFollowing: async (userId: string): Promise<boolean> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.IS_FOLLOWING(userId));
-    return response.data.data;
-  },
+//   isFollowing: async (userId: string): Promise<boolean> => {
+//     const response = await axiosInstance.get(API_ENDPOINTS.IS_FOLLOWING(userId));
+//     return response.data.data;
+//   },
 
-  getFollowers: async (userId: string, page = 0, limit = 20): Promise<UserProfile[]> => {
-    // Backend trả List không phải Page
-    const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWERS(userId), {
-      params: { page, limit },
-    });
-    return response.data.data;
-  },
+//   getFollowers: async (userId: string, page = 0, limit = 20): Promise<UserResponse[]> => {
+//     // Backend trả List không phải Page
+//     const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWERS(userId), {
+//       params: { page, limit },
+//     });
+//     return response.data.data;
+//   },
 
-  getFollowing: async (userId: string, page = 0, limit = 20): Promise<UserProfile[]> => {
-    // Backend trả List không phải Page
-    const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWING(userId), {
-      params: { page, limit },
-    });
-    return response.data.data;
-  },
+//   getFollowing: async (userId: string, page = 0, limit = 20): Promise<UserResponse[]> => {
+//     // Backend trả List không phải Page
+//     const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWING(userId), {
+//       params: { page, limit },
+//     });
+//     return response.data.data;
+//   },
 
-  getFollowingSummary: async (
-    userId: string,
-    params?: { query?: string; page?: number; size?: number }
-  ): Promise<UserSummary[]> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWING_SUMMARY(userId), {
-      params: {
-        query: params?.query ?? '',
-        page: params?.page ?? 0,
-        size: params?.size ?? 20,
-      },
-    });
-    return response.data.data;
-  },
+//   getFollowingSummary: async (
+//     targetUserId: string
+//   ): Promise<UserSummaryResponse[]> => {
+//     const response = await axiosInstance.get(API_ENDPOINTS.FOLLOWING(targetUserId), {
+//     });
+//     return response.data.data;
+//   },
 
-  getMutualFollows: async (
-    userId: string,
-    query = '',
-    page = 0,
-    size = 20
-  ): Promise<UserSummary[]> => {
-    const mapToSummary = (user: UserProfile): UserSummary => ({
-      id: user.id,
-      username: user.username,
-      avatar: user.profile?.avatar,
-      isVerified: !!user.isVerified,
-    });
+//   getMutualFollows: async (
+//     userId: string,
+//     query = '',
+//     page = 0,
+//     size = 20
+//   ): Promise<UserSummaryResponse[]> => {
+//     const mapToSummary = (user: UserResponse): UserSummaryResponse => ({
+//       id: user.id,
+//       username: user.username,
+//       email: user.email,
+//       profile: user.profile,
+//       isVerified: !!user.isVerified,
+//       followingByCurrentUser: user.followingByCurrentUser ?? false,
+//     });
 
-    try {
-      const response = await axiosInstance.get(API_ENDPOINTS.MUTUAL_FOLLOWS(userId), {
-        params: { query, page, size },
-      });
-      return response.data.data;
-    } catch (error) {
-      console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
-      const [followers, following] = await Promise.all([
-        userAPI.getFollowers(userId, 0, 100),
-        userAPI.getFollowing(userId, 0, 100),
-      ]);
+//     try {
+//       const response = await axiosInstance.get(API_ENDPOINTS.MUTUAL_FOLLOWS(userId), {
+//         params: { query, page, size },
+//       });
+//       return response.data.data;
+//     } catch (error) {
+//       console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
+//       const [followers, following]: [UserResponse[], UserResponse[]] = await Promise.all([
+//         userAPI.getFollowers(userId, 0, 100),
+//         userAPI.getFollowing(userId, 0, 100),
+//       ]);
 
-      const followerIds = new Set(followers.map(u => u.id));
-      let mutuals = following.filter(u => followerIds.has(u.id));
+//       const followerIds = new Set(followers.map(u => u.id));
+//       let mutuals = following.filter(u => followerIds.has(u.id));
 
-      if (query.trim()) {
-        const lowerQuery = query.toLowerCase();
-        mutuals = mutuals.filter(user => {
-          const username = user.username?.toLowerCase() || '';
-          const firstName = user.profile?.firstName?.toLowerCase() || '';
-          const lastName = user.profile?.lastName?.toLowerCase() || '';
-          return (
-            username.includes(lowerQuery) ||
-            firstName.includes(lowerQuery) ||
-            lastName.includes(lowerQuery)
-          );
-        });
-      }
+//       if (query.trim()) {
+//         const lowerQuery = query.toLowerCase();
+//         mutuals = mutuals.filter(user => {
+//           const username = user.username?.toLowerCase() || '';
+//           const firstName = user.profile?.firstName?.toLowerCase() || '';
+//           const lastName = user.profile?.lastName?.toLowerCase() || '';
+//           return (
+//             username.includes(lowerQuery) ||
+//             firstName.includes(lowerQuery) ||
+//             lastName.includes(lowerQuery)
+//           );
+//         });
+//       }
 
-      return mutuals.map(mapToSummary);
-    }
-  },
+//       return mutuals.map(mapToSummary);
+//     }
+//   },
 
-  getUserStats: async (userId: string): Promise<any> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.USER_STATS(userId));
-    return response.data.data;
-  },
-};
+//   getUserStats: async (userId: string): Promise<UserStatsResponse> => {
+//     const response = await axiosInstance.get(API_ENDPOINTS.USER_STATS(userId));
+//     return response.data.data;
+//   },
+// };
 
 // Comment API
 export const commentAPI = {

@@ -45,7 +45,8 @@ public abstract class MessageMapper {
                     target = "content",
                     expression = "java(message.getContent() == null || message.getContent().isEmpty() " +
                             "|| !(message.getType() == com.hoanghuy04.instagrambackend.enums.MessageType.IMAGE " +
-                            "|| message.getType() == com.hoanghuy04.instagrambackend.enums.MessageType.VIDEO) " +
+                            "|| message.getType() == com.hoanghuy04.instagrambackend.enums.MessageType.VIDEO " +
+                            "|| message.getType() == com.hoanghuy04.instagrambackend.enums.MessageType.AUDIO) " +
                             "? message.getContent() " +
                             ": fileService.getMediaFileResponse(message.getContent()).getUrl())"
             )
