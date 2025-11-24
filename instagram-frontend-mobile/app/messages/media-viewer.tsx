@@ -12,17 +12,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Video } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import * as Linking from 'expo-linking';
+import { Paths, File } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import { Platform, Alert } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { MessageType } from '../../types/enum.type';
 import { formatMessageTime } from '../../utils/messageUtils';
+import { showAlert } from '../../utils/helpers';
 
 const { width } = Dimensions.get('window');
 
 export default function MediaViewerScreen() {
   const router = useRouter();
   const { theme } = useTheme();
+  const [isDownloading, setIsDownloading] = React.useState(false);
 
   const params = useLocalSearchParams<{
     url?: string;
@@ -101,10 +106,75 @@ export default function MediaViewerScreen() {
   };
 
   const handleDownload = async () => {
-    if (!url) return;
-    // Tạm thời: mở URL trong browser / viewer ngoài
-    await Linking.openURL(url);
-    // Sau này có thể dùng expo-file-system để tải về và lưu vào gallery
+    if (!url) {
+      showAlert('Lỗi', 'Không có URL để tải');
+      return;
+    }
+
+    if (isDownloading) return;
+
+    try {
+      setIsDownloading(true);
+
+      // Request media library permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      
+      if (status !== 'granted') {
+        showAlert(
+          'Quyền truy cập',
+          'Vui lòng cho phép truy cập thư viện ảnh để lưu media.'
+        );
+        return;
+      }
+
+      // Determine file extension based on type
+      const fileExtension = type === MessageType.VIDEO ? 'mp4' : 'jpg';
+      const fileName = `instagram_media_${Date.now()}.${fileExtension}`;
+      
+      // Download file to cache directory
+      const downloadedFile = await File.downloadFileAsync(
+        url,
+        new File(Paths.cache, fileName),
+        { idempotent: true }
+      );
+
+      // Save to media library
+      const asset = await MediaLibrary.createAssetAsync(downloadedFile.uri);
+      
+      // Try to add to album
+      try {
+        const album = await MediaLibrary.getAlbumAsync('Instagram');
+        if (album) {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+        } else {
+          await MediaLibrary.createAlbumAsync('Instagram', asset, false);
+        }
+      } catch (albumError) {
+        console.log('Album operation failed, file saved to gallery:', albumError);
+      }
+
+      // Delete temp file
+      try {
+        downloadedFile.delete();
+      } catch (deleteError) {
+        console.log('Failed to delete temp file:', deleteError);
+      }
+
+      showAlert(
+        'Thành công',
+        type === MessageType.VIDEO 
+          ? 'Video đã được lưu vào thư viện'
+          : 'Ảnh đã được lưu vào thư viện'
+      );
+    } catch (error: any) {
+      console.error('Download error:', error);
+      showAlert(
+        'Lỗi',
+        error?.message || 'Không thể tải xuống media. Vui lòng thử lại.'
+      );
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const renderMedia = () => {
@@ -116,7 +186,7 @@ export default function MediaViewerScreen() {
           <Video
             source={{ uri: url }}
             style={styles.video}
-            resizeMode="contain"
+            resizeMode={ResizeMode.CONTAIN}
             useNativeControls
             isLooping
           />
