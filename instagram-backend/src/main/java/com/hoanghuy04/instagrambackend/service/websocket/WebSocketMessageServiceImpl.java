@@ -18,6 +18,9 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Service for WebSocket message operations.
@@ -299,6 +302,33 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                     "/queue/messages",
                     chatMessage
             );
+        }
+    }
+
+    @Override
+    public void pushConversationUpdate(String conversationId, List<String> participantIds, String updateType, Object data) {
+        try {
+            Map<String, Object> update = new HashMap<>();
+            update.put("type", "CONVERSATION_UPDATE");
+            update.put("conversationId", conversationId);
+            update.put("updateType", updateType);
+            update.put("data", data);
+            update.put("timestamp", LocalDateTime.now());
+
+            for (String userId : participantIds) {
+                try {
+                    messagingTemplate.convertAndSendToUser(
+                        userId,
+                        "/queue/conversation-updates",
+                        update
+                    );
+                    log.debug("Pushed conversation update to user: {} - type: {}", userId, updateType);
+                } catch (Exception e) {
+                    log.error("Failed to push conversation update to user: {}", userId, e);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to push conversation update for conversation: {}", conversationId, e);
         }
     }
 }

@@ -4,6 +4,8 @@ import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * Service interface for WebSocket message operations.
  * Handles pushing messages, read receipts, and typing indicators via WebSocket.
@@ -56,4 +58,15 @@ public interface WebSocketMessageService {
      * @param errorMessage the error message
      */
     void pushError(String userId, String errorMessage);
+
+    /**
+     * Push conversation update to all participants.
+     * Used for: rename, avatar change, member add/remove, role changes.
+     *
+     * @param conversationId the conversation ID
+     * @param participantIds list of participant user IDs to notify
+     * @param updateType type of update (MEMBER_ADDED, MEMBER_REMOVED, etc.)
+     * @param data additional data for the update
+     */
+    void pushConversationUpdate(String conversationId, List<String> participantIds, String updateType, Object data);
 }
