@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 
 import com.hoanghuy04.instagrambackend.dto.response.FollowToggleResponse;
+import com.hoanghuy04.instagrambackend.dto.response.FollowerUserResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeUserResponse;
 import org.springframework.data.domain.Pageable;
@@ -25,5 +26,12 @@ public interface FollowService {
     PageResponse<PostLikeUserResponse> getFollowing(String userId, Pageable pageable);
 
     boolean isFollowing(String targetUserId);
+
+    PageResponse<FollowerUserResponse> searchFollowers(String userId, String username, Pageable pageable);
+
+    PageResponse<PostLikeUserResponse> searchFollowing(String userId, String username, Pageable pageable);
+
+    void removeFollower(String followerId);
 }
+
 

@@ -86,3 +86,20 @@ export interface UserStats {
   followingCount: number;
   postsCount: number;
 }
+
+/**
+ * @description: Simple user response for likes/followers/following
+ */
+export interface SimpleUserResponse {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * @description: Follower user response with additional field
+ */
+export interface FollowerUserResponse extends SimpleUserResponse {
+  followingByCurrentUser: boolean; // True if current user follows this follower back
+}
+

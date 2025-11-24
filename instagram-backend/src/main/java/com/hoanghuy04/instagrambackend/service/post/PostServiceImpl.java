@@ -247,9 +247,11 @@ public class PostServiceImpl implements PostService {
             User current = securityUtil.getCurrentUser();
 
             if (current != null && author != null && !current.getId().equals(author.getId())) {
-                following = followRepository
-                        .findByFollowerAndFollowing(current, author)
-                        .isPresent();
+                // ĐÃ ĐỔI: dùng existsByFollowerIdAndFollowingId thay cho findByFollowerAndFollowing
+                following = followRepository.existsByFollowerIdAndFollowingId(
+                        current.getId(),
+                        author.getId()
+                );
             }
         } catch (Exception e) {
             following = false;

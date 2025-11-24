@@ -4,6 +4,9 @@ import { FollowButton } from '../common/FollowButton';
 import { UserSummaryResponse } from '../../types/user';
 import { Avatar } from '../common/Avatar';
 import React from 'react';
+import { useRouter } from 'expo-router';
+
+import { useAuth } from '@/context/AuthContext';
 
 interface FeedFooterProps {
   data: PostResponse;
@@ -11,6 +14,8 @@ interface FeedFooterProps {
 }
 
 const FeedFooter = ({ data, onFollowChange }: FeedFooterProps) => {
+  const { user } = useAuth();
+  const router = useRouter();
   const { author, caption } = data;
 
   const authorData = author as UserSummaryResponse;
@@ -24,17 +29,18 @@ const FeedFooter = ({ data, onFollowChange }: FeedFooterProps) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.profileContainer}>
-        <Avatar
-          uri={authorAvatar}
-          name={authorData.username}
-          size={30}
-        />
+      <TouchableOpacity
+        style={styles.profileContainer}
+        onPress={() => router.push({ pathname: '/users/[id]', params: { id: authorData.id } })}
+      >
+        <TouchableOpacity>
+          <Avatar uri={authorAvatar} name={authorData.username} size={30} />
+        </TouchableOpacity>
         <View style={styles.userInfo}>
           <View style={styles.userNameContainer}>
             <Text style={styles.nameStyle}>{authorName}</Text>
 
-            {!initiallyFollowing && (
+            {!initiallyFollowing && authorData.id !== user?.id && (
               <FollowButton
                 userId={authorData.id}
                 initialIsFollowing={false}
@@ -48,7 +54,7 @@ const FeedFooter = ({ data, onFollowChange }: FeedFooterProps) => {
             )}
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
 
       <Text numberOfLines={2} style={styles.desc}>
         {caption || ''}

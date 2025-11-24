@@ -30,6 +30,8 @@ export const colors = {
     overlay: 'rgba(0, 0, 0, 0.5)',
     tabBar: '#FFFFFF',
     tabBarInactive: '#8E8E8E',
+    inputBackground: '#FAFAFA',
+    gray: '#8E8E8E',
   },
 
   // Dark theme colors
@@ -47,6 +49,8 @@ export const colors = {
     overlay: 'rgba(255, 255, 255, 0.1)',
     tabBar: '#000000',
     tabBarInactive: '#A8A8A8',
+    inputBackground: '#121212',
+    gray: '#A8A8A8',
   },
 
   // Chat-specific palettes cho từng theme

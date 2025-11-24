@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { UserResponse } from '../../types/user';
 import { useTheme } from '@hooks/useTheme';
 import { Avatar } from '../common/Avatar';
@@ -23,6 +24,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onEdit,
 }) => {
   const { theme } = useTheme();
+  const router = useRouter();
 
   const fullName =
     profile.profile?.firstName && profile.profile?.lastName
@@ -38,6 +40,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     }
   };
 
+  const handleFollowersPress = () => {
+    router.push(`/users/${profile.id}/follows?tab=followers`);
+  };
+
+  const handleFollowingPress = () => {
+    router.push(`/users/${profile.id}/follows?tab=following`);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
@@ -51,14 +61,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             <Text style={[styles.statLabel, { color: theme.colors.text }]}>bài viết</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statItem}>
+          <TouchableOpacity style={styles.statItem} onPress={handleFollowersPress}>
             <Text style={[styles.statValue, { color: theme.colors.text }]}>
               {formatNumber(profile.followersCount || 0)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.colors.text }]}>người theo dõi</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statItem}>
+          <TouchableOpacity style={styles.statItem} onPress={handleFollowingPress}>
             <Text style={[styles.statValue, { color: theme.colors.text }]}>
               {formatNumber(profile.followingCount || 0)}
             </Text>

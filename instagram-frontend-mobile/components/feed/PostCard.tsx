@@ -26,6 +26,7 @@ import { PostLikesModal } from './PostLikesModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
+import { useAuth } from '@/context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
@@ -52,6 +53,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   disableNavigation = false,
 }) => {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const router = useRouter();
   const [isMuted, setIsMuted] = useState(true);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -255,7 +257,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {!initiallyFollowing && (
+          {!initiallyFollowing && post.author.id !== user?.id && (
             <FollowButton
               userId={authorData.id}
               initialIsFollowing={false}

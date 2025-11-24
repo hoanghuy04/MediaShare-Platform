@@ -9,6 +9,7 @@ import { FollowButton } from '../common/FollowButton';
 import { Avatar } from '../common/Avatar';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { PostLikesModal } from './PostLikesModal';
+import { useAuth } from '@/context/AuthContext';
 
 import { MediaCategory } from '../../types/enum.type';
 import { postLikeService } from '../../services/post-like.service';
@@ -18,6 +19,7 @@ const MEDIA_HEIGHT = width * (16 / 9);
 
 export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; isVisible: boolean; onLike?: (postId: string) => void }) => {
   const router = useRouter();
+  const { user } = useAuth();
   const [showOverlay, setShowOverlay] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -170,7 +172,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
                 </Text>
               </TouchableOpacity>
 
-              {!initiallyFollowing && (
+              {!initiallyFollowing && post.author.id !== user?.id && (
                 <>
 
                   <FollowButton

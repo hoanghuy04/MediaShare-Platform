@@ -1,6 +1,6 @@
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
-import { UserResponse, UpdateUserRequest, UserStatsResponse, FollowToggleResponse } from '../types/user';
+import { UserResponse, UpdateUserRequest, UserStatsResponse, FollowToggleResponse, FollowerUserResponse, SimpleUserResponse } from '../types/user';
 import { PaginatedResponse } from '../types';
 
 export const userService = {
@@ -59,7 +59,54 @@ export const userService = {
     return response.data.data;
   },
 
+  /**
+   * Search followers with username filter
+   */
+  searchFollowers: async (
+    userId: string,
+    username?: string,
+    page = 0,
+    size = 20,
+    sortDirection: 'ASC' | 'DESC' = 'DESC'
+  ): Promise<PaginatedResponse<FollowerUserResponse>> => {
+    const response = await axiosInstance.get(`${API_ENDPOINTS.FOLLOWERS(userId)}`, {
+      params: {
+        username: username || '',
+        page,
+        size,
+        sort: `createdAt,${sortDirection}`,
+      },
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Search following with username filter and sorting
+   */
+  searchFollowing: async (
+    userId: string,
+    username?: string,
+    page = 0,
+    size = 20,
+    sortDirection: 'ASC' | 'DESC' = 'DESC'
+  ): Promise<PaginatedResponse<SimpleUserResponse>> => {
+    const response = await axiosInstance.get(`${API_ENDPOINTS.FOLLOWING(userId)}`, {
+      params: {
+        username: username || '',
+        page,
+        size,
+        sort: `createdAt,${sortDirection}`,
+      },
+    });
+    console.log(response.data.data)
+    return response.data.data;
+  },
+
   deleteUser: async (userId: string): Promise<void> => {
     await axiosInstance.delete(API_ENDPOINTS.DELETE_USER(userId));
+  },
+
+  removeFollower: async (followerId: string): Promise<void> => {
+    await axiosInstance.delete(API_ENDPOINTS.REMOVE_FOLLOWER(followerId));
   },
 };

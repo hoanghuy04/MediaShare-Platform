@@ -26,9 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -82,7 +80,6 @@ public class UserServiceImpl implements UserService {
                 });
     }
 
-
     @Transactional(readOnly = true)
     @Override
     public UserResponse getUserById(String userId) {
@@ -97,9 +94,9 @@ public class UserServiceImpl implements UserService {
         boolean following = false;
 
         if (current != null && !current.getId().equals(user.getId())) {
+            // ĐÃ ĐỔI: dùng existsByFollowerIdAndFollowingId thay vì findByFollowerAndFollowing
             following = followRepository
-                    .findByFollowerAndFollowing(current, user)
-                    .isPresent();
+                    .existsByFollowerIdAndFollowingId(current.getId(), user.getId());
         }
 
         dto.setFollowingByCurrentUser(following);
@@ -208,17 +205,17 @@ public class UserServiceImpl implements UserService {
         userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        // Lấy danh sách following và followers
+        // Lấy danh sách following và followers (theo schema Follow mới: followerId / followingId)
         List<Follow> following = followRepository.findByFollowerId(userId);
         List<Follow> followers = followRepository.findByFollowingId(userId);
 
         // Tạo Set để giao cắt
         Set<String> followingIds = following.stream()
-                .map(f -> f.getFollowing().getId())
+                .map(Follow::getFollowingId)
                 .collect(Collectors.toSet());
 
         Set<String> followerIds = followers.stream()
-                .map(f -> f.getFollower().getId())
+                .map(Follow::getFollowerId)
                 .collect(Collectors.toSet());
 
         // Giao cắt: mutual = vừa là following vừa là follower

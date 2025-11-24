@@ -43,6 +43,11 @@ interface FollowButtonProps {
     followingTextColor?: string;
     style?: ViewStyle;
     textStyle?: TextStyle;
+
+    /** text khi ĐÃ follow */
+    followingText?: string;
+    /** text khi CHƯA follow */
+    notFollowingText?: string;
 }
 
 export const FollowButton: React.FC<FollowButtonProps> = ({
@@ -57,6 +62,8 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
     followingTextColor,
     style,
     textStyle,
+    followingText = 'Đang theo dõi',
+    notFollowingText = 'Theo dõi',
 }) => {
     const { theme } = useTheme();
     const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
@@ -130,7 +137,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
     };
 
     const getButtonText = () => {
-        return isFollowing ? 'Đang theo dõi' : 'Theo dõi';
+        return isFollowing ? followingText : notFollowingText;
     };
 
     const shouldShowBorder = () => {

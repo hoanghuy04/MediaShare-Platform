@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUserData = async () => {
     if (!user?.id) return;
-    
+
     try {
       const freshUserData = await userService.getUserById(user.id);
       setUser(freshUserData as unknown as User);
