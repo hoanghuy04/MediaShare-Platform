@@ -6,12 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 type Props = {
   isGroup: boolean;
   isAI: boolean;
-  gradientColors: string[];
+  gradientColors: [string, string, string];
   onViewProfileOrEditGroup: () => void;
+  onOpenEditMenu?: () => void;
   onSearch: () => void;
   onToggleNotification: () => void;
   onOpenMenu: () => void;
-  menuButtonRef: React.RefObject<TouchableOpacity | null>;
+  menuButtonRef: React.RefObject<any>;
+  editButtonRef?: React.RefObject<any>;
   textColor: string;
 };
 
@@ -20,18 +22,21 @@ export const SettingsQuickActions: React.FC<Props> = ({
   isAI,
   gradientColors,
   onViewProfileOrEditGroup,
+  onOpenEditMenu,
   onSearch,
   onToggleNotification,
   onOpenMenu,
   menuButtonRef,
+  editButtonRef,
   textColor,
 }) => {
   return (
     <View style={styles.quickActions}>
       {/* Trang cá nhân / Chỉnh sửa nhóm */}
       <TouchableOpacity
+        ref={isGroup ? editButtonRef : undefined}
         style={styles.quickActionItem}
-        onPress={onViewProfileOrEditGroup}
+        onPress={isGroup ? onOpenEditMenu : onViewProfileOrEditGroup}
       >
         <LinearGradient
           colors={gradientColors}

@@ -1,6 +1,8 @@
 package com.hoanghuy04.instagrambackend;
 
 import com.hoanghuy04.instagrambackend.entity.*;
+import com.hoanghuy04.instagrambackend.enums.MediaCategory;
+import com.hoanghuy04.instagrambackend.enums.MediaUsage;
 import com.hoanghuy04.instagrambackend.enums.NotificationType;
 import com.hoanghuy04.instagrambackend.enums.UserRole;
 import com.hoanghuy04.instagrambackend.repository.*;
@@ -28,9 +30,10 @@ public class InitApp implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
-//    private final LikeRepository likeRepository;
+    private final LikeRepository likeRepository;
     private final FollowRepository followRepository;
     private final NotificationRepository notificationRepository;
+    private final MediaFileRepository mediaFileRepository;
     private final PasswordEncoder passwordEncoder;
     
     @Override
@@ -48,6 +51,7 @@ public class InitApp implements CommandLineRunner {
             clearExistingData();
             
             initializeUsers();
+            initializeMediaFiles();
             initializePosts();
             initializeComments();
             initializeFollows();
@@ -66,10 +70,11 @@ public class InitApp implements CommandLineRunner {
         log.info("Clearing existing data...");
         
         notificationRepository.deleteAll();
-//        likeRepository.deleteAll();
+        likeRepository.deleteAll();
         commentRepository.deleteAll();
         followRepository.deleteAll();
         postRepository.deleteAll();
+        mediaFileRepository.deleteAll();
         userRepository.deleteAll();
         
         log.info("Existing data cleared");
@@ -118,8 +123,8 @@ public class InitApp implements CommandLineRunner {
         List<User> users = new ArrayList<>();
         
         String[][] userData = {
-            {"tnhxinhdep", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
-            {"tnh", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
+            {"john_doe", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
+            {"jane_smith", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
             {"mike_wilson", "mike@example.com", "Mike", "Wilson", "Fitness coach 💪", "", "Miami, FL"},
             {"sarah_jones", "sarah@example.com", "Sarah", "Jones", "Food lover 🍕", "", "Chicago, IL"},
             {"alex_brown", "alex@example.com", "Alex", "Brown", "Tech enthusiast 💻", "", "Seattle, WA"},
@@ -141,7 +146,7 @@ public class InitApp implements CommandLineRunner {
             User user = User.builder()
                     .username(data[0])
                     .email(data[1])
-                    .password(passwordEncoder.encode("123"))
+                    .password(passwordEncoder.encode("password123"))
                     .profile(profile)
                     .roles(Set.of(UserRole.USER))
                     .isPrivate(Math.random() < 0.3) // 30% chance of private account
@@ -154,6 +159,41 @@ public class InitApp implements CommandLineRunner {
         }
         
         return users;
+    }
+    
+    /**
+     * Initialize sample media files
+     */
+    private void initializeMediaFiles() {
+        log.info("Initializing media files...");
+        
+        List<User> users = userRepository.findAll();
+        if (users.isEmpty()) {
+            log.warn("No users found, skipping media file initialization");
+            return;
+        }
+        
+        // Find the specific user with ID 692132250bb92bb8ea7e41b1 or use first user as fallback
+        User targetUser = users.stream()
+                .filter(u -> "692132250bb92bb8ea7e41b1".equals(u.getId()))
+                .findFirst()
+                .orElse(users.get(0));
+        
+        // Create AI assistant profile image
+        MediaFile aiAssistantMedia = MediaFile.builder()
+                .id("000000000000000000000000")
+                .userId(targetUser.getId())
+                .fileName("ai-assistant.jpeg")
+                .filePath(".\\uploads\\ai-assistant.jpeg")
+                .fileSize(81961L)
+                .category(MediaCategory.IMAGE)
+                .usage(MediaUsage.PROFILE)
+                .contentType("image/jpeg")
+                .uploadedAt(LocalDateTime.of(2025, 11, 22, 3, 52, 37, 903000000))
+                .build();
+        
+        mediaFileRepository.save(aiAssistantMedia);
+        log.info("Created AI assistant media file for user: {}", targetUser.getUsername());
     }
     
     /**

@@ -34,6 +34,7 @@ import {
   EMOJI_DEFAULTS,
 } from '../../utils/constants';
 import { MessageType } from '../../types/enum.type';
+import { mediaService } from '../../services/media';
 
 type EmojiCategory = (typeof EMOJI_CATEGORIES_ORDER)[number];
 
@@ -331,9 +332,21 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setShowEmoji(false);
   };
 
-  const handleOpenCamera = () => {
-    Alert.alert('Camera', 'Mở camera (todo: tích hợp).');
-  };
+  const handleOpenCamera = useCallback(async () => {
+    if (!onSendMedia) {
+      Alert.alert('Thông báo', 'Chức năng gửi media chưa được kích hoạt.');
+      return;
+    }
+    try {
+      const photo = await mediaService.takePhoto();
+      if (photo?.uri) {
+        onSendMedia(MessageType.IMAGE, photo.uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Lỗi', 'Không thể mở camera. Vui lòng thử lại.');
+    }
+  }, [onSendMedia]);
 
   const handlePickImage = async () => {
     if (!onSendMedia) {

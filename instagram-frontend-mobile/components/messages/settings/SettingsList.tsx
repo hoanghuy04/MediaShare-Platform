@@ -14,6 +14,7 @@ type Props = {
   };
   onOpenThemePicker: () => void;
   onOpenMembers: () => void;
+  onOpenPrivacy: () => void;
   onCreateGroupFromDirect: () => void;
   onCreateGroupFromGroup: () => void;
 };
@@ -25,6 +26,7 @@ export const SettingsList: React.FC<Props> = ({
   themeColors,
   onOpenThemePicker,
   onOpenMembers,
+  onOpenPrivacy,
   onCreateGroupFromDirect,
   onCreateGroupFromGroup,
 }) => {
@@ -89,6 +91,7 @@ export const SettingsList: React.FC<Props> = ({
         left={<Ionicons name="lock-closed-outline" size={24} color={themeColors.text} />}
         title="Quyền riêng tư và an toàn"
         textColor={themeColors.text}
+        onPress={onOpenPrivacy}
         textSecondaryColor={themeColors.textSecondary}
       />
 

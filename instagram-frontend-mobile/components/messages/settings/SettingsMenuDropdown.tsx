@@ -72,7 +72,7 @@ export const SettingsMenuDropdown: React.FC<Props> = ({
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => {
                   onClose();
@@ -93,7 +93,7 @@ export const SettingsMenuDropdown: React.FC<Props> = ({
                 >
                   Ẩn
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
 
               <TouchableOpacity
                 style={styles.menuItem}
