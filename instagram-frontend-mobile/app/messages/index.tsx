@@ -20,6 +20,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { userAPI } from '../../services/api';
 import { messageAPI } from '../../services/message.service';
+import { messageRequestAPI } from '../../services/message-request.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
 import { UserProfile, Conversation, Message, InboxItem, UserSummary } from '../../types';
@@ -29,7 +30,6 @@ import {
   calculateUnreadCount,
   formatMessageTime,
 } from '../../utils/messageUtils';
-import { messageRequestAPI } from '../../services/api';
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
@@ -67,7 +67,6 @@ export default function MessagesScreen() {
       clearTimeout(refreshTimeoutRef.current);
     }
     refreshTimeoutRef.current = setTimeout(() => {
-      console.log('Debounced refresh triggered');
       refresh();
     }, 300);
   }, [refresh]);
@@ -111,12 +110,6 @@ export default function MessagesScreen() {
   // Set up WebSocket listener for real-time message updates
   useEffect(() => {
     const handleWebSocketMessage = (message: any) => {
-      console.log('📨 [Inbox] WebSocket message received:', {
-        type: message.type,
-        conversationId: message.conversationId,
-        senderId: message.senderId,
-        content: message.content?.substring(0, 50),
-      });
 
       if (message.type === 'CHAT' && message.conversationId) {
         // Update last message in inbox immediately for better UX
@@ -154,7 +147,6 @@ export default function MessagesScreen() {
     };
 
     const handleTyping = (isTyping: boolean, userId: string, conversationId?: string) => {
-      console.log('⌨️ [Inbox] Typing indicator:', { isTyping, userId, conversationId });
 
       // Only handle typing if conversationId is provided
       if (!conversationId) return;
@@ -188,7 +180,6 @@ export default function MessagesScreen() {
     };
 
     const handleReadReceipt = (messageId: string, readerId: string, conversationId?: string) => {
-      console.log('👁️ [Inbox] Read receipt:', { messageId, readerId, conversationId });
       
       if (!conversationId) return;
 
@@ -230,7 +221,6 @@ export default function MessagesScreen() {
   // Refresh data when screen comes into focus (debounced)
   useFocusEffect(
     React.useCallback(() => {
-      console.log('Messages screen focused, refreshing...');
       debouncedRefresh();
     }, [debouncedRefresh])
   );
@@ -264,7 +254,6 @@ export default function MessagesScreen() {
 
   const handleLongPress = (conversation: Conversation) => {
     // TODO: Show options (delete, mute, etc.)
-    console.log('Long press on conversation:', conversation.id);
   };
 
   const renderHeader = () => (
@@ -391,7 +380,6 @@ export default function MessagesScreen() {
 
   // Render inbox item (conversation or message request)
   const renderInboxItem = ({ item }: { item: InboxItem }) => {
-    console.log('item', item);
 
     if (!currentUser) return null;
 

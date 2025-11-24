@@ -1,65 +1,17 @@
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
 import {
-  LoginRequest,
-  RegisterRequest,
-  AuthResponse,
   UserProfile,
   UpdateProfileRequest,
   Post,
   Comment,
   CreateCommentRequest,
-  Conversation,
-  Message,
-  SendMessageRequest,
-  MessageRequest,
-  InboxItem,
   Notification,
   PaginatedResponse,
   UserSummary,
 } from '../types';
-import apiConfig from '../config/apiConfig';
 import { CreatePostRequest } from '../types/post.type';
 
-// Auth API
-export const authAPI = {
-  login: async (data: LoginRequest): Promise<AuthResponse> => {
-    console.log('API URL:', apiConfig.apiUrl);
-    const response = await axiosInstance.post(API_ENDPOINTS.LOGIN, data);
-    return response.data.data;
-  },
-
-  register: async (data: RegisterRequest): Promise<AuthResponse> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.REGISTER, data);
-    return response.data.data;
-  },
-
-  logout: async (): Promise<void> => {
-    await axiosInstance.post(API_ENDPOINTS.LOGOUT);
-  },
-
-  refreshToken: async (refreshToken: string): Promise<AuthResponse> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.REFRESH_TOKEN, null, {
-      params: { refreshToken },
-    });
-    return response.data.data;
-  },
-
-  verifyToken: async (token: string): Promise<boolean> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.VERIFY_TOKEN, {
-      params: { token },
-    });
-    return response.data.data;
-  },
-
-  forgotPassword: async (email: string): Promise<void> => {
-    await axiosInstance.post(API_ENDPOINTS.FORGOT_PASSWORD, { email });
-  },
-
-  resetPassword: async (token: string, newPassword: string): Promise<void> => {
-    await axiosInstance.post(API_ENDPOINTS.RESET_PASSWORD, { token, newPassword });
-  },
-};
 
 // User API
 export const userAPI = {
@@ -258,50 +210,6 @@ export const commentAPI = {
   },
 };
 
-// Message Request API
-export const messageRequestAPI = {
-  getPendingRequests: async (): Promise<MessageRequest[]> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS, {
-      params: { userId },
-    });
-    return response.data.data;
-  },
-
-  getPendingRequestsCount: async (): Promise<number> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_COUNT, {
-      params: { userId },
-    });
-    return response.data.data;
-  },
-
-  getPendingInboxItems: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_INBOX, {
-      params: { userId, page, size: limit }, // Backend uses 'size' not 'limit'
-    });
-    return response.data.data;
-  },
-
-  getPendingMessages: async (senderId: string, receiverId: string): Promise<Message[]> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.MESSAGE_REQUESTS_PENDING_MESSAGES, {
-      params: { senderId, receiverId },
-    });
-    return response.data.data;
-  },
-
-  getPendingMessagesByRequestId: async (requestId: string): Promise<Message[]> => {
-    const userId = axiosInstance.defaults.headers.common['X-User-ID'];
-    const response = await axiosInstance.get(
-      API_ENDPOINTS.MESSAGE_REQUESTS_PENDING_MESSAGES_BY_ID(requestId),
-      {
-        params: { userId },
-      }
-    );
-    return response.data.data;
-  },
-};
 
 // Notification API
 export const notificationAPI = {
@@ -364,41 +272,3 @@ export const uploadAPI = {
   },
 };
 
-// AI Chat API
-export const aiAPI = {
-  // Send message to AI assistant, returns the AI response with conversationId
-  sendMessage: async (prompt: string): Promise<Message> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.AI_CHAT, {
-      content: prompt,
-    });
-    console.log("___________________________________response dât_____________: ", response.data.data);
-    
-    return response.data.data; // Returns MessageResponse which includes conversationId
-  },
-
-  // Send prompt to AI with optional conversationId
-  sendPrompt: async (prompt: string, opts?: { conversationId?: string }): Promise<{ message: Message; conversationId: string }> => {
-    const response = await axiosInstance.post(API_ENDPOINTS.AI_CHAT, {
-      content: prompt,
-      ...(opts?.conversationId && { conversationId: opts.conversationId }),
-    });
-    console.log("AI sendPrompt response:", response.data.data);
-    
-    const message = response.data.data;
-    return {
-      message,
-      conversationId: message.conversationId || opts?.conversationId || '',
-    };
-  },
-
-  // Get or create AI conversation
-  getConversation: async (): Promise<Conversation> => {
-    const response = await axiosInstance.get(API_ENDPOINTS.AI_CONVERSATION);
-    return response.data.data;
-  },
-
-  // Clear AI conversation history
-  clearHistory: async (): Promise<void> => {
-    await axiosInstance.delete(API_ENDPOINTS.AI_CLEAR_HISTORY);
-  },
-};

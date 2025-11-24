@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import { messageRequestAPI } from '../../services/api';
+import { messageRequestAPI } from '../../services/message-request.service';
 import { InboxItem } from '../../types/message';
 import { Avatar } from '../../components/common/Avatar';
 import { showAlert } from '../../utils/helpers';
