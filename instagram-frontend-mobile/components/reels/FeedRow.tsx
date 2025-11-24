@@ -36,7 +36,15 @@ interface HeartItem {
   y?: number;
 }
 
-const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplete: () => void }) => {
+const AnimatedHeart = ({
+  x,
+  y,
+  onComplete,
+}: {
+  x?: number;
+  y?: number;
+  onComplete: () => void;
+}) => {
   const scale = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -103,21 +111,22 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
     outputRange: ['-15deg', '15deg'],
   });
 
-  const containerStyle = (x !== undefined && y !== undefined)
-    ? {
-      position: 'absolute' as const,
-      left: x,
-      top: y,
-      zIndex: 20,
-      pointerEvents: 'none' as const,
-    }
-    : {
-      ...StyleSheet.absoluteFillObject,
-      justifyContent: 'center' as const,
-      alignItems: 'center' as const,
-      zIndex: 20,
-      pointerEvents: 'none' as const,
-    };
+  const containerStyle =
+    x !== undefined && y !== undefined
+      ? {
+        position: 'absolute' as const,
+        left: x,
+        top: y,
+        zIndex: 20,
+        pointerEvents: 'none' as const,
+      }
+      : {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center' as const,
+        alignItems: 'center' as const,
+        zIndex: 20,
+        pointerEvents: 'none' as const,
+      };
 
   return (
     <View style={containerStyle}>
@@ -125,14 +134,16 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
         style={{
           transform: [{ scale }, { rotate: rotateStr }],
           opacity,
-        }}>
+        }}
+      >
         <MaskedView
           style={{ width: 100, height: 100 }}
           maskElement={
             <View style={styles.maskContainer}>
               <Ionicons name="heart" size={100} color="black" />
             </View>
-          }>
+          }
+        >
           <LinearGradient
             colors={gradientColors}
             start={{ x: 0, y: 0 }}
@@ -145,10 +156,17 @@ const AnimatedHeart = ({ x, y, onComplete }: { x?: number; y?: number; onComplet
   );
 };
 
-
-const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess, onFullScreenChange }: FeedRowProps) => {
+const FeedRow = ({
+  data,
+  isVisible,
+  height,
+  onModalStateChange,
+  onDeleteSuccess,
+  onFullScreenChange,
+}: FeedRowProps) => {
   const [isLiked, setIsLiked] = useState(data.likedByCurrentUser);
   const [totalLike, setTotalLike] = useState(data.totalLike);
+  const [totalComment, setTotalComment] = useState(data.totalComment);
   const [currentHeart, setCurrentHeart] = useState<HeartItem | null>(null);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
@@ -169,6 +187,22 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
     }
   }, [showLikesModal, showCommentsModal, onModalStateChange]);
 
+  // Reset modalTranslateY when comments modal closes
+  React.useEffect(() => {
+    if (!showCommentsModal && height > 0) {
+      modalTranslateY.value = height;
+    }
+  }, [showCommentsModal, height, modalTranslateY]);
+
+  // Reset animation when component becomes invisible (switching reels)
+  React.useEffect(() => {
+    if (!isVisible) {
+      modalTranslateY.value = height;
+      setShowCommentsModal(false);
+      setShowLikesModal(false);
+    }
+  }, [isVisible, height, modalTranslateY]);
+
   React.useEffect(() => {
     if (onFullScreenChange) {
       onFullScreenChange(isFullScreen);
@@ -177,7 +211,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
     fullScreenOpacity.value = withTiming(isFullScreen ? 0 : 1, { duration: 300 });
     exitButtonScale.value = withTiming(isFullScreen ? 1 : 0, {
       duration: 300,
-      easing: Easing.out(Easing.cubic)
+      easing: Easing.out(Easing.cubic),
     });
   }, [isFullScreen, onFullScreenChange]);
 
@@ -187,7 +221,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
       modalTranslateY.value,
       [stopPoint, height],
       [0, 1],
-      Extrapolation.CLAMP,
+      Extrapolation.CLAMP
     );
 
     return {
@@ -225,7 +259,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
     } else {
       const newLikedState = !isLiked;
       setIsLiked(newLikedState);
-      setTotalLike(prev => newLikedState ? prev + 1 : prev - 1);
+      setTotalLike(prev => (newLikedState ? prev + 1 : prev - 1));
 
       if (newLikedState) {
         setCurrentHeart({ id: Date.now() });
@@ -244,9 +278,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
     const authorData = data.author as UserSummaryResponse;
     const username = authorData.profile?.firstName || authorData.username || 'Unknown';
 
-    const message = isFollowing
-      ? `Đang theo dõi ${username}`
-      : `Đã bỏ theo dõi ${username}`;
+    const message = isFollowing ? `Đang theo dõi ${username}` : `Đã bỏ theo dõi ${username}`;
     setToastMessage(message);
     setToastVisible(true);
   };
@@ -261,7 +293,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
         modalTranslateY.value,
         [stopPoint, height],
         [stopPoint, height],
-        Extrapolation.CLAMP,
+        Extrapolation.CLAMP
       ),
     };
   });
@@ -291,16 +323,22 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
 
         {isFullScreen && (
           <Reanimated.View style={[styles.exitFullScreenButton, exitButtonStyle]}>
-            <AntDesign name="expand-alt" size={24} color="white" onPress={() => setIsFullScreen(false)} />
+            <AntDesign
+              name="expand-alt"
+              size={24}
+              color="white"
+              onPress={() => setIsFullScreen(false)}
+            />
           </Reanimated.View>
         )}
 
         {!isFullScreen && (
           <Reanimated.View
             style={uiAnimatedStyle}
-            pointerEvents={showLikesModal || showCommentsModal ? 'none' : 'box-none'}>
+            pointerEvents={showLikesModal || showCommentsModal ? 'none' : 'box-none'}
+          >
             <FeedSideBar
-              data={{ ...data, totalLike }}
+              data={{ ...data, totalLike, totalComment }}
               isLiked={isLiked}
               onLike={() => handleLike()}
               onLikeCountPress={() => {
@@ -314,10 +352,7 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
               onDeleteSuccess={onDeleteSuccess}
               onFullScreen={() => setIsFullScreen(true)}
             />
-            <FeedFooter
-              data={data}
-              onFollowChange={handleFollowChange}
-            />
+            <FeedFooter data={data} onFollowChange={handleFollowChange} />
           </Reanimated.View>
         )}
       </Reanimated.View>
@@ -337,12 +372,15 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
         onClose={() => {
           setShowCommentsModal(false);
           onModalStateChange?.(false);
+          // Ensure animation is reset
+          modalTranslateY.value = height;
         }}
         postId={data.id}
         postAuthorId={data.author.id}
         modalTranslateY={modalTranslateY}
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(prev => !prev)}
+        onCommentChange={(delta: number) => setTotalComment(prev => Math.max(0, prev + delta))}
       />
 
       <Toast

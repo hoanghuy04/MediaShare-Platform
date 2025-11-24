@@ -65,6 +65,7 @@ type Props = {
   modalTranslateY?: SharedValue<number>;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onCommentChange?: (delta: number) => void;
 };
 
 type CommentWithReplies = CommentData & {
@@ -82,6 +83,7 @@ const CommentsModal = ({
   modalTranslateY,
   isMuted,
   onToggleMute,
+  onCommentChange,
 }: Props) => {
   const insets = useSafeAreaInsets();
   const { user: currentUser } = useAuth();
@@ -268,6 +270,8 @@ const CommentsModal = ({
       setReplyingTo(null);
       setRootIDToReply(null);
       Keyboard.dismiss();
+      // Reset translateY to SNAP_CLOSE when modal closes
+      translateY.value = SNAP_CLOSE;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, postId]);
@@ -318,12 +322,12 @@ const CommentsModal = ({
         prev.map(c =>
           c.id === comment.id
             ? {
-                ...c,
-                replies,
-                repliesLoaded: true,
-                showReplies: true,
-                loadingReplies: false,
-              }
+              ...c,
+              replies,
+              repliesLoaded: true,
+              showReplies: true,
+              loadingReplies: false,
+            }
             : c
         )
       );
@@ -355,10 +359,10 @@ const CommentsModal = ({
             replies: c.replies?.map(r =>
               r.id === comment.id
                 ? {
-                    ...r,
-                    likedByCurrentUser: optimisticLiked,
-                    totalLike: optimisticLikes,
-                  }
+                  ...r,
+                  likedByCurrentUser: optimisticLiked,
+                  totalLike: optimisticLikes,
+                }
                 : r
             ),
           };
@@ -369,10 +373,10 @@ const CommentsModal = ({
         prev.map(c =>
           c.id === comment.id
             ? {
-                ...c,
-                likedByCurrentUser: optimisticLiked,
-                totalLike: optimisticLikes,
-              }
+              ...c,
+              likedByCurrentUser: optimisticLiked,
+              totalLike: optimisticLikes,
+            }
             : c
         )
       );
@@ -390,10 +394,10 @@ const CommentsModal = ({
               replies: c.replies?.map(r =>
                 r.id === comment.id
                   ? {
-                      ...r,
-                      likedByCurrentUser: result.liked,
-                      totalLike: result.totalLikes,
-                    }
+                    ...r,
+                    likedByCurrentUser: result.liked,
+                    totalLike: result.totalLikes,
+                  }
                   : r
               ),
             };
@@ -404,10 +408,10 @@ const CommentsModal = ({
           prev.map(c =>
             c.id === comment.id
               ? {
-                  ...c,
-                  likedByCurrentUser: result.liked,
-                  totalLike: result.totalLikes,
-                }
+                ...c,
+                likedByCurrentUser: result.liked,
+                totalLike: result.totalLikes,
+              }
               : c
           )
         );
@@ -473,9 +477,13 @@ const CommentsModal = ({
           };
         })
       );
+      // optimistic increment total comment count for replies
+      onCommentChange?.(1);
     } else {
       setComments(prev => [tempComment, ...prev]);
       flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      // optimistic increment total comment count for new root comment
+      onCommentChange?.(1);
     }
 
     setSubmitting(true);
@@ -522,8 +530,12 @@ const CommentsModal = ({
             };
           })
         );
+        // revert optimistic increment
+        onCommentChange?.(-1);
       } else {
         setComments(prev => prev.filter(c => c.id !== tempId));
+        // revert optimistic increment
+        onCommentChange?.(-1);
       }
     } finally {
       setSubmitting(false);
