@@ -89,6 +89,7 @@ export default function ConversationScreen() {
     onMessage,
     onReadReceipt,
     onTyping,
+    onConversationUpdate,
     isConnected,
     connectionStatus,
   } = useWebSocket();
@@ -399,6 +400,59 @@ export default function ConversationScreen() {
     ensureMessageSender,
     sortAsc,
   ]);
+
+  // Listen for real-time conversation updates
+  useEffect(() => {
+    const unsubscribe = onConversationUpdate((update) => {
+      console.log('📡 [ConversationScreen] Conversation update received:', update);
+      
+      // Only process updates for current conversation
+      if (update.conversationId !== actualConversationId) return;
+
+      switch (update.updateType) {
+        case 'GROUP_INFO_UPDATED':
+          // Conversation details will auto-refresh via ConversationContext
+          // Just show notification
+          console.log('Group info updated');
+          break;
+
+        case 'MEMBERS_ADDED':
+          // Reload conversation to get updated participant list
+          if (actualConversationId) {
+            loadExistingThread(actualConversationId);
+          }
+          break;
+
+        case 'MEMBER_REMOVED':
+          // Check if current user was removed
+          if (update.data?.removedUserId === user?.id) {
+            showAlert('Thông báo', 'Bạn đã bị xóa khỏi nhóm');
+            router.replace('/messages');
+          } else {
+            // Reload to update member list
+            if (actualConversationId) {
+              loadExistingThread(actualConversationId);
+            }
+          }
+          break;
+
+        case 'MEMBER_PROMOTED':
+        case 'MEMBER_DEMOTED':
+          // Reload to update roles
+          if (actualConversationId) {
+            loadExistingThread(actualConversationId);
+          }
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [actualConversationId, onConversationUpdate, loadExistingThread, user?.id, router]);
 
   // WebSocket events (đã xử lý cho group)
   useEffect(() => {

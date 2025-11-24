@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { messageAPI } from '../services/message.service';
 import { Conversation } from '../types';
+import { useWebSocket } from './WebSocketContext';
 
 // ========================================
 // Types
@@ -80,6 +81,16 @@ export const ConversationProvider: React.FC<{
   const [conversations, setConversations] = useState<ConversationState>(
     {}
   );
+  
+  // Get WebSocket hook - with fallback for when not in WebSocketProvider
+  let onConversationUpdate: ((callback: (update: any) => void) => () => void) | undefined;
+  try {
+    const ws = useWebSocket();
+    onConversationUpdate = ws.onConversationUpdate;
+  } catch (e) {
+    // Not in WebSocketProvider, skip WebSocket updates
+    console.log('ConversationProvider: Not in WebSocketProvider context');
+  }
 
   // Map để track các promise đang pending (tránh fetch trùng lặp)
   const pendingPromises = useMemo(
@@ -231,6 +242,47 @@ export const ConversationProvider: React.FC<{
     },
     []
   );
+
+  // Listen for real-time conversation updates via WebSocket
+  useEffect(() => {
+    if (!onConversationUpdate) return;
+
+    const unsubscribe = onConversationUpdate((update) => {
+      console.log('📡 [ConversationContext] Conversation update received:', update);
+      
+      const { conversationId, updateType, data } = update;
+      
+      if (!conversationId) return;
+
+      // Auto-refresh conversation when updates occur
+      switch (updateType) {
+        case 'GROUP_INFO_UPDATED':
+          // Update local cache with new data if provided
+          if (data) {
+            setConversation(data);
+          } else {
+            // Fallback: refresh from server
+            refreshConversation(conversationId);
+          }
+          break;
+
+        case 'MEMBERS_ADDED':
+        case 'MEMBER_REMOVED':
+        case 'MEMBER_PROMOTED':
+        case 'MEMBER_DEMOTED':
+          // Refresh conversation to get updated participant list
+          refreshConversation(conversationId);
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [onConversationUpdate, setConversation, refreshConversation]);
 
   const value = useMemo<ConversationContextValue>(
     () => ({

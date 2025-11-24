@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
+import { useWebSocket } from '../../context/WebSocketContext';
 import { useConversation, useConversationActions } from '../../context/ConversationContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 // import { userAPI } from '../../services/api';
@@ -37,6 +38,7 @@ import { SettingsEditGroup } from '../../components/messages/settings/SettingsEd
 export default function ConversationSettingsScreen() {
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
+  const { onConversationUpdate } = useWebSocket();
   const router = useRouter();
   const params = useLocalSearchParams<{ userId?: string; conversationId?: string }>();
   const normalize = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v);
@@ -119,6 +121,54 @@ export default function ConversationSettingsScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Listen for real-time conversation updates
+  useEffect(() => {
+    const unsubscribe = onConversationUpdate((update) => {
+      console.log('📡 Conversation update received:', update);
+      
+      // Only process updates for current conversation
+      if (update.conversationId !== routeConversationId) return;
+
+      switch (update.updateType) {
+        case 'GROUP_INFO_UPDATED':
+          // Refresh conversation data
+          if (update.data) {
+            setConversation(update.data);
+          }
+          break;
+
+        case 'MEMBERS_ADDED':
+          // Refresh conversation to show new members
+          refreshConversation();
+          break;
+
+        case 'MEMBER_REMOVED':
+          // Check if current user was removed
+          if (update.data?.removedUserId === currentUser?.id) {
+            showAlert('Thông báo', 'Bạn đã bị xóa khỏi nhóm');
+            router.back();
+          } else {
+            // Refresh to update member list
+            refreshConversation();
+          }
+          break;
+
+        case 'MEMBER_PROMOTED':
+        case 'MEMBER_DEMOTED':
+          // Refresh to update roles
+          refreshConversation();
+          break;
+
+        default:
+          break;
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [routeConversationId, onConversationUpdate, setConversation, refreshConversation, currentUser?.id, router]);
 
   // ----- LEAVE GROUP -----
   const handleLeaveGroup = useCallback(() => {

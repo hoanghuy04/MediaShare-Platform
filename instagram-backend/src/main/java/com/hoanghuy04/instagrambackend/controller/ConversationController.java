@@ -32,6 +32,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * REST controller for conversation management endpoints.
  * Handles both direct and group conversations.
@@ -135,6 +138,18 @@ public class ConversationController {
 
         // build DTO + resolve URL
         ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, userId);
+        
+        // Notify all participants about the update
+        List<String> participantIds = dto.getParticipants().stream()
+                .map(p -> p.getUserId())
+                .collect(Collectors.toList());
+        webSocketMessageService.pushConversationUpdate(
+                conversationId,
+                participantIds,
+                "GROUP_INFO_UPDATED",
+                dto
+        );
+        
         return ResponseEntity.ok(ApiResponse.success("Group updated successfully", dto));
     }
 
@@ -149,6 +164,23 @@ public class ConversationController {
         for (String userId : request.getUserIds()) {
             conversationService.addMember(conversationId, userId, addedBy);
         }
+        
+        // Notify all participants including new members
+        ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, addedBy);
+        List<String> participantIds = dto.getParticipants().stream()
+                .map(p -> p.getUserId())
+                .collect(Collectors.toList());
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("addedUserIds", request.getUserIds());
+        data.put("addedBy", addedBy);
+        data.put("conversation", dto);
+        webSocketMessageService.pushConversationUpdate(
+                conversationId,
+                participantIds,
+                "MEMBERS_ADDED",
+                data
+        );
+        
         return ResponseEntity.ok(ApiResponse.success("Members added successfully", null));
     }
 
@@ -162,6 +194,24 @@ public class ConversationController {
                 conversationId, userId, removedBy);
 
         conversationService.removeMember(conversationId, userId);
+        
+        // Notify all remaining participants + the removed user
+        ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, removedBy);
+        java.util.List<String> participantIds = new java.util.ArrayList<>(dto.getParticipants().stream()
+                .map(p -> p.getUserId())
+                .collect(java.util.stream.Collectors.toList()));
+        participantIds.add(userId); // Also notify the removed user
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("removedUserId", userId);
+        data.put("removedBy", removedBy);
+        data.put("conversation", dto);
+        webSocketMessageService.pushConversationUpdate(
+                conversationId,
+                participantIds,
+                "MEMBER_REMOVED",
+                data
+        );
+        
         return ResponseEntity.ok(ApiResponse.success("Member removed successfully", null));
     }
 
@@ -185,6 +235,23 @@ public class ConversationController {
         log.info("Promote member {} to admin in conversation {} by user {}", userId, conversationId, promotedBy);
 
         conversationService.promoteMemberToAdmin(conversationId, userId);
+        
+        // Notify all participants
+        ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, promotedBy);
+        java.util.List<String> participantIds = dto.getParticipants().stream()
+                .map(p -> p.getUserId())
+                .collect(java.util.stream.Collectors.toList());
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("promotedUserId", userId);
+        data.put("promotedBy", promotedBy);
+        data.put("conversation", dto);
+        webSocketMessageService.pushConversationUpdate(
+                conversationId,
+                participantIds,
+                "MEMBER_PROMOTED",
+                data
+        );
+        
         return ResponseEntity.ok(ApiResponse.success("Member promoted to admin successfully", null));
     }
 
@@ -197,6 +264,23 @@ public class ConversationController {
         log.info("Demote admin {} to member in conversation {} by user {}", userId, conversationId, demotedBy);
 
         conversationService.demoteAdminToMember(conversationId, userId);
+        
+        // Notify all participants
+        ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, demotedBy);
+        java.util.List<String> participantIds = dto.getParticipants().stream()
+                .map(p -> p.getUserId())
+                .collect(java.util.stream.Collectors.toList());
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("demotedUserId", userId);
+        data.put("demotedBy", demotedBy);
+        data.put("conversation", dto);
+        webSocketMessageService.pushConversationUpdate(
+                conversationId,
+                participantIds,
+                "MEMBER_DEMOTED",
+                data
+        );
+        
         return ResponseEntity.ok(ApiResponse.success("Admin demoted to member successfully", null));
     }
 

@@ -30,6 +30,7 @@ export interface MessageCallbacks {
   onReadReceipt?: (messageId: string, userId: string, conversationId?: string) => void;
   onUserOnline?: (userId: string) => void;
   onUserOffline?: (userId: string) => void;
+  onConversationUpdate?: (update: { conversationId: string; updateType: string; data: any }) => void;
   onError?: (error: string) => void;
   onConnected?: () => void;
   onDisconnected?: () => void;
@@ -118,6 +119,9 @@ class WebSocketService {
 
     // Subscribe to user presence
     this.subscribeToPresence();
+
+    // Subscribe to conversation updates
+    this.subscribeToConversationUpdates();
 
     // Subscribe to errors
     this.subscribeToErrors();
@@ -276,6 +280,28 @@ class WebSocketService {
           }
         } catch (error) {
           console.error('Error parsing presence update:', error);
+        }
+      }
+    );
+
+    this.subscriptions.set('presence', subscription);
+  }
+
+  /**
+   * Subscribe to conversation updates
+   */
+  private subscribeToConversationUpdates(): void {
+    if (!this.client || !this.config) return;
+
+    const subscription = this.client.subscribe(
+      `/user/${this.config.userId}/queue/conversation-updates`,
+      (message: IMessage) => {
+        try {
+          console.log('📥 Conversation update received:', message.body);
+          const update = JSON.parse(message.body);
+          this.callbacks.onConversationUpdate?.(update);
+        } catch (error) {
+          console.error('Error parsing conversation update:', error);
         }
       }
     );
