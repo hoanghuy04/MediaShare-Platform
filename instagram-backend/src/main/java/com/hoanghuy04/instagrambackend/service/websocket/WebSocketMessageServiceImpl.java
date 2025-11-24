@@ -219,7 +219,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 .senderId(sender.getId())
                 .senderUsername(sender.getUsername())
                 .senderProfileImage(sender.getAvatar())
-                .conversationId(message.getConversationId()) 
+                .conversationId(message.getConversationId())
                 .content(message.getContent())
                 .contentType(message.getType())
                 .timestamp(message.getCreatedAt())

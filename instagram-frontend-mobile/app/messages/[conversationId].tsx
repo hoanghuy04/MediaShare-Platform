@@ -7,30 +7,31 @@ import React, {
 } from 'react';
 import {
   View,
-  FlatList,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Text,
-  TouchableOpacity,
-  ImageBackground,
-  ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { useConversation, useConversationActions } from '../../context/ConversationContext';
+import { useConversation } from '../../context/ConversationContext';
 import { MessageType } from '../../types/enum.type';
 import { fileService } from '../../services/file.service';
 import { ChatMessage } from '../../components/messages/ChatMessage';
 import { MessageInput } from '../../components/messages/MessageInput';
-import { TypingIndicator } from '../../components/messages/TypingIndicator';
-import { ConnectionStatus } from '../../components/messages/ConnectionStatus';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { userAPI, messageRequestAPI, aiAPI } from '../../services/api';
+import { MessageList } from '../../components/messages/MessageList';
+import { WallpaperWrapper } from '../../components/messages/WallpaperWrapper';
+import { ScrollToBottomButton } from '../../components/messages/ScrollToBottomButton';
+import { TypingDock } from '../../components/messages/TypingDock';
+import { ReadReceiptLabel } from '../../components/messages/ReadReceiptLabel';
+import { userAPI } from '../../services/api';
+import { messageRequestAPI } from '../../services/message-request.service';
+import { aiAPI } from '../../services/ai.service';
 import { messageAPI } from '../../services/message.service';
 import { Conversation, Message, UserProfile } from '../../types';
 import { showAlert } from '../../utils/helpers';
@@ -109,10 +110,7 @@ export default function ConversationScreen() {
   // ConversationContext
   const {
     conversation: conversationDetails,
-    status: conversationStatus,
-    refresh: refreshConversation,
   } = useConversation(actualConversationId || routeConversationId);
-  const { setConversation } = useConversationActions();
   const [pendingMembers, setPendingMembers] = useState<
     Record<string, MutualUserOption>
   >({});
@@ -406,18 +404,6 @@ export default function ConversationScreen() {
   useEffect(() => {
     // CHAT packet
     const onMsg = (packet: any) => {
-      console.log('📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨📨 WebSocket packet received:', {
-        type: packet.type,
-        messageType: packet.contentType || " ",
-        conversationId: packet.conversationId,
-        senderId: packet.senderId,
-        receiverId: packet.receiverId,
-        content: packet.content,
-        mediaUrl: packet.mediaUrl,
-        currentConvId: actualConversationId,
-        isGroup: isGroupConversation,
-      });
-
       if (packet.type !== 'CHAT') return;
       if (!packet.senderId) return;
 
@@ -434,11 +420,8 @@ export default function ConversationScreen() {
         (packet.senderId === peerId || packet.receiverId === peerId);
 
       if (!matchesConv && !matchesPeer) {
-        console.log('❌ Message không match conversation hiện tại, bỏ qua');
         return;
       }
-
-      console.log('✅ Message match conversation, đang xử lý...');
 
       const incoming: Message = {
         id: packet.id || '',
@@ -486,15 +469,7 @@ export default function ConversationScreen() {
     };
 
     const onRr = (messageId: string, readerId: string, convId?: string) => {
-      console.log('👁️ Read receipt received:', {
-        messageId,
-        readerId,
-        convId,
-        currentConvId: actualConversationId,
-      });
-
       if (actualConversationId && convId && convId !== actualConversationId) {
-        console.log('❌ Read receipt không match conversation, bỏ qua');
         return;
       }
 
@@ -510,30 +485,18 @@ export default function ConversationScreen() {
     };
 
     const onTp = (isTypingFlag: boolean, uid: string, convId?: string) => {
-      console.log('⌨️ Typing indicator received:', {
-        isTyping: isTypingFlag,
-        userId: uid,
-        convId,
-        currentConvId: actualConversationId,
-        isGroup: isGroupConversation,
-      });
-
       if (!uid || uid === user?.id) return;
 
       if (actualConversationId && convId && convId !== actualConversationId) {
-        console.log('❌ Typing indicator không match conversation, bỏ qua');
         return;
       }
 
       if (!isGroupConversation && !convId) {
         const peer = otherUser?.id || peerUserId || routeConversationId;
         if (!peer || uid !== peer) {
-          console.log('❌ Typing indicator không match peer, bỏ qua');
           return;
         }
       }
-
-      console.log('✅ Typing indicator match, đang xử lý...');
 
       setTypingUsers(prev =>
         isTypingFlag
@@ -544,12 +507,10 @@ export default function ConversationScreen() {
       );
     };
 
-    // 💡 LƯU unsubscribe
     const offMessage = onMessage(onMsg);
     const offReadReceipt = onReadReceipt(onRr as any);
     const offTyping = onTyping(onTp as any);
 
-    // 🧹 Cleanup: HỦY lắng nghe khi unmount hoặc deps thay đổi
     return () => {
       offMessage();
       offReadReceipt();
@@ -572,7 +533,6 @@ export default function ConversationScreen() {
   ]);
 
 
-  // Sync otherUser và peerUserId từ conversationDetails
   useEffect(() => {
     if (!conversationDetails) return;
 
@@ -622,7 +582,6 @@ export default function ConversationScreen() {
     loadPendingThread,
   ]);
 
-  // Auto send prompt to AI
   useEffect(() => {
     if (!textPrompt) return;
     if (!isAiAssistant) return;
@@ -799,7 +758,6 @@ export default function ConversationScreen() {
     }
   };
 
-  // Gửi media message (IMAGE/VIDEO)
   const handleSendMedia = async (type: MessageType, localUri: string) => {
     const targetUserId =
       otherUser?.id || peerUserId || routeConversationId;
@@ -895,7 +853,6 @@ export default function ConversationScreen() {
     }
   };
 
-  // Cluster flags
   const CLUSTER_MS = 2 * 60 * 1000;
   const getClusterFlags = useCallback(
     (index: number) => {
@@ -939,14 +896,12 @@ export default function ConversationScreen() {
   );
 
   const handleHeaderAddMembers = useCallback(() => {
-    // Nếu là GROUP → mở modal thêm thành viên (giữ behavior cũ)
     if (isGroupConversation) {
       setPendingMembers({});
       setAddMembersVisible(true);
       return;
     }
 
-    // Nếu là DIRECT → chuyển sang màn create-group, seed user hiện tại
     const seedUserId = otherUser?.id || peerUserId || undefined;
 
     if (seedUserId) {
@@ -1008,21 +963,11 @@ export default function ConversationScreen() {
           onPressReply={handleScrollToMessage}
           palette={bubblePalette}
         />
-        {hasPeerSeen && (
-          <Text
-            style={[
-              styles.readReceiptLabel,
-              { color: theme.colors.textSecondary },
-            ]}
-          >
-            Đã xem
-          </Text>
-        )}
+        <ReadReceiptLabel visible={hasPeerSeen} />
       </View>
     );
   };
 
-  // Header title / subtitle giống Messenger
   const title = useMemo(() => {
     if (isGroupConversation) {
       if (conversationDetails?.name) {
@@ -1066,49 +1011,16 @@ export default function ConversationScreen() {
     : undefined;
 
   const messageList = (
-    <FlatList
-      ref={flatListRef}
-      data={messages}
-      renderItem={renderMessage}
-      keyExtractor={item => item.id}
-      contentContainerStyle={styles.messagesList}
-      keyboardShouldPersistTaps="handled"
-      onScroll={handleListScroll}
-      scrollEventThrottle={16}
-      inverted={false}
+    <MessageList
+      messages={messages}
+      renderMessage={renderMessage}
       onEndReached={loadMoreMessages}
-      onEndReachedThreshold={0.5}
-      // 👇 tránh iOS tự cộng thêm safe-area lần nữa
-      contentInsetAdjustmentBehavior="never"
-      automaticallyAdjustContentInsets={false}
-      ListHeaderComponent={
-        <>
-          {isLoadingMore && (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator
-                size="small"
-                color={theme.colors.primary}
-              />
-              <Text
-                style={[
-                  styles.loadingText,
-                  { color: theme.colors.textSecondary },
-                ]}
-              >
-                Đang tải tin nhắn cũ hơn...
-              </Text>
-            </View>
-          )}
-          {canUseRealtime &&
-            connectionStatus !== 'connected' && (
-              <ConnectionStatus
-                status={connectionStatus}
-                onRetry={() => { }}
-              />
-            )}
-        </>
-      }
-      ListFooterComponent={<View style={styles.listFooter} />}
+      onScroll={handleListScroll}
+      isLoadingMore={isLoadingMore}
+      canUseRealtime={canUseRealtime}
+      connectionStatus={connectionStatus}
+      theme={theme}
+      flatListRef={flatListRef}
     />
   );
 
@@ -1148,14 +1060,6 @@ export default function ConversationScreen() {
           }}
           onOpenInfo={() => setGroupInfoVisible(true)}
           onAddMembers={handleHeaderAddMembers}
-        // onAddMembers={
-        //   isGroupConversation
-        //     ? () => {
-        //       setPendingMembers({});
-        //       setAddMembersVisible(true);
-        //     }
-        //     : undefined
-        // }
         />
         <LoadingSpinner />
       </SafeAreaView>
@@ -1201,14 +1105,6 @@ export default function ConversationScreen() {
           }}
           onOpenInfo={() => setGroupInfoVisible(true)}
           onAddMembers={handleHeaderAddMembers}
-        // onAddMembers={
-        //   isGroupConversation
-        //     ? () => {
-        //       setPendingMembers({});
-        //       setAddMembersVisible(true);
-        //     }
-        //     : undefined
-        // }
         />
 
         <ConversationMeta
@@ -1229,49 +1125,22 @@ export default function ConversationScreen() {
         />
 
         <View style={styles.messagesWrapper}>
-          {conversationDetails?.wallpaperUrl ? (
-            <ImageBackground
-              source={{ uri: conversationDetails.wallpaperUrl }}
-              style={styles.wallpaperBackground}
-              blurRadius={0}
-            >
-              <View
-                style={[
-                  styles.wallpaperOverlay,
-                  { backgroundColor: wallpaperOverlay },
-                ]}
-              />
-              {messageList}
-            </ImageBackground>
-          ) : (
-            messageList
-          )}
+          <WallpaperWrapper
+            wallpaperUrl={conversationDetails?.wallpaperUrl}
+            overlayColor={wallpaperOverlay}
+          >
+            {messageList}
+          </WallpaperWrapper>
 
-          {showScrollToBottom && (
-            <TouchableOpacity
-              style={[
-                styles.scrollFab,
-                { backgroundColor: chatPalette.fabBg },
-              ]}
-              onPress={scrollToBottom}
-            >
-              <Ionicons
-                name="chevron-down"
-                size={22}
-                color={theme.colors.text}
-              />
-            </TouchableOpacity>
-          )}
+          <ScrollToBottomButton
+            visible={showScrollToBottom}
+            onPress={scrollToBottom}
+            backgroundColor={chatPalette.fabBg}
+            iconColor={theme.colors.text}
+          />
         </View>
 
-        {typingDisplayNames.length > 0 && (
-          <View style={styles.typingDock}>
-            <TypingIndicator
-              isVisible
-              multipleUsers={typingDisplayNames}
-            />
-          </View>
-        )}
+        <TypingDock typingDisplayNames={typingDisplayNames} />
 
         <MessageInput
           onSend={handleSendMessage}
@@ -1304,7 +1173,7 @@ export default function ConversationScreen() {
           onLeaveGroup={async () => {
             if (!actualConversationId || !user?.id) return;
             try {
-              await messageAPI.leaveGroup(actualConversationId, user.id);
+              await messageAPI.leaveGroup(actualConversationId);
               showAlert('Thông báo', 'Bạn đã rời nhóm');
               router.replace('/messages');
             } catch (e: any) {
@@ -1338,7 +1207,6 @@ export default function ConversationScreen() {
               setIsAddingMembers(true);
               await messageAPI.addGroupMembers(
                 actualConversationId,
-                user.id,
                 userIds
               );
               showAlert('Thành công', 'Đã thêm thành viên mới');
@@ -1364,56 +1232,10 @@ export default function ConversationScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   messagesWrapper: { flex: 1, position: 'relative' },
-  wallpaperBackground: { flex: 1 },
-  wallpaperOverlay: { ...StyleSheet.absoluteFillObject },
-  messagesList: {
-    paddingRight: 6,
-    paddingLeft: 36,
-    paddingTop: 8,
-    paddingBottom: 64,
-  },
-  listFooter: { height: 40 },
-  scrollFab: {
-    position: 'absolute',
-    right: '50%',
-    transform: [{ translateX: 22 }],
-    bottom: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.18,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-      },
-      android: { elevation: 6 },
-    }),
-  },
-  typingDock: { paddingHorizontal: 16, paddingVertical: 4, minHeight: 24 },
-  readReceiptLabel: {
-    fontSize: 11,
-    marginTop: 2,
-    marginRight: 16,
-    textAlign: 'right',
-  },
   systemMessageContainer: {
     alignItems: 'center',
     marginVertical: 6,
     paddingHorizontal: 16,
   },
   systemMessageText: { fontSize: 12, textAlign: 'center' },
-  loadingMore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-  },
 });

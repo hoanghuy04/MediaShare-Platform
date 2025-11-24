@@ -160,10 +160,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     });
   };
 
-  if (message.type === MessageType.IMAGE) {
-    console.log('>>>>>>>>>>>>>>>>>>>>>>>>>Rendering image message with URL:', message);
-  }
-
   const renderBody = () => {
     // IMAGE
     if (message.type === MessageType.IMAGE) {

@@ -134,7 +134,7 @@ export default function GroupMembersScreen() {
     }
     try {
       setIsAddingMembers(true);
-      await messageAPI.addGroupMembers(conversationId, currentUser.id, userIds);
+      await messageAPI.addGroupMembers(conversationId, userIds);
       showAlert('Thành công', 'Đã thêm thành viên mới');
       setAddMembersVisible(false);
       setPendingMembers({});
