@@ -5,11 +5,12 @@ import { UserResponse } from '../../types/user';
 import { useTheme } from '@hooks/useTheme';
 import { Avatar } from '../common/Avatar';
 import { formatNumber } from '@utils/formatters';
+import { FollowButton } from '../common/FollowButton';
 
 interface ProfileHeaderProps {
   profile: UserResponse;
   isOwnProfile: boolean;
-  onFollow?: () => void;
+  onFollow?: (isFollowing: boolean) => void;
   onMessage?: () => void;
   onEdit?: () => void;
 }
@@ -122,28 +123,13 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </>
         ) : (
           <>
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.primaryButton,
-                {
-                  backgroundColor: profile.isFollowing
-                    ? theme.colors.surface
-                    : theme.colors.primary,
-                  borderColor: profile.isFollowing ? theme.colors.border : theme.colors.primary,
-                },
-              ]}
-              onPress={onFollow}
-            >
-              <Text
-                style={[
-                  styles.buttonText,
-                  { color: profile.isFollowing ? theme.colors.text : '#fff' },
-                ]}
-              >
-                {profile.isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
-              </Text>
-            </TouchableOpacity>
+            <FollowButton
+              userId={profile.id}
+              initialIsFollowing={profile.followingByCurrentUser}
+              variant="primary"
+              size="medium"
+              style={{ flex: 1 }}
+            />
 
             <TouchableOpacity
               style={[

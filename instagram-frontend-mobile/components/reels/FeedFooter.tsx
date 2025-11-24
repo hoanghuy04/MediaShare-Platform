@@ -1,43 +1,58 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PostResponse } from '../../types/post.type';
+import { FollowButton } from '../common/FollowButton';
+import { UserSummaryResponse } from '../../types/user';
+import { Avatar } from '../common/Avatar';
+import React from 'react';
 
 interface FeedFooterProps {
   data: PostResponse;
+  onFollowChange?: (isFollowing: boolean) => void;
 }
 
-const FeedFooter = ({ data }: FeedFooterProps) => {
+const FeedFooter = ({ data, onFollowChange }: FeedFooterProps) => {
   const { author, caption } = data;
 
-  const authorName = (author as any).fullName || (author as any).username || 'Unknown';
-  const authorAvatar = (author as any).avatarUrl || 'https://i.pravatar.cc/150?u=1';
+  const authorData = author as UserSummaryResponse;
+  const authorName = authorData.profile?.firstName || authorData.username || 'Unknown';
+  const authorAvatar = authorData.profile?.avatar;
+  const initiallyFollowing = authorData.followingByCurrentUser || false;
+
+  const handleFollowChange = (status: boolean) => {
+    onFollowChange?.(status);
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.profileContainer}>
-        <Image source={{ uri: authorAvatar }} style={styles.thumbnail} contentFit="cover" />
+        <Avatar
+          uri={authorAvatar}
+          name={authorData.username}
+          size={30}
+        />
         <View style={styles.userInfo}>
           <View style={styles.userNameContainer}>
             <Text style={styles.nameStyle}>{authorName}</Text>
+
+            {!initiallyFollowing && (
+              <FollowButton
+                userId={authorData.id}
+                initialIsFollowing={false}
+                variant="transparent"
+                size="small"
+                textColor="#fff"
+                followingTextColor="#fff"
+                style={styles.followButton}
+                onFollowChange={handleFollowChange}
+              />
+            )}
           </View>
         </View>
-
-        <TouchableOpacity style={styles.followButton}>
-          <Text style={styles.followText}>Theo dõi</Text>
-        </TouchableOpacity>
       </View>
 
       <Text numberOfLines={2} style={styles.desc}>
         {caption || ''}
       </Text>
-
-      {/* <View style={styles.friendsContainer}>
-        {friends.map((item, index) => (
-          <Image key={index} source={{ uri: item.imageUrl }} style={styles.friendImage} />
-        ))}
-        <Text style={styles.followInfo}>{`Followed by Akash and ${followerCount} others`}</Text>
-      </View> */}
     </View>
   );
 };
@@ -47,14 +62,16 @@ export default FeedFooter;
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 20,
-    marginLeft: 20,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
     zIndex: 10,
   },
   profileContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   thumbnail: {
     width: 30,
@@ -64,6 +81,7 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     marginLeft: 10,
+    flex: 1,
   },
   userNameContainer: {
     flexDirection: 'row',
@@ -71,9 +89,10 @@ const styles = StyleSheet.create({
   },
   nameStyle: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    marginRight: 4,
+    marginRight: 8,
+    flexShrink: 1,
   },
   audioContainer: {
     flexDirection: 'row',
@@ -85,15 +104,10 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   followButton: {
-    marginLeft: 24,
-    borderWidth: 1,
     borderColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  followText: {
-    color: '#fff',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderWidth: 1,
   },
   desc: {
     color: '#fff',

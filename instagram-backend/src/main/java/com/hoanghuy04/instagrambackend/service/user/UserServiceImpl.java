@@ -14,6 +14,7 @@ import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.service.FileService;
+import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
@@ -51,6 +52,7 @@ public class UserServiceImpl implements UserService {
     FollowRepository followRepository;
     FileService fileService;
     UserMapper userMapper;
+    SecurityUtil securityUtil;
 
     @Override
     public User ensureAiUser() {
@@ -89,7 +91,19 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        return userMapper.toUserResponse(user);
+        UserResponse dto = userMapper.toUserResponse(user);
+
+        User current = securityUtil.getCurrentUser();
+        boolean following = false;
+
+        if (current != null && !current.getId().equals(user.getId())) {
+            following = followRepository
+                    .findByFollowerAndFollowing(current, user)
+                    .isPresent();
+        }
+
+        dto.setFollowingByCurrentUser(following);
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -159,93 +173,6 @@ public class UserServiceImpl implements UserService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<UserResponse> getUserFollowers(String userId) {
-        log.debug("Getting followers for user: {}", userId);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-        return followRepository.findByFollowing(user).stream()
-                .map(follow -> userMapper.toUserResponse(follow.getFollower()))
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public List<UserResponse> getUserFollowing(String userId) {
-        log.debug("Getting following for user: {}", userId);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-        return followRepository.findByFollower(user).stream()
-                .map(follow -> userMapper.toUserResponse(follow.getFollowing()))
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public List<UserSummaryResponse> getUserFollowingSummary(String userId, String query, int page, int size) {
-        log.debug("Getting following summary for user {} with query: {}", userId, query);
-
-        userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-        int normalizedSize = Math.min(Math.max(size, 1), 100);
-        int normalizedPage = Math.max(page, 0);
-
-        List<Follow> followings = followRepository.findByFollowerId(userId);
-        if (followings.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        String loweredQuery = query != null ? query.trim().toLowerCase() : "";
-        if (!loweredQuery.isEmpty()) {
-            followings = followings.stream()
-                    .filter(follow -> {
-                        User followed = follow.getFollowing();
-                        if (followed == null) {
-                            return false;
-                        }
-                        String username = followed.getUsername() != null ? followed.getUsername().toLowerCase() : "";
-                        String firstName = followed.getProfile() != null && followed.getProfile().getFirstName() != null
-                                ? followed.getProfile().getFirstName().toLowerCase() : "";
-                        String lastName = followed.getProfile() != null && followed.getProfile().getLastName() != null
-                                ? followed.getProfile().getLastName().toLowerCase() : "";
-                        return username.contains(loweredQuery) ||
-                                firstName.contains(loweredQuery) ||
-                                lastName.contains(loweredQuery);
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        Comparator<Follow> comparator = Comparator
-                .comparing((Follow follow) -> follow.getCreatedAt() != null ? follow.getCreatedAt() : LocalDateTime.MIN)
-                .reversed()
-                .thenComparing(follow -> {
-                    User followed = follow.getFollowing();
-                    return followed != null && followed.getUsername() != null
-                            ? followed.getUsername().toLowerCase()
-                            : "";
-                });
-
-        List<Follow> sorted = followings.stream()
-                .sorted(comparator)
-                .collect(Collectors.toList());
-
-        int start = normalizedPage * normalizedSize;
-        if (start >= sorted.size()) {
-            return new ArrayList<>();
-        }
-        int end = Math.min(start + normalizedSize, sorted.size());
-
-        return sorted.subList(start, end).stream()
-                .map(follow -> userMapper.toUserSummary(follow.getFollowing()))
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
-    @Override
     public PageResponse<UserResponse> searchUsers(String query, Pageable pageable) {
         log.debug("Searching users with query: '{}', page: {}, size: {}", query, pageable.getPageNumber(), pageable.getPageSize());
 
@@ -259,26 +186,6 @@ public class UserServiceImpl implements UserService {
                 page.getTotalElements());
 
         return PageResponse.of(page);
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public UserStatsResponse getUserStats(String userId) {
-        log.debug("Getting stats for user: {}", userId);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-        long postsCount = postRepository.countByAuthor(user);
-        long followersCount = followRepository.countByFollowing(user);
-        long followingCount = followRepository.countByFollower(user);
-
-        return UserStatsResponse.builder()
-                .userId(userId)
-                .postsCount(postsCount)
-                .followersCount(followersCount)
-                .followingCount(followingCount)
-                .build();
     }
 
     @Transactional(readOnly = true)

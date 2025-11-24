@@ -18,6 +18,8 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { postLikeService } from '../../services/post-like.service';
 import CommentsModal from './CommentsModal';
+import { Toast } from '../common/Toast';
+import { UserSummaryResponse } from '../../types/user';
 
 interface FeedRowProps {
   data: PostResponse;
@@ -154,6 +156,9 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
   const handleToggleMute = () => setIsMuted(prev => !prev);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
   const modalTranslateY = useSharedValue(height);
   const fullScreenOpacity = useSharedValue(1);
   const exitButtonScale = useSharedValue(0);
@@ -235,6 +240,17 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
     }
   };
 
+  const handleFollowChange = (isFollowing: boolean) => {
+    const authorData = data.author as UserSummaryResponse;
+    const username = authorData.profile?.firstName || authorData.username || 'Unknown';
+
+    const message = isFollowing
+      ? `Đang theo dõi ${username}`
+      : `Đã bỏ theo dõi ${username}`;
+    setToastMessage(message);
+    setToastVisible(true);
+  };
+
   const videoContainerStyle = useAnimatedStyle(() => {
     if (!modalTranslateY) return { flex: 1 };
 
@@ -298,7 +314,10 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
               onDeleteSuccess={onDeleteSuccess}
               onFullScreen={() => setIsFullScreen(true)}
             />
-            <FeedFooter data={data} />
+            <FeedFooter
+              data={data}
+              onFollowChange={handleFollowChange}
+            />
           </Reanimated.View>
         )}
       </Reanimated.View>
@@ -324,6 +343,14 @@ const FeedRow = ({ data, isVisible, height, onModalStateChange, onDeleteSuccess,
         modalTranslateY={modalTranslateY}
         isMuted={isMuted}
         onToggleMute={() => setIsMuted(prev => !prev)}
+      />
+
+      <Toast
+        visible={toastVisible}
+        message={toastMessage}
+        onHide={() => setToastVisible(false)}
+        position="center"
+        duration={2000}
       />
     </View>
   );
@@ -361,6 +388,6 @@ const styles = StyleSheet.create({
     zIndex: 20,
     padding: 10,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: '50%',
+    borderRadius: 25,
   },
 });

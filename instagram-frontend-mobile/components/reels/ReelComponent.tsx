@@ -49,6 +49,7 @@ const ReelComponent = () => {
     try {
       const limit = REELS_PER_PAGE;
       const res = await postService.getReels(pageNum, limit);
+      console.log('Reels nè', res.content)
       const newReels = res.content || [];
 
       if (newReels.length < limit) setHasMore(false);

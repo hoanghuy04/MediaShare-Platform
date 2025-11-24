@@ -10,52 +10,20 @@ import org.springframework.transaction.annotation.Transactional;
  * @author Instagram Backend Team
  * @version 1.0.0
  */
-@Service
+
+import com.hoanghuy04.instagrambackend.dto.response.FollowToggleResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
+import com.hoanghuy04.instagrambackend.dto.response.PostLikeUserResponse;
+import org.springframework.data.domain.Pageable;
+
 public interface FollowService {
-    
-    /**
-     * Follow a user.
-     *
-     * @param followerId the follower user ID
-     * @param followingId the user ID to follow
-     */
-    @Transactional
-    void followUser(String followerId, String followingId);
 
-    /**
-     * Unfollow a user.
-     *
-     * @param followerId the follower user ID
-     * @param followingId the user ID to unfollow
-     */
-    @Transactional
-    void unfollowUser(String followerId, String followingId);
+    FollowToggleResponse toggleFollow(String targetUserId);
 
-    /**
-     * Check if a user is following another user.
-     *
-     * @param followerId the follower user ID
-     * @param followingId the user ID to check
-     * @return true if following, false otherwise
-     */
-    @Transactional(readOnly = true)
-    boolean isFollowing(String followerId, String followingId);
+    PageResponse<PostLikeUserResponse> getFollowers(String userId, Pageable pageable);
 
-    /**
-     * Get follower count for a user.
-     *
-     * @param userId the user ID
-     * @return follower count
-     */
-    @Transactional(readOnly = true)
-    long getFollowerCount(String userId);
+    PageResponse<PostLikeUserResponse> getFollowing(String userId, Pageable pageable);
 
-    /**
-     * Get following count for a user.
-     *
-     * @param userId the user ID
-     * @return following count
-     */
-    @Transactional(readOnly = true)
-    long getFollowingCount(String userId);
+    boolean isFollowing(String targetUserId);
 }
+

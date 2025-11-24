@@ -13,6 +13,7 @@ import { UserProfile, Post } from '@types';
 import { showAlert } from '@utils/helpers';
 import { Ionicons } from '@expo/vector-icons';
 import { messageAPI } from '../../services/api';
+import { userService } from '../../services/user.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_SIZE = (SCREEN_WIDTH - 4) / 3;
@@ -61,7 +62,8 @@ export default function UserProfileScreen() {
 
   const loadProfile = async () => {
     try {
-      const data = await userAPI.getUserProfile(id);
+      const data = await userService.getUserById(id);
+
       setProfile(data);
     } catch (error: any) {
       showAlert('Error', error.message);
@@ -71,29 +73,6 @@ export default function UserProfileScreen() {
     }
   };
 
-  const handleFollow = async () => {
-    if (!profile) return;
-
-    try {
-      if (profile.isFollowing) {
-        await userAPI.unfollowUser(id);
-        setProfile({
-          ...profile,
-          isFollowing: false,
-          followersCount: (profile.followersCount || 0) - 1,
-        });
-      } else {
-        await userAPI.followUser(id);
-        setProfile({
-          ...profile,
-          isFollowing: true,
-          followersCount: (profile.followersCount || 0) + 1,
-        });
-      }
-    } catch (error: any) {
-      showAlert('Error', error.message);
-    }
-  };
 
   const handleMessage = async () => {
     // Navigate directly to conversation using the user's ID as conversationId
@@ -232,7 +211,6 @@ export default function UserProfileScreen() {
             <ProfileHeader
               profile={profileWithPosts}
               isOwnProfile={isOwnProfile}
-              onFollow={handleFollow}
               onMessage={handleMessage}
             />
             {renderTabMenu()}

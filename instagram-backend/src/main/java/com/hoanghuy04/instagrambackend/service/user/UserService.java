@@ -61,36 +61,6 @@ public interface UserService {
     void deleteUser(String userId);
 
     /**
-     * Get user followers.
-     *
-     * @param userId the user ID
-     * @return List of UserResponse
-     */
-    @Transactional(readOnly = true)
-    List<UserResponse> getUserFollowers(String userId);
-
-    /**
-     * Get users that the user is following (detailed response).
-     *
-     * @param userId the user ID
-     * @return List of UserResponse
-     */
-    @Transactional(readOnly = true)
-    List<UserResponse> getUserFollowing(String userId);
-
-    /**
-     * Get a lightweight summary of users that the user is following.
-     *
-     * @param userId the user ID
-     * @param query optional search keyword (username/firstName/lastName)
-     * @param page zero-based page index
-     * @param size number of records per page (1..100)
-     * @return List of UserSummaryDTO
-     */
-    @Transactional(readOnly = true)
-    List<UserSummaryResponse> getUserFollowingSummary(String userId, String query, int page, int size);
-
-    /**
      * Search users by query.
      *
      * @param query    the search query
@@ -99,15 +69,6 @@ public interface UserService {
      */
     @Transactional(readOnly = true)
     PageResponse<UserResponse> searchUsers(String query, Pageable pageable);
-
-    /**
-     * Get user statistics.
-     *
-     * @param userId the user ID
-     * @return UserStatsResponse
-     */
-    @Transactional(readOnly = true)
-    UserStatsResponse getUserStats(String userId);
 
     /**
      * Get user entity by ID.

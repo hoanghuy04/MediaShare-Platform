@@ -32,8 +32,6 @@ public abstract class UserMapper {
      */
     @Mappings({
             @Mapping(target = "profile", expression = "java(getProfileWithAvatarUrl(user.getProfile()))"),
-            @Mapping(target = "followersCount", expression = "java(user.getFollowers() != null ? user.getFollowers().size() : 0)"),
-            @Mapping(target = "followingCount", expression = "java(user.getFollowing() != null ? user.getFollowing().size() : 0)")
     })
     public abstract UserResponse toUserResponse(User user);
 
@@ -50,6 +48,24 @@ public abstract class UserMapper {
                 .username(user.getUsername())
                 .avatar(getProfileWithAvatarUrl(user.getProfile()).getAvatar())
                 .isVerified(user.isVerified())
+                .followingByCurrentUser(false)
+                .build();
+    }
+
+    /**
+     * Convert User entity to UserSummaryResponse DTO with followingByCurrentUser status
+     */
+    public UserSummaryResponse toUserSummary(User user, boolean followingByCurrentUser) {
+        if (user == null) {
+            return null;
+        }
+
+        return UserSummaryResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .avatar(getProfileWithAvatarUrl(user.getProfile()).getAvatar())
+                .isVerified(user.isVerified())
+                .followingByCurrentUser(followingByCurrentUser)
                 .build();
     }
 

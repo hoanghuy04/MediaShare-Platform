@@ -20,6 +20,8 @@ import { formatDate, formatNumber } from '@utils/formatters';
 import { isVideoFormatSupported } from '@utils/videoUtils';
 import apiConfig from '@config/apiConfig';
 import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
+import { UserSummaryResponse } from '../../types/user';
+import { FollowButton } from '../common/FollowButton';
 import { PostLikesModal } from './PostLikesModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -66,7 +68,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const likeButtonScale = useSharedValue(1);
 
   // Create separate scale values for each media item
-  const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({}); 
+  const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({});
   const baseScaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({});
   const uiOpacity = useSharedValue(1);
 
@@ -106,7 +108,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const handleMediaPress = async () => {
     if (disableNavigation) return;
     setIsNavigating(true);
-    await new Promise(resolve => setTimeout(resolve, 100)); 
+    await new Promise(resolve => setTimeout(resolve, 100));
     router.push({
       pathname: '/profile/posts',
       params: { userId: post.author.id, postId: post.id },
@@ -239,6 +241,9 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
+  const authorData = post.author as UserSummaryResponse;
+  const initiallyFollowing = authorData.followingByCurrentUser || false;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Animated.View style={[styles.header, uiAnimatedStyle]}>
@@ -249,10 +254,15 @@ export const PostCard: React.FC<PostCardProps> = ({
               {post.author.username}
             </Text>
           </TouchableOpacity>
-          {showFollowButton && (
-            <TouchableOpacity onPress={() => onFollow?.(post.author.id)}>
-              <Text style={[styles.followText, { color: theme.colors.primary }]}>• Theo dõi</Text>
-            </TouchableOpacity>
+
+          {!initiallyFollowing && (
+            <FollowButton
+              userId={authorData.id}
+              initialIsFollowing={false}
+              variant="grey"
+              size="small"
+              style={{ marginLeft: 8 }}
+            />
           )}
         </View>
 
@@ -389,24 +399,24 @@ export const PostCard: React.FC<PostCardProps> = ({
       {/* Likes Info */}
       {post.totalLike > 0 && (
         <Animated.View style={uiAnimatedStyle}>
-        <TouchableOpacity 
-          style={styles.likesInfo}
-          onPress={() => setShowLikesModal(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.likesText, { color: theme.colors.text }]}>
-            {firstLiker ? (
-              <>
-                <Text style={styles.boldText}>{firstLiker.username}</Text>
-                {post.totalLike > 1 && (
-                  <Text> và {formatNumber(post.totalLike - 1)} người khác đã thích</Text>
-                )}
-              </>
-            ) : (
-              <Text style={styles.boldText}>{formatNumber(post.totalLike)} lượt thích</Text>
-            )}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.likesInfo}
+            onPress={() => setShowLikesModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.likesText, { color: theme.colors.text }]}>
+              {firstLiker ? (
+                <>
+                  <Text style={styles.boldText}>{firstLiker.username}</Text>
+                  {post.totalLike > 1 && (
+                    <Text> và {formatNumber(post.totalLike - 1)} người khác đã thích</Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.boldText}>{formatNumber(post.totalLike)} lượt thích</Text>
+              )}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
 
