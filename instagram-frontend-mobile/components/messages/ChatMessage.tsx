@@ -45,8 +45,11 @@ const hexToRgba = (hex: string, alpha: number) => {
   const r = (num >> 16) & 255;
   const g = (num >> 8) & 255;
   const b = num & 255;
-  return `rgba(${r},${g},${b},${alpha})`;
+  return `rgba(${r},${g},${b},alpha)`.replace('alpha', String(alpha));
 };
+
+// waveform “fake” – chỉ để hiển thị giống UI Telegram
+const WAVE_BARS = [0.35, 0.6, 0.9, 0.5, 0.8, 0.4, 0.7, 1, 0.65, 0.45, 0.8, 0.55, 0.9, 0.6, 0.7];
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
@@ -93,8 +96,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   ];
 
   const bubbleShape = {
-    borderTopLeftRadius: isOwn ? 18 : isClusterStart ? 22 : isClusterMiddle ? 16 : 12,
-    borderTopRightRadius: isOwn ? (isClusterStart ? 22 : isClusterMiddle ? 16 : 12) : 18,
+    borderTopLeftRadius: isOwn ? 18 : isClusterStart ? 22 : 16,
+    borderTopRightRadius: isOwn ? (isClusterStart ? 22 : 16) : 18,
     borderBottomLeftRadius: isOwn ? (isClusterEnd ? 22 : 14) : 22,
     borderBottomRightRadius: isOwn ? 22 : (isClusterEnd ? 22 : 14),
   };
@@ -224,7 +227,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   useEffect(() => {
     return () => {
       if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current.unloadAsync().catch(() => { });
         soundRef.current = null;
       }
     };
@@ -261,6 +264,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     });
   };
 
+  /* -------- AUDIO BODY (UI giống hình gửi) -------- */
   const renderAudioBody = () => {
     if (!audioUri) {
       return (
@@ -297,7 +301,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             />
           )}
         </TouchableOpacity>
+
         <View style={styles.audioMeta}>
+          <Text
+            style={[
+              styles.audioDuration,
+              { color: isOwn ? colors.bubbleTextOut : colors.bubbleTextIn },
+            ]}
+          >
+            {formatDuration(
+              isAudioPlaying ? audioPosition : audioDuration ?? audioPosition
+            )}
+          </Text>
           <View
             style={[
               styles.audioProgressTrack,
@@ -313,25 +328,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 styles.audioProgressBar,
                 {
                   width: `${Math.min(audioProgress * 100, 100)}%`,
-                  backgroundColor: isOwn ? theme.colors.white : theme.colors.primary,
+                  backgroundColor: isOwn
+                    ? theme.colors.white
+                    : theme.colors.primary,
                 },
               ]}
             />
           </View>
-          <Text
-            style={[
-              styles.audioDuration,
-              { color: isOwn ? colors.bubbleTextOut : colors.bubbleTextIn },
-            ]}
-          >
-            {formatDuration(
-              isAudioPlaying ? audioPosition : audioDuration ?? audioPosition
-            )}
-          </Text>
+
         </View>
       </View>
     );
   };
+
 
   const renderBody = () => {
     // IMAGE
@@ -509,19 +518,18 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   bubbleBase: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 50,
+    minWidth: 60,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    // không alignItems/justifyContent để con (audioWrapper) được kéo full chiều ngang
   },
-  bubbleShadow: {
-    // Shadow iOS
-    shadowColor: '#000',
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-    shadowOffset: { width: 2, height: 6 },
 
-    // Shadow Android
-    elevation: 2,
+  bubbleShadow: {
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
 
   content: {
@@ -575,7 +583,6 @@ const styles = StyleSheet.create({
     width: 220,
     height: 280,
     borderRadius: 12,
-    //image cover
     resizeMode: 'cover',
   },
   videoContainer: {
@@ -603,12 +610,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
+  /* ---- AUDIO UI ---- */
   audioWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 8,
+    minWidth: 180,
+    maxWidth: 260,
   },
+
   audioButton: {
     width: 36,
     height: 36,
@@ -617,24 +629,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
+
   audioMeta: {
     flex: 1,
   },
+
   audioProgressTrack: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
     overflow: 'hidden',
     marginBottom: 4,
   },
+
   audioProgressBar: {
     height: '100%',
     borderRadius: 2,
   },
+
   audioDuration: {
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'right',
+  },
+  audioRight: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  waveRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    marginBottom: 4,
+  },
+  waveBar: {
+    width: 4,
+    borderRadius: 999,
+    marginRight: 3,
   },
 });
 

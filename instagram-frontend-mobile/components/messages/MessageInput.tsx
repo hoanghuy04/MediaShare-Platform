@@ -21,6 +21,7 @@ import {
   Dimensions,
   ActionSheetIOS,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -217,6 +218,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const [pendingAudio, setPendingAudio] = useState<{ uri: string; duration?: number } | null>(null);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewDuration, setPreviewDuration] = useState<number | null>(null);
+  const [previewPosition, setPreviewPosition] = useState(0);
+  const previewSoundRef = useRef<Audio.Sound | null>(null);
 
   const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [routeToAI, setRouteToAI] = useState(false);
@@ -263,6 +270,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         recordingRef.current.stopAndUnloadAsync().catch(() => {});
         recordingRef.current = null;
       }
+      if (previewSoundRef.current) {
+        previewSoundRef.current.unloadAsync().catch(() => {});
+        previewSoundRef.current = null;
+      }
     };
   }, []);
 
@@ -305,6 +316,81 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     scheduleStopTyping();
   };
 
+  const formatDuration = useCallback((millis?: number | null) => {
+    if (!millis || Number.isNaN(millis)) {
+      return '0:00';
+    }
+    const totalSeconds = Math.max(0, Math.floor(millis / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
+
+  const clearPreview = useCallback(() => {
+    if (previewSoundRef.current) {
+      previewSoundRef.current.unloadAsync().catch(() => {});
+      previewSoundRef.current = null;
+    }
+    setPendingAudio(null);
+    setIsPreviewPlaying(false);
+    setIsPreviewLoading(false);
+    setPreviewDuration(null);
+    setPreviewPosition(0);
+  }, []);
+
+  const togglePreviewPlayback = useCallback(async () => {
+    if (!pendingAudio?.uri) return;
+    try {
+      if (previewSoundRef.current) {
+        const status = await previewSoundRef.current.getStatusAsync();
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await previewSoundRef.current.pauseAsync();
+          } else {
+            await previewSoundRef.current.playAsync();
+          }
+          return;
+        }
+        await previewSoundRef.current.unloadAsync().catch(() => {});
+        previewSoundRef.current = null;
+      }
+      setIsPreviewLoading(true);
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: pendingAudio.uri },
+        { shouldPlay: true }
+      );
+      previewSoundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate(status => {
+        if (!status.isLoaded) {
+          return;
+        }
+        setIsPreviewPlaying(status.isPlaying);
+        setPreviewDuration(status.durationMillis ?? pendingAudio.duration ?? null);
+        setPreviewPosition(status.positionMillis ?? 0);
+        if (status.didJustFinish) {
+          sound.stopAsync().catch(() => {});
+          sound.setPositionAsync(0).catch(() => {});
+          setIsPreviewPlaying(false);
+          setPreviewPosition(0);
+        }
+      });
+    } catch (_error) {
+      Alert.alert('Lỗi', 'Không thể phát bản ghi. Vui lòng thử lại.');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }, [pendingAudio]);
+
+  const handlePreviewSend = useCallback(() => {
+    if (!pendingAudio?.uri || !onSendMedia) return;
+    onSendMedia(MessageType.AUDIO, pendingAudio.uri);
+    clearPreview();
+  }, [clearPreview, onSendMedia, pendingAudio]);
+
+  const handlePreviewDelete = useCallback(() => {
+    clearPreview();
+  }, [clearPreview]);
+
   const handleSelectAiAssistant = () => {
     setMessage(prev => {
       const tokens = prev.split(/\s+/);
@@ -326,6 +412,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const startRecording = useCallback(async () => {
     if (!onSendMedia) {
       Alert.alert('Thông báo', 'Chức năng gửi voice chưa được kích hoạt.');
+      return;
+    }
+    if (pendingAudio) {
+      Alert.alert(
+        'Đang có bản ghi',
+        'Vui lòng gửi hoặc xoá bản ghi hiện tại trước khi ghi mới.'
+      );
       return;
     }
     try {
@@ -352,19 +445,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       recordingRef.current = null;
       setIsRecording(false);
     }
-  }, [onSendMedia]);
+  }, [onSendMedia, pendingAudio]);
 
-  const stopRecordingAndSend = useCallback(async () => {
+  const stopRecording = useCallback(async () => {
     const currentRecording = recordingRef.current;
     if (!currentRecording) return;
     try {
       await currentRecording.stopAndUnloadAsync();
       const uri = currentRecording.getURI();
-      if (uri && onSendMedia) {
-        onSendMedia(MessageType.AUDIO, uri);
+      let duration: number | undefined;
+      try {
+        const status = await currentRecording.getStatusAsync();
+        duration = status.durationMillis ?? recordSeconds * 1000;
+      } catch {
+        duration = recordSeconds * 1000;
+      }
+      if (uri) {
+        setPendingAudio({ uri, duration });
+        setPreviewDuration(duration ?? null);
+        setPreviewPosition(0);
       }
     } catch (_error) {
-      Alert.alert('Lỗi', 'Không thể gửi tin nhắn thoại. Vui lòng thử lại.');
+      Alert.alert('Lỗi', 'Không thể hoàn tất bản ghi. Vui lòng thử lại.');
     } finally {
       try {
         await Audio.setAudioModeAsync({
@@ -378,7 +480,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       setIsRecording(false);
       setRecordSeconds(0);
     }
-  }, [onSendMedia]);
+  }, [recordSeconds]);
 
   const handleSend = () => {
     const trimmed = message.trim();
@@ -414,8 +516,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (photo?.uri) {
         onSendMedia(MessageType.IMAGE, photo.uri);
       }
-    } catch (error) {
-      console.error('Error taking photo:', error);
+    } catch (_error) {
       Alert.alert('Lỗi', 'Không thể mở camera. Vui lòng thử lại.');
     }
   }, [onSendMedia]);
@@ -599,7 +700,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             <View style={styles.inputIconsRow}>
               <TouchableOpacity
                 style={styles.inlineIconButton}
-                onPress={isRecording ? stopRecordingAndSend : startRecording}
+                onPress={isRecording ? stopRecording : startRecording}
               >
                 <Ionicons
                   name={isRecording ? 'stop-circle' : 'mic-outline'}
@@ -658,14 +759,96 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       {isRecording && (
         <View
           style={[
-            styles.recordingBadge,
+            styles.recordingContainer,
             { backgroundColor: theme.chat.tint },
           ]}
         >
-          <Ionicons name="pulse" size={12} color={theme.colors.white} />
-          <Text style={styles.recordingText} allowFontScaling={false}>
-            {recordSeconds}s
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingLabel} allowFontScaling={false}>
+            Đang ghi âm • {recordSeconds}s
           </Text>
+          <TouchableOpacity
+            style={styles.recordingStopButton}
+            onPress={stopRecording}
+          >
+            <Ionicons name="stop" size={18} color={theme.colors.white} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {pendingAudio && (
+        <View
+          style={[
+            styles.audioPreviewContainer,
+            {
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.audioPreviewPlay}
+            onPress={togglePreviewPlayback}
+          >
+            {isPreviewLoading ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Ionicons
+                name={isPreviewPlaying ? 'pause' : 'play'}
+                size={18}
+                color={theme.colors.primary}
+              />
+            )}
+          </TouchableOpacity>
+          <View style={styles.audioPreviewInfo}>
+            <Text
+              style={[
+                styles.audioPreviewTitle,
+                { color: theme.colors.text },
+              ]}
+              numberOfLines={1}
+            >
+              Bản ghi mới • {formatDuration(previewDuration ?? pendingAudio.duration)}
+            </Text>
+            <View
+              style={[
+                styles.audioPreviewTrack,
+                { backgroundColor: `${theme.colors.text}20` },
+              ]}
+            >
+              <View
+                style={[
+                  styles.audioPreviewProgress,
+                  {
+                    width: `${
+                      previewDuration
+                        ? Math.min(previewPosition / previewDuration, 1) * 100
+                        : 0
+                    }%`,
+                    backgroundColor: theme.chat.tint,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+          <View style={styles.audioPreviewActions}>
+            <TouchableOpacity
+              style={styles.audioPreviewButton}
+              onPress={handlePreviewDelete}
+            >
+              <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.audioPreviewButton,
+                styles.audioPreviewSend,
+                { backgroundColor: theme.chat.tint },
+              ]}
+              onPress={handlePreviewSend}
+            >
+              <Ionicons name="send" size={18} color={theme.colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -722,16 +905,90 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  recordingBadge: {
-    marginTop: 4,
-    alignSelf: 'flex-end',
+  recordingContainer: {
+    marginHorizontal: SIZES.md,
+    marginTop: SIZES.xs,
+    borderRadius: SIZES.radiusLg,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
   },
-  recordingText: { color: '#fff', fontSize: 12, marginLeft: 4 },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+    marginRight: 10,
+  },
+  recordingLabel: {
+    flex: 1,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  recordingStopButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioPreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SIZES.md,
+    marginTop: SIZES.sm,
+    borderRadius: SIZES.radiusLg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  audioPreviewPlay: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  audioPreviewInfo: {
+    flex: 1,
+  },
+  audioPreviewTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  audioPreviewTrack: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  audioPreviewProgress: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  audioPreviewActions: {
+    flexDirection: 'row',
+    marginLeft: 10,
+    gap: 8,
+  },
+  audioPreviewButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioPreviewSend: {
+    borderWidth: 0,
+  },
 
   emojiPanel: {
     width: '100%',
