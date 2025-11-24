@@ -253,11 +253,8 @@ public class ConversationController {
     @PostMapping("/messages/{messageId}/read")
     @Operation(summary = "Mark message as read (marks all in conversation)")
     public ResponseEntity<ApiResponse<Void>> markMessageAsRead(
-            @PathVariable String messageId,
-            @RequestParam String userId) {
-        log.info("Mark message {} as read by user {}", messageId, userId);
-
-        conversationMessageService.markAsRead(messageId, userId);
+            @PathVariable String messageId) {
+        conversationMessageService.markAsRead(messageId);
         return ResponseEntity.ok(ApiResponse.success("Message marked as read", null));
     }
 

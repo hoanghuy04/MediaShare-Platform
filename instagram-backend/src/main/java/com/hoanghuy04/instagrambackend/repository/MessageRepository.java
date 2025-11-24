@@ -85,6 +85,8 @@ public interface MessageRepository extends MongoRepository<Message, String> {
         String userId,
         Pageable pageable
     );
+
+    List<Message> findByConversationId(String conversationId);
     
     /**
      * Find messages deleted by all participants (for cleanup)

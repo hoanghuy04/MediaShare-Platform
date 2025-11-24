@@ -25,8 +25,8 @@ export interface WebSocketConfig {
 
 export interface MessageCallbacks {
   onMessage?: (message: ChatMessage) => void;
-  onTyping?: (isTyping: boolean, userId: string) => void;
-  onReadReceipt?: (messageId: string, userId: string) => void;
+  onTyping?: (isTyping: boolean, userId: string, conversationId?: string) => void;
+  onReadReceipt?: (messageId: string, userId: string, conversationId?: string) => void;
   onUserOnline?: (userId: string) => void;
   onUserOffline?: (userId: string) => void;
   onError?: (error: string) => void;
@@ -213,9 +213,16 @@ class WebSocketService {
       `/user/${this.config.userId}/queue/typing`,
       (message: IMessage) => {
         try {
+          console.log('📥 Raw typing message body:', message.body);
           const chatMessage: ChatMessage = JSON.parse(message.body);
+          console.log('📦 Parsed typing message:', {
+            type: chatMessage.type,
+            senderId: chatMessage.senderId,
+            conversationId: chatMessage.conversationId,
+            receiverId: chatMessage.receiverId,
+          });
           const isTyping = chatMessage.type === 'TYPING';
-          this.callbacks.onTyping?.(isTyping, chatMessage.senderId);
+          this.callbacks.onTyping?.(isTyping, chatMessage.senderId, chatMessage.conversationId);
         } catch (error) {
           console.error('Error parsing typing indicator:', error);
         }
@@ -236,7 +243,7 @@ class WebSocketService {
       (message: IMessage) => {
         try {
           const chatMessage: ChatMessage = JSON.parse(message.body);
-          this.callbacks.onReadReceipt?.(chatMessage.id || '', chatMessage.senderId);
+          this.callbacks.onReadReceipt?.(chatMessage.id || '', chatMessage.senderId, chatMessage.conversationId);
         } catch (error) {
           console.error('Error parsing read receipt:', error);
         }
@@ -341,16 +348,25 @@ class WebSocketService {
 
   /**
    * Send typing indicator
+   * @param receiverOrConversationId - Can be either receiverId (direct) or conversationId (group)
+   * @param isConversationId - If true, treats first param as conversationId
    */
-  sendTyping(receiverId: string): void {
+  sendTyping(receiverOrConversationId: string, isConversationId = false): void {
     if (!this.client || !this.config) return;
 
     const typingMessage: ChatMessage = {
       type: 'TYPING',
       senderId: this.config.userId,
-      receiverId,
+      receiverId: isConversationId ? '' : receiverOrConversationId,
+      conversationId: isConversationId ? receiverOrConversationId : undefined,
       timestamp: new Date().toISOString(),
     };
+
+    console.log('⚡ Sending typing indicator:', {
+      isConversationId,
+      conversationId: typingMessage.conversationId,
+      receiverId: typingMessage.receiverId,
+    });
 
     this.client.publish({
       destination: '/app/chat.typing',
@@ -360,16 +376,25 @@ class WebSocketService {
 
   /**
    * Send stop typing indicator
+   * @param receiverOrConversationId - Can be either receiverId (direct) or conversationId (group)
+   * @param isConversationId - If true, treats first param as conversationId
    */
-  sendStopTyping(receiverId: string): void {
+  sendStopTyping(receiverOrConversationId: string, isConversationId = false): void {
     if (!this.client || !this.config) return;
 
     const stopTypingMessage: ChatMessage = {
       type: 'STOP_TYPING',
       senderId: this.config.userId,
-      receiverId,
+      receiverId: isConversationId ? '' : receiverOrConversationId,
+      conversationId: isConversationId ? receiverOrConversationId : undefined,
       timestamp: new Date().toISOString(),
     };
+
+    console.log('⚡ Sending stop typing indicator:', {
+      isConversationId,
+      conversationId: stopTypingMessage.conversationId,
+      receiverId: stopTypingMessage.receiverId,
+    });
 
     this.client.publish({
       destination: '/app/chat.stopTyping',

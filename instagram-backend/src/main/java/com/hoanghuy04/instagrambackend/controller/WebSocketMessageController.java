@@ -103,38 +103,72 @@ public class WebSocketMessageController {
     /**
      * Handle typing indicator.
      * Endpoint: /app/chat.typing
+     * Supports both direct messages (receiverId) and group chat (conversationId).
      * 
      * @param chatMessage the typing indicator message
      */
     @MessageMapping("/chat.typing")
     public void handleTyping(@Payload ChatMessage chatMessage) {
-        log.debug("User {} is typing to {}", chatMessage.getSenderId(), chatMessage.getReceiverId());
+        log.debug("User {} is typing (conversationId: {}, receiverId: {})", 
+                chatMessage.getSenderId(), chatMessage.getConversationId(), chatMessage.getReceiverId());
         
-        if (chatMessage.getSenderId() != null && chatMessage.getReceiverId() != null) {
+        if (chatMessage.getSenderId() == null) {
+            log.warn("Invalid typing indicator: senderId is null");
+            return;
+        }
+        
+        // Prefer conversationId for group chat support
+        if (chatMessage.getConversationId() != null) {
+            webSocketMessageService.pushTypingIndicatorForConversation(
+                chatMessage.getSenderId(),
+                chatMessage.getConversationId(),
+                true
+            );
+        } else if (chatMessage.getReceiverId() != null) {
+            // Fallback to direct message (backward compatibility)
             webSocketMessageService.pushTypingIndicator(
                 chatMessage.getSenderId(),
                 chatMessage.getReceiverId(),
                 true
             );
+        } else {
+            log.warn("Invalid typing indicator: both conversationId and receiverId are null");
         }
     }
 
     /**
      * Handle stop typing indicator.
      * Endpoint: /app/chat.stopTyping
+     * Supports both direct messages (receiverId) and group chat (conversationId).
      * 
      * @param chatMessage the stop typing indicator message
      */
     @MessageMapping("/chat.stopTyping")
     public void handleStopTyping(@Payload ChatMessage chatMessage) {
-        log.debug("User {} stopped typing to {}", chatMessage.getSenderId(), chatMessage.getReceiverId());
+        log.debug("User {} stopped typing (conversationId: {}, receiverId: {})", 
+                chatMessage.getSenderId(), chatMessage.getConversationId(), chatMessage.getReceiverId());
         
-        if (chatMessage.getSenderId() != null && chatMessage.getReceiverId() != null) {
+        if (chatMessage.getSenderId() == null) {
+            log.warn("Invalid stop typing indicator: senderId is null");
+            return;
+        }
+        
+        // Prefer conversationId for group chat support
+        if (chatMessage.getConversationId() != null) {
+            webSocketMessageService.pushTypingIndicatorForConversation(
+                chatMessage.getSenderId(),
+                chatMessage.getConversationId(),
+                false
+            );
+        } else if (chatMessage.getReceiverId() != null) {
+            // Fallback to direct message (backward compatibility)
             webSocketMessageService.pushTypingIndicator(
                 chatMessage.getSenderId(),
                 chatMessage.getReceiverId(),
                 false
             );
+        } else {
+            log.warn("Invalid stop typing indicator: both conversationId and receiverId are null");
         }
     }
 
@@ -159,8 +193,7 @@ public class WebSocketMessageController {
             // and automatically push WebSocket read receipt
             if (chatMessage.getSenderId() != null) {
                 conversationMessageService.markAsRead(
-                    chatMessage.getId(),
-                    chatMessage.getSenderId()
+                    chatMessage.getId()
                 );
             }
             

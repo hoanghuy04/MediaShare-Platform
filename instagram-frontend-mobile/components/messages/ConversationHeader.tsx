@@ -1,12 +1,10 @@
 import React from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   StyleSheet,
   Platform,
   TouchableOpacity,
-  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../common/Avatar';
@@ -42,8 +40,6 @@ export const ConversationHeader: React.FC<Props> = ({
     title === 'ai-assistant' || title === 'AI Assistant';
 
   return (
-    <SafeAreaView style={styles.headerWrapper}>
-      <StatusBar barStyle="dark-content" />
       <View style={[styles.headerContent, { backgroundColor: headerBg }]}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Ionicons
@@ -133,7 +129,6 @@ export const ConversationHeader: React.FC<Props> = ({
           )}
         </View>
       </View>
-    </SafeAreaView>
   );
 };
 

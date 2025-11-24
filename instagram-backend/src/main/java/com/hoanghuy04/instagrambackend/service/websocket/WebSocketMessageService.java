@@ -32,13 +32,22 @@ public interface WebSocketMessageService {
     void pushReadReceipt(MessageResponse message, String readByUserId);
 
     /**
-     * Push typing indicator via WebSocket.
+     * Push typing indicator via WebSocket (for direct messages).
      *
      * @param senderId the sender user ID
      * @param receiverId the receiver user ID
      * @param isTyping true if typing, false if stopped typing
      */
     void pushTypingIndicator(String senderId, String receiverId, boolean isTyping);
+
+    /**
+     * Push typing indicator for conversation via WebSocket (supports group chat).
+     *
+     * @param senderId the sender user ID
+     * @param conversationId the conversation ID
+     * @param isTyping true if typing, false if stopped typing
+     */
+    void pushTypingIndicatorForConversation(String senderId, String conversationId, boolean isTyping);
 
     /**
      * Push error message via WebSocket.

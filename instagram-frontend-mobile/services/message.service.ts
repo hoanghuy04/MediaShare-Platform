@@ -9,9 +9,7 @@ import {
 
 // Message API
 export const messageAPI = {
-  // Get inbox items (conversations + sent message requests)
   getInbox: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
-    // userId will be automatically added by axios interceptor
     console.log("____________________________________getInbox____________________________________");
     const response = await axiosInstance.get(API_ENDPOINTS.INBOX, {
       params: { page, size: limit }, // Backend uses 'size' not 'limit'
@@ -24,7 +22,6 @@ export const messageAPI = {
     return res.data?.data ?? null; // String hoặc null
   },
 
-  // Get conversation details
   getConversation: async (conversationId: string): Promise<Conversation> => {
     console.log("____________________________________get conversation____________________________________");
     
@@ -36,7 +33,6 @@ export const messageAPI = {
     return response.data.data;
   },
 
-  // Get messages in a conversation
   getMessages: async (
     conversationId: string,
     page = 0,
@@ -51,7 +47,6 @@ export const messageAPI = {
     return response.data.data;
   },
 
-  // Send direct message (auto-creates conversation if needed)
   sendDirectMessage: async (
     receiverId: string,
     content: string,
@@ -66,7 +61,6 @@ export const messageAPI = {
     return response.data.data;
   },
 
-  // Send message to existing conversation
   sendMessage: async (
     conversationId: string,
     content: string,
@@ -82,7 +76,6 @@ export const messageAPI = {
     return response.data.data;
   },
 
-  // Mark message as read (marks all messages in conversation)
   markAsRead: async (messageId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     await axiosInstance.post(
@@ -92,7 +85,6 @@ export const messageAPI = {
     );
   },
 
-  // Delete message (soft delete)
   deleteMessage: async (messageId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     await axiosInstance.delete(
@@ -101,7 +93,6 @@ export const messageAPI = {
     );
   },
 
-  // Delete conversation (soft delete)
   deleteConversation: async (conversationId: string): Promise<void> => {
     const userId = axiosInstance.defaults.headers.common['X-User-ID'];
     await axiosInstance.delete(
@@ -110,7 +101,6 @@ export const messageAPI = {
     );
   },
 
-  // Create group chat
   createGroup: async (groupName: string, participantIds: string[], avatar?: string | null): Promise<Conversation> => {
     const creatorId = axiosInstance.defaults.headers.common['X-User-ID'];
     const response = await axiosInstance.post(
@@ -121,7 +111,6 @@ export const messageAPI = {
     return response.data.data;
   },
 
-  // Update group info
   updateConversation: async (
   conversationId: string,
   data: {
@@ -138,7 +127,6 @@ export const messageAPI = {
   return response.data.data;
 },
 
-  // Add members to group
   addGroupMembers: async (conversationId: string, addedBy: string, userIds: string[]): Promise<void> => {
     await axiosInstance.post(
       API_ENDPOINTS.ADD_MEMBERS(conversationId),
@@ -147,7 +135,6 @@ export const messageAPI = {
     );
   },
 
-  // Leave group
   leaveGroup: async (conversationId: string, userId?: string): Promise<void> => {
     const requesterId = userId ?? axiosInstance.defaults.headers.common['X-User-ID'];
     await axiosInstance.post(
@@ -157,7 +144,6 @@ export const messageAPI = {
     );
   },
 
-  // Remove member from group
   removeGroupMember: async (conversationId: string, userId: string): Promise<void> => {
     const removedBy = axiosInstance.defaults.headers.common['X-User-ID'];
     await axiosInstance.delete(
@@ -166,7 +152,6 @@ export const messageAPI = {
     );
   },
 
-  // Promote member to admin
   promoteGroupAdmin: async (conversationId: string, userId: string): Promise<void> => {
     await axiosInstance.post(
       API_ENDPOINTS.PROMOTE_ADMIN(conversationId, userId),
@@ -174,7 +159,6 @@ export const messageAPI = {
     );
   },
 
-  // Demote admin to member
   demoteGroupAdmin: async (conversationId: string, userId: string): Promise<void> => {
     await axiosInstance.post(
       API_ENDPOINTS.DEMOTE_ADMIN(conversationId, userId),

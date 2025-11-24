@@ -74,11 +74,36 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                     .type(ChatMessage.MessageType.READ)
                     .senderId(readByUserId)
                     .receiverId(sender.getId())
+                    .conversationId(message.getConversationId()) // Add conversationId for group chat support
                     .status(ChatMessage.MessageStatus.READ)
                     .timestamp(LocalDateTime.now())
                     .build();
 
-            // Notify sender that message was read
+            // For group conversations, notify all participants
+            if (message.getConversationId() != null) {
+                try {
+                    Conversation conversation = conversationRepository.findById(message.getConversationId())
+                            .orElse(null);
+                    if (conversation != null && conversation.getType() == ConversationType.GROUP) {
+                        // Notify all participants in group
+                        for (String participantId : conversation.getParticipants().stream()
+                                .map(p -> p.getUserId())
+                                .collect(java.util.stream.Collectors.toList())) {
+                            messagingTemplate.convertAndSendToUser(
+                                    participantId,
+                                    "/queue/read-receipts",
+                                    readReceipt
+                            );
+                        }
+                        log.debug("Read receipt pushed via WebSocket to group conversation: {}", message.getConversationId());
+                        return;
+                    }
+                } catch (Exception ex) {
+                    log.warn("Failed to load conversation for read receipt: {}", ex.getMessage());
+                }
+            }
+
+            // For direct conversations, notify sender only
             messagingTemplate.convertAndSendToUser(
                     sender.getId(),
                     "/queue/read-receipts",
@@ -121,6 +146,50 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
         }
     }
 
+    /**
+     * Push typing indicator for conversation (supports group chat).
+     */
+    public void pushTypingIndicatorForConversation(String senderId, String conversationId, boolean isTyping) {
+        try {
+            Conversation conversation = conversationRepository.findById(conversationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
+
+            // Notify all participants except sender
+            for (String participantId : conversation.getParticipants().stream()
+                    .map(p -> p.getUserId())
+                    .filter(id -> !id.equals(senderId))
+                    .collect(java.util.stream.Collectors.toList())) {
+                
+                // Create new message for each participant to avoid mutation issues
+                ChatMessage typingMessage = ChatMessage.builder()
+                        .senderId(senderId)
+                        .receiverId(participantId)
+                        .conversationId(conversationId)
+                        .type(isTyping ? ChatMessage.MessageType.TYPING : ChatMessage.MessageType.STOP_TYPING)
+                        .timestamp(LocalDateTime.now())
+                        .build();
+                
+                log.debug("📤 Sending typing message: senderId={}, receiverId={}, conversationId={}, type={}", 
+                        typingMessage.getSenderId(), 
+                        typingMessage.getReceiverId(), 
+                        typingMessage.getConversationId(),
+                        typingMessage.getType());
+                
+                messagingTemplate.convertAndSendToUser(
+                        participantId,
+                        "/queue/typing",
+                        typingMessage
+                );
+                
+                log.debug("Typing indicator pushed to participant {} for conversation: {}", participantId, conversationId);
+            }
+
+            log.debug("Typing indicator pushed via WebSocket for conversation: {} (sender: {})", conversationId, senderId);
+        } catch (Exception e) {
+            log.warn("Failed to push typing indicator for conversation via WebSocket: {}", e.getMessage());
+        }
+    }
+
     @Override
     public void pushError(String userId, String errorMessage) {
         try {
@@ -150,6 +219,7 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 .senderId(sender.getId())
                 .senderUsername(sender.getUsername())
                 .senderProfileImage(sender.getAvatar())
+                .conversationId(message.getConversationId()) // Add conversationId for frontend filtering
                 .content(message.getContent())
 //                .mediaUrl(message.getMediaUrl())
                 .timestamp(message.getCreatedAt())
