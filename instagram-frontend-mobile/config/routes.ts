@@ -111,4 +111,11 @@ export const API_ENDPOINTS = {
   AI_CHAT: '/api/ai/chat',
   AI_CONVERSATION: '/api/ai/conversation',
   AI_CLEAR_HISTORY: '/api/ai/conversation/history',
+
+  // Hashtags
+  HASHTAGS: '/api/hashtags',
+  HASHTAG_BY_TAG: (tag: string) => `/api/hashtags/${tag}`,
+  HASHTAG_SEARCH: '/api/hashtags/search',
+  HASHTAG_TRENDING: '/api/hashtags/trending',
+  HASHTAG_INCREASE: (tag: string) => `/api/hashtags/${tag}/increase`,
 } as const;

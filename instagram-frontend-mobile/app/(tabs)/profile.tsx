@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Image, Dimensions, Text } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useTheme } from '@hooks/useTheme';
 import { useAuth } from '@hooks/useAuth';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
@@ -9,6 +8,7 @@ import { Header } from '@components/common/Header';
 import { ProfileHeader } from '@components/profile/ProfileHeader';
 import { ProfileHeaderSkeleton } from '@components/profile/ProfileHeaderSkeleton';
 import { ProfileGridSkeleton } from '@components/profile/ProfileGridSkeleton';
+import { ReelGrid } from '@components/profile/ReelGrid';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { postService } from '../../services/post.service';
 import { showAlert } from '@utils/helpers';
@@ -20,69 +20,11 @@ const ITEM_SIZE = (SCREEN_WIDTH - 4) / 3;
 
 type TabType = 'posts' | 'reels' | 'tagged';
 
-interface ReelGridItemProps {
-  item: Post;
-  userId?: string;
-  videoThumbnails: { [key: string]: string };
-  onThumbnailGenerated: (itemId: string, uri: string) => void;
-}
-
-const ReelGridItem: React.FC<ReelGridItemProps> = ({ item, userId, videoThumbnails, onThumbnailGenerated }) => {
-  const router = useRouter();
-  const videoMedia = item.media?.find(m => m.category === 'VIDEO' || m.type === 'VIDEO' || m.type === 'video');
-  const imageMedia = item.media?.find(m => m.category === 'IMAGE');
-  const isVideo = !!videoMedia;
-  
-  // Use cached thumbnail, image thumbnail, or video URL
-  const thumbnailUri = videoThumbnails[item.id] || imageMedia?.url || videoMedia?.url || item.media?.[0]?.url;
-
-  // Generate thumbnail for video if not cached
-  React.useEffect(() => {
-    if (isVideo && videoMedia && !videoThumbnails[item.id] && !imageMedia) {
-      VideoThumbnails.getThumbnailAsync(videoMedia.url, {
-        time: 0,
-      })
-        .then(({ uri }) => {
-          onThumbnailGenerated(item.id, uri);
-        })
-        .catch(error => {
-          console.log('Error generating thumbnail for', item.id, error);
-        });
-    }
-  }, [item.id, isVideo, videoMedia, imageMedia]);
-  
-  return (
-    <TouchableOpacity
-      style={styles.gridItem}
-      onPress={() =>
-        router.push({
-          pathname: '/profile/reels',
-          params: { userId, reelId: item.id },
-        })
-      }
-    >
-      <Image source={{ uri: thumbnailUri }} style={styles.image} resizeMode="cover" />
-      {/* Video indicator */}
-      {isVideo && (
-        <View style={styles.videoIndicator}>
-          <Ionicons name="play" size={16} color="white" />
-        </View>
-      )}
-      {/* View count overlay */}
-      <View style={styles.viewCountOverlay}>
-        <Ionicons name="play" size={12} color="white" />
-        <Text style={styles.viewCountText}>{item.totalLike || 0}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
 export default function ProfileScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const { user, logout, refreshUserData } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('posts');
-  const [videoThumbnails, setVideoThumbnails] = useState<{ [key: string]: string }>({});
 
   const {
     data: posts,
@@ -175,17 +117,6 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  const renderReelItem = ({ item }: { item: Post }) => (
-    <ReelGridItem
-      item={item}
-      userId={user?.id}
-      videoThumbnails={videoThumbnails}
-      onThumbnailGenerated={(itemId, uri) => {
-        setVideoThumbnails(prev => ({ ...prev, [itemId]: uri }));
-      }}
-    />
-  );
-
   const renderTabMenu = () => (
     <View style={[styles.tabMenu, { borderBottomColor: theme.colors.border }]}>
       <TouchableOpacity
@@ -243,28 +174,45 @@ export default function ProfileScreen() {
       );
     }
 
-    const data = activeTab === 'posts' ? posts : reels;
-    const isLoading = activeTab === 'posts' ? isLoadingPosts : isLoadingReels;
-    const loadMore = activeTab === 'posts' ? loadMorePosts : loadMoreReels;
-    const renderItem = activeTab === 'posts' ? renderPostItem : renderReelItem;
+    if (activeTab === 'reels') {
+      return (
+        <ReelGrid
+          reels={reels}
+          userId={user?.id}
+          onLoadMore={loadMoreReels}
+          isLoading={isLoadingReels}
+          ListEmptyComponent={
+            isLoadingReels ? (
+              <ProfileGridSkeleton itemCount={9} />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                  Chưa có thước phim
+                </Text>
+              </View>
+            )
+          }
+        />
+      );
+    }
 
     return (
       <FlatList
-        data={data}
-        renderItem={renderItem}
+        data={posts}
+        renderItem={renderPostItem}
         keyExtractor={item => item.id}
         numColumns={3}
         columnWrapperStyle={styles.row}
-        onEndReached={loadMore}
+        onEndReached={loadMorePosts}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          isLoading ? (
+          isLoadingPosts ? (
             <ProfileGridSkeleton itemCount={9} />
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                {activeTab === 'posts' ? 'Chưa có bài viết' : 'Chưa có thước phim'}
+                Chưa có bài viết
               </Text>
             </View>
           )
@@ -318,30 +266,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-  },
-  videoIndicator: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    padding: 4,
-  },
-  viewCountOverlay: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  viewCountText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   tabMenu: {
     flexDirection: 'row',

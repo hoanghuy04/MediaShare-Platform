@@ -34,6 +34,7 @@ public class InitApp implements CommandLineRunner {
     private final FollowRepository followRepository;
     private final NotificationRepository notificationRepository;
     private final MediaFileRepository mediaFileRepository;
+    private final HashtagRepository hashtagRepository;
     private final PasswordEncoder passwordEncoder;
     
     @Override
@@ -52,6 +53,7 @@ public class InitApp implements CommandLineRunner {
             
             initializeUsers();
             initializeMediaFiles();
+            initializeHashtags();
             initializePosts();
             initializeComments();
             initializeFollows();
@@ -75,6 +77,7 @@ public class InitApp implements CommandLineRunner {
         followRepository.deleteAll();
         postRepository.deleteAll();
         mediaFileRepository.deleteAll();
+        hashtagRepository.deleteAll();
         userRepository.deleteAll();
         
         log.info("Existing data cleared");
@@ -194,6 +197,43 @@ public class InitApp implements CommandLineRunner {
         
         mediaFileRepository.save(aiAssistantMedia);
         log.info("Created AI assistant media file for user: {}", targetUser.getUsername());
+    }
+    
+    /**
+     * Initialize sample hashtags
+     */
+    private void initializeHashtags() {
+        log.info("Initializing hashtags...");
+        
+        List<Hashtag> hashtags = Arrays.asList(
+            Hashtag.builder().tag("love").usageCount(500).build(),
+            Hashtag.builder().tag("instagood").usageCount(450).build(),
+            Hashtag.builder().tag("photooftheday").usageCount(420).build(),
+            Hashtag.builder().tag("fashion").usageCount(410).build(),
+            Hashtag.builder().tag("beautiful").usageCount(400).build(),
+            Hashtag.builder().tag("travel").usageCount(380).build(),
+            Hashtag.builder().tag("photography").usageCount(350).build(),
+            Hashtag.builder().tag("nature").usageCount(330).build(),
+            Hashtag.builder().tag("food").usageCount(320).build(),
+            Hashtag.builder().tag("art").usageCount(310).build(),
+            Hashtag.builder().tag("happy").usageCount(290).build(),
+            Hashtag.builder().tag("style").usageCount(280).build(),
+            Hashtag.builder().tag("summer").usageCount(270).build(),
+            Hashtag.builder().tag("beach").usageCount(260).build(),
+            Hashtag.builder().tag("sunset").usageCount(250).build(),
+            Hashtag.builder().tag("fitness").usageCount(240).build(),
+            Hashtag.builder().tag("lifestyle").usageCount(230).build(),
+            Hashtag.builder().tag("motivation").usageCount(220).build(),
+            Hashtag.builder().tag("selfie").usageCount(210).build(),
+            Hashtag.builder().tag("model").usageCount(200).build(),
+            Hashtag.builder().tag("hello").usageCount(180).build(),
+            Hashtag.builder().tag("haha").usageCount(150).build(),
+            Hashtag.builder().tag("handmade").usageCount(100).build(),
+            Hashtag.builder().tag("haircut").usageCount(90).build()
+        );
+        
+        hashtagRepository.saveAll(hashtags);
+        log.info("Created {} sample hashtags", hashtags.size());
     }
     
     /**

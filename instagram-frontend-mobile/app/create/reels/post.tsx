@@ -14,11 +14,12 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useUpload } from '@/context/UploadContext';
-import { useAuth } from '@/context/AuthContext';
+import { useUpload } from '../../../context/UploadContext';
+import { useAuth } from '../../../hooks/useAuth';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LocationSearchScreen } from '@/components/create/reels/LocationSearchScreen';
+import { LocationSearchScreen } from '../../../components/create/reels/LocationSearchScreen';
+import CaptionInputScreen from '../../../components/common/CaptionInputScreen';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
@@ -42,6 +43,8 @@ export default function ReelPostScreen() {
   const mediaType = (params.mediaType as 'photo' | 'video') || 'video';
 
   const [caption, setCaption] = useState('');
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [showCaptionInput, setShowCaptionInput] = useState(false);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
 
@@ -66,16 +69,10 @@ export default function ReelPostScreen() {
     }
   };
 
-  const handleHashtagPress = () => {
-    setCaption(prev => {
-      if (prev.trim().length === 0) return '#';
-      if (prev.endsWith(' ') || prev.endsWith('\n')) return prev + '#';
-      return prev + ' #';
-    });
-
-    setTimeout(() => {
-      captionInputRef.current?.focus();
-    }, 50);
+  const handleCaptionSave = (newCaption: string, extractedHashtags: string[]) => {
+    setCaption(newCaption);
+    setHashtags(extractedHashtags);
+    setShowCaptionInput(false);
   };
 
   const handleShare = () => {
@@ -95,13 +92,14 @@ export default function ReelPostScreen() {
         mediaUris: [mediaUri],
         mediaType: mediaType,
         caption: caption,
+        hashtags: hashtags,
         location: pickedLocation?.name,
         userId: user.id,
       });
     }, 100);
   };
 
-  const handleSelectLocation = (loc: { name: string; address: string; distance: string }) => {
+  const handleSelectLocation = (loc: { name: string; address?: string; distance?: string }) => {
     setPickedLocation({
       name: loc.name,
       address: loc.address,
@@ -114,15 +112,6 @@ export default function ReelPostScreen() {
     setPickedLocation(null);
   };
 
-  if (showLocationSearch) {
-    return (
-      <LocationSearchScreen
-        onClose={() => setShowLocationSearch(false)}
-        onSelectLocation={handleSelectLocation}
-      />
-    );
-  }
-
   const renderLocationSecondaryLine = () => {
     if (!pickedLocation) return null;
     const pieces: string[] = [];
@@ -134,6 +123,15 @@ export default function ReelPostScreen() {
     }
     return pieces.join(' · ');
   };
+
+  if (showLocationSearch) {
+    return (
+      <LocationSearchScreen
+        onClose={() => setShowLocationSearch(false)}
+        onSelectLocation={handleSelectLocation}
+      />
+    );
+  }
 
   if (!mediaUri) {
     return (
@@ -170,7 +168,6 @@ export default function ReelPostScreen() {
               <VideoView
                 style={styles.previewMedia}
                 player={player}
-                contentFit="cover"
                 nativeControls={false}
               />
             ) : (
@@ -179,25 +176,30 @@ export default function ReelPostScreen() {
           </View>
         </View>
 
-        <View style={styles.captionSection}>
-          <TextInput
-            ref={captionInputRef}
-            style={styles.captionInput}
-            placeholder="Viết phụ đề và thêm hashtag..."
-            placeholderTextColor="#999"
-            value={caption}
-            onChangeText={setCaption}
-            multiline
-            maxLength={2200}
-          />
-        </View>
-
-        <View style={styles.chipsRow}>
-          <TouchableOpacity style={styles.chip} onPress={handleHashtagPress}>
-            <Text style={styles.chipIconText}>#</Text>
-            <Text style={styles.chipText}>Hashtag</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.captionSection}
+          onPress={() => setShowCaptionInput(true)}
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[styles.captionText, !caption && styles.captionPlaceholder]}
+            numberOfLines={3}
+          >
+            {caption || 'Viết phụ đề và thêm hashtag...'}
+          </Text>
+          {hashtags.length > 0 && (
+            <View style={styles.hashtagsPreview}>
+              {hashtags.slice(0, 3).map((tag, index) => (
+                <View key={index} style={styles.hashtagChip}>
+                  <Text style={styles.hashtagChipText}>#{tag}</Text>
+                </View>
+              ))}
+              {hashtags.length > 3 && (
+                <Text style={styles.hashtagMoreText}>+{hashtags.length - 3} nữa</Text>
+              )}
+            </View>
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.rowPressable}>
           <View style={styles.rowLeft}>
@@ -261,6 +263,13 @@ export default function ReelPostScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <CaptionInputScreen
+        visible={showCaptionInput}
+        initialCaption={caption}
+        onSave={handleCaptionSave}
+        onClose={() => setShowCaptionInput(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -314,41 +323,37 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: '#e0e0e0',
+    minHeight: 80,
   },
-  captionInput: {
+  captionText: {
     fontSize: 16,
     color: '#000',
-    minHeight: 60,
-    textAlignVertical: 'top',
+    lineHeight: 22,
   },
-  chipsRow: {
+  captionPlaceholder: {
+    color: '#999',
+  },
+  hashtagsPreview: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
+    marginTop: 8,
+    gap: 6,
     alignItems: 'center',
-    backgroundColor: '#F3F2F7',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e2e2e4',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
   },
-  chipIconText: {
-    fontSize: 12,
-    color: '#444',
-    fontWeight: '600',
-    marginRight: 6,
+  hashtagChip: {
+    backgroundColor: '#E8F0FE',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  chipText: {
-    fontSize: 12,
-    color: '#444',
+  hashtagChipText: {
+    fontSize: 13,
+    color: '#1976D2',
     fontWeight: '500',
+  },
+  hashtagMoreText: {
+    fontSize: 13,
+    color: '#666',
   },
   rowPressable: {
     flexDirection: 'row',

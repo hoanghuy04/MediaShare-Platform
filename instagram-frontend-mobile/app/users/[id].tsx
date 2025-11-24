@@ -6,6 +6,8 @@ import { useAuth } from '@hooks/useAuth';
 import { useInfiniteScroll } from '@hooks/useInfiniteScroll';
 import { Header } from '@components/common/Header';
 import { ProfileHeader } from '@components/profile/ProfileHeader';
+import { ProfileGridSkeleton } from '@components/profile/ProfileGridSkeleton';
+import { ReelGrid } from '@components/profile/ReelGrid';
 import { LoadingSpinner } from '@components/common/LoadingSpinner';
 import { userAPI } from '@services/api';
 import { postService } from '../../services/post.service';
@@ -88,7 +90,7 @@ export default function UserProfileScreen() {
     postsCount: posts?.length || profile.postsCount || 0,
   };
 
-  const renderItem = ({ item }: { item: Post }) => (
+  const renderPostItem = ({ item }: { item: Post }) => (
     <TouchableOpacity
       style={styles.gridItem}
       onPress={() =>
@@ -155,27 +157,45 @@ export default function UserProfileScreen() {
       );
     }
 
-    const data = activeTab === 'posts' ? posts : reels;
-    const isLoadingData = activeTab === 'posts' ? isLoadingPosts : isLoadingReels;
-    const loadMore = activeTab === 'posts' ? loadMorePosts : loadMoreReels;
+    if (activeTab === 'reels') {
+      return (
+        <ReelGrid
+          reels={reels}
+          userId={id}
+          onLoadMore={loadMoreReels}
+          isLoading={isLoadingReels}
+          ListEmptyComponent={
+            isLoadingReels ? (
+              <ProfileGridSkeleton itemCount={9} />
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                  Chưa có thước phim
+                </Text>
+              </View>
+            )
+          }
+        />
+      );
+    }
 
     return (
       <FlatList
-        data={data}
-        renderItem={renderItem}
+        data={posts}
+        renderItem={renderPostItem}
         keyExtractor={item => item.id}
         numColumns={3}
         columnWrapperStyle={styles.row}
-        onEndReached={loadMore}
+        onEndReached={loadMorePosts}
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          isLoadingData ? (
-            <LoadingSpinner />
+          isLoadingPosts ? (
+            <ProfileGridSkeleton itemCount={9} />
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                {activeTab === 'posts' ? 'Chưa có bài viết' : 'Chưa có thước phim'}
+                Chưa có bài viết
               </Text>
             </View>
           )
