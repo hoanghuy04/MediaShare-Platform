@@ -51,7 +51,6 @@ public class UserController {
         log.info("response_________________________________________: {}", response);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-    
     /**
      * Get all users with pagination.
      *
@@ -103,58 +102,6 @@ public class UserController {
     }
     
     /**
-     * Get user followers.
-     *
-     * @param id the user ID
-     * @return ResponseEntity with List of UserResponse
-     */
-    @GetMapping("/{id}/followers")
-    @Operation(summary = "Get user followers")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getUserFollowers(@PathVariable String id) {
-        log.info("Get followers request received for user: {}", id);
-        
-        List<UserResponse> response = userService.getUserFollowers(id);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-    
-    /**
-     * Get user following list (detailed).
-     *
-     * @param id the user ID
-     * @return ResponseEntity with List of UserResponse
-     */
-    @GetMapping("/{id}/following")
-    @Operation(summary = "Get user following (detailed)")
-    public ResponseEntity<ApiResponse<List<UserResponse>>> getUserFollowing(@PathVariable String id) {
-        log.info("Get following request received for user: {}", id);
-        
-        List<UserResponse> response = userService.getUserFollowing(id);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-    
-    /**
-     * Get user following summary (lightweight).
-     *
-     * @param id user ID
-     * @param query optional search keyword
-     * @param page page number
-     * @param size page size
-     * @return ResponseEntity with List of UserSummaryDTO
-     */
-    @GetMapping("/{id}/following-summary")
-    @Operation(summary = "Get user following summary")
-    public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getUserFollowingSummary(
-            @PathVariable String id,
-            @RequestParam(required = false, defaultValue = "") String query,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        
-        log.info("Get following summary request received for user: {} with query: {}", id, query);
-        List<UserSummaryResponse> response = userService.getUserFollowingSummary(id, query, page, size);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-    
-    /**
      * Search users.
      *
      * @param query the search query
@@ -171,22 +118,7 @@ public class UserController {
         PageResponse<UserResponse> response = userService.searchUsers(query, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-    
-    /**
-     * Get user statistics.
-     *
-     * @param id the user ID
-     * @return ResponseEntity with UserStatsResponse
-     */
-    @GetMapping("/{id}/stats")
-    @Operation(summary = "Get user statistics")
-    public ResponseEntity<ApiResponse<UserStatsResponse>> getUserStats(@PathVariable String id) {
-        log.info("Get user stats request received for user: {}", id);
-        
-        UserStatsResponse response = userService.getUserStats(id);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-    
+
     /**
      * Get mutual follows for a user (users that both follow each other).
      *

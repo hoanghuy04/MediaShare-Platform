@@ -20,11 +20,14 @@ import { formatDate, formatNumber } from '@utils/formatters';
 import { isVideoFormatSupported } from '@utils/videoUtils';
 import apiConfig from '@config/apiConfig';
 import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
+import { UserSummaryResponse } from '../../types/user';
+import { FollowButton } from '../common/FollowButton';
 import { PostLikesModal } from './PostLikesModal';
 import { PostCommentsModal } from './PostCommentsModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
+import { useAuth } from '@/context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
@@ -51,6 +54,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   disableNavigation = false,
 }) => {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const router = useRouter();
   const [isMuted, setIsMuted] = useState(true);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -84,7 +88,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   }, [post.id, post.likedByCurrentUser, post.totalLike]);
 
   // Create separate scale values for each media item
-  const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({}); 
+  const scaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({});
   const baseScaleValues = useRef<{ [key: number]: Animated.SharedValue<number> }>({});
   const uiOpacity = useSharedValue(1);
 
@@ -124,7 +128,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const handleMediaPress = async () => {
     if (disableNavigation) return;
     setIsNavigating(true);
-    await new Promise(resolve => setTimeout(resolve, 100)); 
+    await new Promise(resolve => setTimeout(resolve, 100));
     router.push({
       pathname: '/profile/posts',
       params: { userId: post.author.id, postId: post.id },
@@ -296,6 +300,9 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
+  const authorData = post.author as UserSummaryResponse;
+  const initiallyFollowing = authorData.followingByCurrentUser || false;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Animated.View style={[styles.header, uiAnimatedStyle]}>
@@ -306,10 +313,15 @@ export const PostCard: React.FC<PostCardProps> = ({
               {post.author.username}
             </Text>
           </TouchableOpacity>
-          {showFollowButton && (
-            <TouchableOpacity onPress={() => onFollow?.(post.author.id)}>
-              <Text style={[styles.followText, { color: theme.colors.primary }]}>• Theo dõi</Text>
-            </TouchableOpacity>
+
+          {!initiallyFollowing && post.author.id !== user?.id && (
+            <FollowButton
+              userId={authorData.id}
+              initialIsFollowing={false}
+              variant="grey"
+              size="small"
+              style={{ marginLeft: 8 }}
+            />
           )}
         </View>
 

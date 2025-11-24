@@ -289,59 +289,59 @@ public class InitApp implements CommandLineRunner {
      * Initialize sample follows
      */
     private void initializeFollows() {
-        log.info("Initializing follows...");
-        
-        List<User> users = userRepository.findAll();
-        if (users.size() < 2) {
-            log.warn("Not enough users for follow initialization");
-            return;
-        }
-        
-        List<Follow> follows = new ArrayList<>();
-        Set<String> existingFollows = new HashSet<>();
-        
-        // Create random follow relationships
-        for (User user : users) {
-            int followCount = 3; // 3 follows per user
-            int userFollows = 0;
-            int attempts = 0;
-            int maxAttempts = 20; // Prevent infinite loop
-            
-            while (userFollows < followCount && attempts < maxAttempts) {
-                User targetUser = users.get((int) (Math.random() * users.size()));
-                String followKey = user.getId() + "_" + targetUser.getId();
-                
-                // Check if this follow relationship already exists or is self-follow
-                if (!targetUser.getId().equals(user.getId()) && 
-                    !existingFollows.contains(followKey)) {
-                    
-                    Follow follow = Follow.builder()
-                            .follower(user)
-                            .following(targetUser)
-                            .createdAt(LocalDateTime.now().minusDays((long) (Math.random() * 30)))
-                            .build();
-                    follows.add(follow);
-                    existingFollows.add(followKey);
-                    userFollows++;
-                }
-                attempts++;
-            }
-        }
-        
-        // Save follows individually to handle duplicates gracefully
-        int savedFollows = 0;
-        for (Follow follow : follows) {
-            try {
-                followRepository.save(follow);
-                savedFollows++;
-            } catch (Exception e) {
-                log.warn("Skipping duplicate follow relationship: {} -> {}", 
-                    follow.getFollower().getUsername(), 
-                    follow.getFollowing().getUsername());
-            }
-        }
-        
-        log.info("Created {} sample follows", savedFollows);
+//        log.info("Initializing follows...");
+//
+//        List<User> users = userRepository.findAll();
+//        if (users.size() < 2) {
+//            log.warn("Not enough users for follow initialization");
+//            return;
+//        }
+//
+//        List<Follow> follows = new ArrayList<>();
+//        Set<String> existingFollows = new HashSet<>();
+//
+//        // Create random follow relationships
+//        for (User user : users) {
+//            int followCount = 3; // 3 follows per user
+//            int userFollows = 0;
+//            int attempts = 0;
+//            int maxAttempts = 20; // Prevent infinite loop
+//
+//            while (userFollows < followCount && attempts < maxAttempts) {
+//                User targetUser = users.get((int) (Math.random() * users.size()));
+//                String followKey = user.getId() + "_" + targetUser.getId();
+//
+//                // Check if this follow relationship already exists or is self-follow
+//                if (!targetUser.getId().equals(user.getId()) &&
+//                    !existingFollows.contains(followKey)) {
+//
+//                    Follow follow = Follow.builder()
+//                            .follower(user)
+//                            .following(targetUser)
+//                            .createdAt(LocalDateTime.now().minusDays((long) (Math.random() * 30)))
+//                            .build();
+//                    follows.add(follow);
+//                    existingFollows.add(followKey);
+//                    userFollows++;
+//                }
+//                attempts++;
+//            }
+//        }
+//
+//        // Save follows individually to handle duplicates gracefully
+//        int savedFollows = 0;
+//        for (Follow follow : follows) {
+//            try {
+//                followRepository.save(follow);
+//                savedFollows++;
+//            } catch (Exception e) {
+//                log.warn("Skipping duplicate follow relationship: {} -> {}",
+//                    follow.getFollower().getUsername(),
+//                    follow.getFollowing().getUsername());
+//            }
+//        }
+//
+//        log.info("Created {} sample follows", savedFollows);
     }
     
     /**

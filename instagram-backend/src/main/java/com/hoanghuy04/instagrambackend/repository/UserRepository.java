@@ -14,13 +14,13 @@ import java.util.Optional;
 /**
  * Repository interface for User entity operations.
  * Provides CRUD operations and custom queries for user management.
- * 
+ *
  * @author Instagram Backend Team
  * @version 1.0.0
  */
 @Repository
 public interface UserRepository extends MongoRepository<User, String> {
-    
+
     /**
      * Find a user by username.
      *
@@ -28,7 +28,7 @@ public interface UserRepository extends MongoRepository<User, String> {
      * @return Optional containing the user if found
      */
     Optional<User> findByUsername(String username);
-    
+
     /**
      * Find a user by email.
      *
@@ -36,7 +36,7 @@ public interface UserRepository extends MongoRepository<User, String> {
      * @return Optional containing the user if found
      */
     Optional<User> findByEmail(String email);
-    
+
     /**
      * Check if a user exists by username.
      *
@@ -44,7 +44,7 @@ public interface UserRepository extends MongoRepository<User, String> {
      * @return true if user exists, false otherwise
      */
     boolean existsByUsername(String username);
-    
+
     /**
      * Check if a user exists by email.
      *
@@ -52,7 +52,7 @@ public interface UserRepository extends MongoRepository<User, String> {
      * @return true if user exists, false otherwise
      */
     boolean existsByEmail(String email);
-    
+
     /**
      * Search users by username or name containing the query string.
      *
@@ -63,12 +63,11 @@ public interface UserRepository extends MongoRepository<User, String> {
      * @return Page of users matching the search criteria
      */
     @Query("{'$or': [" +
-           "{'username': {$regex: ?0, $options: 'i'}}, " +
-           "{'profile.firstName': {$regex: ?1, $options: 'i'}}, " +
-           "{'profile.lastName': {$regex: ?2, $options: 'i'}}" +
-           "]}")
+            "{'username': {$regex: ?0, $options: 'i'}}, " +
+            "{'profile.firstName': {$regex: ?1, $options: 'i'}}, " +
+            "{'profile.lastName': {$regex: ?2, $options: 'i'}}" +
+            "]}")
     Page<User> searchUsers(String username, String firstName, String lastName, Pageable pageable);
 
     List<User> findByUsernameContainingIgnoreCase(String username);
 }
-

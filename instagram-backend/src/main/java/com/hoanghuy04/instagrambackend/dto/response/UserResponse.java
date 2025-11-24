@@ -32,15 +32,17 @@ public class UserResponse {
     
     private Set<UserRole> roles;
     
-    private Integer followersCount;
+    private long followersCount;
     
-    private Integer followingCount;
+    private long followingCount;
     
     private boolean isPrivate;
     
     private boolean isVerified;
     
     private boolean isActive;
+
+    private boolean followingByCurrentUser;
     
     private LocalDateTime createdAt;
     

@@ -24,6 +24,8 @@ export interface Theme {
     white: string;
     black: string;
     transparent: string;
+    inputBackground: string;
+    gray: string;
   };
   chat: {
     bubbleIn: string;

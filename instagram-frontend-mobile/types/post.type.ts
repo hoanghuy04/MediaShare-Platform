@@ -1,6 +1,6 @@
 import { PostType } from './enum.type';
 import { MediaFileResponse } from './media.type';
-import { UserResponse } from './user';
+import { UserSummaryResponse } from './user';
 
 export interface CreatePostRequest {
   caption?: string;
@@ -12,7 +12,7 @@ export interface CreatePostRequest {
 
 export interface PostResponse {
   id: string;
-  author: UserResponse;
+  author: UserSummaryResponse;
   caption: string | null;
   type: PostType;
   media: MediaFileResponse[];

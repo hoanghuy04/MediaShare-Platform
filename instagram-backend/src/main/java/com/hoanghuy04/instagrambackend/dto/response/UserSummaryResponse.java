@@ -37,6 +37,11 @@ public class UserSummaryResponse {
      * Whether the account is verified
      */
     private boolean isVerified;
+    
+    /**
+     * Whether the current user is following this user
+     */
+    private boolean followingByCurrentUser;
 }
 
 

@@ -4,8 +4,12 @@ import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useRouter } from 'expo-router';
 import { PostResponse, PostLikeUserResponse } from '../../types/post.type';
+import { UserSummaryResponse } from '../../types/user';
+import { FollowButton } from '../common/FollowButton';
+import { Avatar } from '../common/Avatar';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { PostLikesModal } from './PostLikesModal';
+import { useAuth } from '@/context/AuthContext';
 
 import { MediaCategory } from '../../types/enum.type';
 import { postLikeService } from '../../services/post-like.service';
@@ -15,6 +19,7 @@ const MEDIA_HEIGHT = width * (16 / 9);
 
 export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; isVisible: boolean; onLike?: (postId: string) => void }) => {
   const router = useRouter();
+  const { user } = useAuth();
   const [showOverlay, setShowOverlay] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -114,7 +119,9 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
     transform: [{ scale: likeButtonScale.value }],
   }));
 
-  const avatarUrl = post.author.profile?.avatar || 'https://via.placeholder.com/40';
+  const authorData = post.author as UserSummaryResponse;
+  const initiallyFollowing = authorData.followingByCurrentUser || false;
+  const avatarUrl = authorData.profile?.avatar;
 
   const renderCaption = () => {
     const caption = post.caption || '';
@@ -148,25 +155,37 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
     <View style={styles.container}>
       <View style={styles.headerOverlay}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatarContainer}>
-            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-          </View>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/users/[id]', params: { id: post.author.id } })}>
+            <Avatar
+              uri={avatarUrl}
+              name={post.author.username}
+              size={36}
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
 
           <View style={styles.textContainer}>
             <View style={styles.usernameRow}>
-              <Text style={styles.username} numberOfLines={1}>
-                {post.author.username}
-              </Text>
-              <Text style={styles.dotSeparator}>•</Text>
-              <TouchableOpacity>
-                <Text style={styles.followText}>Theo dõi</Text>
+              <TouchableOpacity onPress={() => router.push({ pathname: '/users/[id]', params: { id: post.author.id } })}>
+                <Text style={styles.username}>
+                  {post.author.username}
+                </Text>
               </TouchableOpacity>
-            </View>
 
-            <View style={styles.audioRow}>
-              <Text style={styles.audioText} numberOfLines={1}>
-                Gợi ý cho bạn
-              </Text>
+              {!initiallyFollowing && post.author.id !== user?.id && (
+                <>
+
+                  <FollowButton
+                    userId={authorData.id}
+                    initialIsFollowing={false}
+                    variant="transparent"
+                    size="small"
+                    textColor="#fff"
+                    followingTextColor="#fff"
+                    style={{ borderColor: '#fff' }}
+                  />
+                </>
+              )}
             </View>
           </View>
         </View>
@@ -315,16 +334,16 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     marginRight: 10,
   },
-  avatar: { width: '100%', height: '100%', borderRadius: 18 },
+  avatar: { marginRight: 10 },
 
   textContainer: {
-    flex: 1,
     justifyContent: 'center',
   },
 
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between'
   },
   username: {
     color: '#fff',
@@ -333,7 +352,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
-    maxWidth: '70%',
   },
   dotSeparator: { color: '#fff', marginHorizontal: 5, fontSize: 12 },
   followText: {

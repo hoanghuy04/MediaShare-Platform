@@ -29,6 +29,16 @@ export interface UserResponse extends User {
   postsCount?: number;
   isFollowing?: boolean;
   isFollowedBy?: boolean;
+  followingByCurrentUser: boolean
+}
+
+export interface UserSummaryResponse {
+  id: string;
+  username: string;
+  email?: string;
+  profile?: UserProfile;
+  isVerified: boolean;
+  followingByCurrentUser: boolean;
 }
 
 export interface UpdateUserRequest {
@@ -54,8 +64,14 @@ export interface FollowResponse {
   message: string;
 }
 
+export interface FollowToggleResponse {
+  followerId: string;
+  followingId: string;
+  followingByCurrentUser: boolean;
+}
+
 // Legacy types for backward compatibility
-export interface ProfileData extends UserProfile {}
+export interface ProfileData extends UserProfile { }
 
 export interface UpdateProfileRequest {
   fullName?: string;
@@ -70,3 +86,20 @@ export interface UserStats {
   followingCount: number;
   postsCount: number;
 }
+
+/**
+ * @description: Simple user response for likes/followers/following
+ */
+export interface SimpleUserResponse {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * @description: Follower user response with additional field
+ */
+export interface FollowerUserResponse extends SimpleUserResponse {
+  followingByCurrentUser: boolean; // True if current user follows this follower back
+}
+
