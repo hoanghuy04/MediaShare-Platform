@@ -327,6 +327,7 @@ public class ConversationServiceImpl implements ConversationService {
             case TEXT -> message.getContent() != null ? message.getContent() : "";
             case IMAGE -> "Đã gửi một ảnh";
             case VIDEO -> "Đã gửi một video";
+            case AUDIO -> "Đã gửi một tin nhắn thoại";
             case POST_SHARE -> "Đã chia sẻ một bài viết";
         };
     }

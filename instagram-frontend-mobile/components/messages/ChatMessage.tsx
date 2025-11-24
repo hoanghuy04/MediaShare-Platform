@@ -1,5 +1,5 @@
 // components/messages/ChatMessage.tsx
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Audio, AVPlaybackStatus } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { Message, MessageRef } from '../../types/message';
 import { MessageType } from '../../types/enum.type';
@@ -62,6 +63,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 }) => {
   const { theme } = useTheme();
   const router = useRouter();
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
+  const [audioPosition, setAudioPosition] = useState(0);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
 
   const colors: BubblePalette = palette || {
     bubbleIn: theme.chat.bubbleIn,
@@ -70,11 +76,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     bubbleTextOut: theme.chat.bubbleTextOut,
   };
 
-  const gradientColors = [
-    theme.chat.gradientHigh,
-    theme.chat.gradientMedium,
-    theme.chat.gradientLow,
-  ];
+  const gradientColors = useMemo(
+    () =>
+      [
+        theme.chat.gradientHigh,
+        theme.chat.gradientMedium,
+        theme.chat.gradientLow,
+      ] as const,
+    [theme.chat.gradientHigh, theme.chat.gradientMedium, theme.chat.gradientLow]
+  );
 
   const containerStyle = [
     styles.row,
@@ -144,6 +154,97 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     message.type === MessageType.IMAGE || message.type === MessageType.VIDEO
       ? message.content
       : null;
+  const audioUri = message.type === MessageType.AUDIO ? message.content : null;
+
+  const cleanupAudio = useCallback(async () => {
+    if (soundRef.current) {
+      try {
+        await soundRef.current.unloadAsync();
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('Error unloading audio message:', error);
+        }
+      }
+      soundRef.current = null;
+    }
+    setIsAudioPlaying(false);
+    setAudioPosition(0);
+  }, []);
+
+  const handleAudioStatusUpdate = useCallback(
+    (status: AVPlaybackStatus) => {
+      if (!status.isLoaded) {
+        if ('error' in status && status.error && __DEV__) {
+          console.warn('Playback error:', status.error);
+        }
+        return;
+      }
+      setIsAudioPlaying(status.isPlaying);
+      setAudioDuration(status.durationMillis ?? null);
+      setAudioPosition(status.positionMillis ?? 0);
+      if (status.didJustFinish) {
+        cleanupAudio();
+      }
+    },
+    [cleanupAudio]
+  );
+
+  const toggleAudioPlayback = useCallback(async () => {
+    if (!audioUri) return;
+    try {
+      if (soundRef.current) {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isLoaded) {
+          if (status.isPlaying) {
+            await soundRef.current.pauseAsync();
+          } else {
+            await soundRef.current.playAsync();
+          }
+          return;
+        }
+        await cleanupAudio();
+      }
+      setIsAudioLoading(true);
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        { shouldPlay: true }
+      );
+      soundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate(handleAudioStatusUpdate);
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Error playing audio message:', error);
+      }
+      cleanupAudio();
+    } finally {
+      setIsAudioLoading(false);
+    }
+  }, [audioUri, cleanupAudio, handleAudioStatusUpdate]);
+
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    setAudioDuration(null);
+    setAudioPosition(0);
+    setIsAudioLoading(false);
+    cleanupAudio();
+  }, [audioUri, cleanupAudio]);
+
+  const formatDuration = (millis: number | null) => {
+    if (millis == null) return '0:00';
+    const totalSeconds = Math.max(0, Math.floor(millis / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+  const audioProgress = audioDuration ? Math.min(audioPosition / audioDuration, 1) : 0;
 
   const handleOpenMedia = () => {
     if (!mediaUrl) return;
@@ -158,6 +259,78 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         createdAt: message.createdAt || '',
       },
     });
+  };
+
+  const renderAudioBody = () => {
+    if (!audioUri) {
+      return (
+        <Text
+          style={[
+            styles.content,
+            { color: isOwn ? colors.bubbleTextOut : colors.bubbleTextIn },
+          ]}
+        >
+          Tin nhắn thoại
+        </Text>
+      );
+    }
+
+    const buttonBg = isOwn
+      ? hexToRgba(theme.colors.white, 0.85)
+      : hexToRgba('#000000', 0.25);
+    const iconColor = isOwn ? theme.colors.primary : theme.colors.white;
+
+    return (
+      <View style={styles.audioWrapper}>
+        <TouchableOpacity
+          style={[styles.audioButton, { backgroundColor: buttonBg }]}
+          onPress={toggleAudioPlayback}
+          activeOpacity={0.8}
+        >
+          {isAudioLoading ? (
+            <ActivityIndicator size="small" color={iconColor} />
+          ) : (
+            <Ionicons
+              name={isAudioPlaying ? 'pause' : 'play'}
+              size={18}
+              color={iconColor}
+            />
+          )}
+        </TouchableOpacity>
+        <View style={styles.audioMeta}>
+          <View
+            style={[
+              styles.audioProgressTrack,
+              {
+                backgroundColor: isOwn
+                  ? hexToRgba(theme.colors.white, 0.35)
+                  : hexToRgba('#000000', 0.1),
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.audioProgressBar,
+                {
+                  width: `${Math.min(audioProgress * 100, 100)}%`,
+                  backgroundColor: isOwn ? theme.colors.white : theme.colors.primary,
+                },
+              ]}
+            />
+          </View>
+          <Text
+            style={[
+              styles.audioDuration,
+              { color: isOwn ? colors.bubbleTextOut : colors.bubbleTextIn },
+            ]}
+          >
+            {formatDuration(
+              isAudioPlaying ? audioPosition : audioDuration ?? audioPosition
+            )}
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   const renderBody = () => {
@@ -217,6 +390,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           )}
         </TouchableOpacity>
       );
+    }
+
+    if (message.type === MessageType.AUDIO) {
+      return renderAudioBody();
     }
 
     // TEXT
@@ -425,6 +602,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  audioWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  audioButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  audioMeta: {
+    flex: 1,
+  },
+  audioProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  audioProgressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  audioDuration: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
   },
 });
 

@@ -788,9 +788,16 @@ export default function ConversationScreen() {
       const formData = new FormData();
       const filename = localUri.split('/').pop() || 'media';
       const match = /\.(\w+)$/.exec(filename);
-      const fileType = match
-        ? `${type.toLowerCase()}/${match[1]}`
-        : `${type.toLowerCase()}/jpeg`;
+      const extension = match ? match[1].toLowerCase() : undefined;
+      let fileType = 'application/octet-stream';
+      if (type === MessageType.IMAGE) {
+        fileType = `image/${extension || 'jpeg'}`;
+      } else if (type === MessageType.VIDEO) {
+        fileType = `video/${extension || 'mp4'}`;
+      } else if (type === MessageType.AUDIO) {
+        const audioExt = extension === 'mp3' ? 'mpeg' : extension || 'm4a';
+        fileType = `audio/${audioExt}`;
+      }
 
       formData.append('file', {
         uri: localUri,

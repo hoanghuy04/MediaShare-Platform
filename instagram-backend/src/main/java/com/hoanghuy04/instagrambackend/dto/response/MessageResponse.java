@@ -15,6 +15,7 @@ import java.util.List;
  * - TEXT: content is the actual text message
  * - IMAGE: content is the mediaFileId of an image
  * - VIDEO: content is the mediaFileId of a video
+ * - AUDIO: content is the mediaFileId of an audio clip
  * - POST_SHARE: content is the postId of a shared post
  * 
  * @author Instagram Backend Team
@@ -47,14 +48,14 @@ public class MessageResponse {
     private UserSummaryResponse receiver;
     
     /**
-     * Type of the message (TEXT, IMAGE, VIDEO, POST_SHARE)
+     * Type of the message (TEXT, IMAGE, VIDEO, AUDIO, POST_SHARE)
      */
     private MessageType type;
     
     /**
      * Content of the message. Meaning depends on type:
      * - TEXT: actual text content
-     * - IMAGE/VIDEO: mediaFileId
+     * - IMAGE/VIDEO/AUDIO: mediaFileId
      * - POST_SHARE: postId
      */
     private String content;

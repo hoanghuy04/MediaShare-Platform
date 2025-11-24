@@ -25,6 +25,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { useTheme } from '../../hooks/useTheme';
 import {
   COLORS,
@@ -215,6 +216,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   const [showAiSuggest, setShowAiSuggest] = useState(false);
   const [routeToAI, setRouteToAI] = useState(false);
@@ -222,11 +224,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasText = message.trim().length > 0;
 
-  const buttonGradientColors = [
-    theme.chat.gradientHigh,
-    theme.chat.gradientMedium,
-    theme.chat.gradientLow,
-  ];
+  const buttonGradientColors = useMemo(
+    () =>
+      [
+        theme.chat.gradientHigh,
+        theme.chat.gradientMedium,
+        theme.chat.gradientLow,
+      ] as const,
+    [theme.chat.gradientHigh, theme.chat.gradientMedium, theme.chat.gradientLow]
+  );
 
   // ---- emoji visible: controlled / uncontrolled ----
   const [innerEmojiVisible, setInnerEmojiVisible] = useState(false);
@@ -250,6 +256,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (timer) clearInterval(timer);
     };
   }, [isRecording]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -307,6 +322,63 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     onTyping?.();
     scheduleStopTyping();
   };
+
+  const startRecording = useCallback(async () => {
+    if (!onSendMedia) {
+      Alert.alert('Thông báo', 'Chức năng gửi voice chưa được kích hoạt.');
+      return;
+    }
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Quyền truy cập', 'Vui lòng cho phép sử dụng micro.');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recordingRef.current = recording;
+      setRecordSeconds(0);
+      setIsRecording(true);
+    } catch (_error) {
+      Alert.alert('Lỗi', 'Không thể bắt đầu ghi âm. Vui lòng thử lại.');
+      recordingRef.current = null;
+      setIsRecording(false);
+    }
+  }, [onSendMedia]);
+
+  const stopRecordingAndSend = useCallback(async () => {
+    const currentRecording = recordingRef.current;
+    if (!currentRecording) return;
+    try {
+      await currentRecording.stopAndUnloadAsync();
+      const uri = currentRecording.getURI();
+      if (uri && onSendMedia) {
+        onSendMedia(MessageType.AUDIO, uri);
+      }
+    } catch (_error) {
+      Alert.alert('Lỗi', 'Không thể gửi tin nhắn thoại. Vui lòng thử lại.');
+    } finally {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+        });
+      } catch (error) {
+        // ignore audio mode reset errors
+      }
+      recordingRef.current = null;
+      setIsRecording(false);
+      setRecordSeconds(0);
+    }
+  }, [onSendMedia]);
 
   const handleSend = () => {
     const trimmed = message.trim();
@@ -418,8 +490,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
-  const toggleRecording = () => setIsRecording(p => !p);
-
   const openEmoji = () => {
     Keyboard.dismiss();
     setShowEmoji(true);
@@ -529,7 +599,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             <View style={styles.inputIconsRow}>
               <TouchableOpacity
                 style={styles.inlineIconButton}
-                onPress={toggleRecording}
+                onPress={isRecording ? stopRecordingAndSend : startRecording}
               >
                 <Ionicons
                   name={isRecording ? 'stop-circle' : 'mic-outline'}

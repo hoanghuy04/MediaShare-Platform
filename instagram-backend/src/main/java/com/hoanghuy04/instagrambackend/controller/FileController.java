@@ -168,6 +168,7 @@ public class FileController {
             case "webm" -> "video/webm";
             case "mkv" -> "video/x-matroska";
             case "mp3" -> "audio/mpeg";
+            case "m4a" -> "audio/mp4";
             case "wav" -> "audio/wav";
             case "ogg" -> "audio/ogg";
             case "aac" -> "audio/aac";

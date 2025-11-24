@@ -5,7 +5,7 @@ import { Message, UserProfile } from '../types';
 export interface ChatMessage {
   id?: string;
   type: 'CHAT' | 'JOIN' | 'LEAVE' | 'TYPING' | 'STOP_TYPING' | 'READ';
-  contentType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'STICKER'; 
+  contentType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'POST_SHARE' | 'STICKER'; 
   senderId: string;
   senderUsername?: string;
   senderProfileImage?: string;

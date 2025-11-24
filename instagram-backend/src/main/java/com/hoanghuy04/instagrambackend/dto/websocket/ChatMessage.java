@@ -31,7 +31,7 @@ public class ChatMessage {
     private MessageType type;
     
     /**
-     * Content type for CHAT messages (TEXT, IMAGE, VIDEO, POST_SHARE).
+     * Content type for CHAT messages (TEXT, IMAGE, VIDEO, AUDIO, POST_SHARE).
      * Only used when type == CHAT.
      */
     private com.hoanghuy04.instagrambackend.enums.MessageType contentType;

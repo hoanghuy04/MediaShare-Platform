@@ -58,6 +58,10 @@ public class FileService {
             "mp4", "mov", "avi", "wmv", "flv", "mkv"
     );
 
+    private static final List<String> ALLOWED_AUDIO_EXTENSIONS = Arrays.asList(
+            "m4a", "aac", "mp3", "wav", "ogg"
+    );
+
     private static final long DEFAULT_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
     /**
@@ -221,6 +225,8 @@ public class FileService {
                 return MediaCategory.IMAGE;
             } else if (contentType.startsWith("video/")) {
                 return MediaCategory.VIDEO;
+            } else if (contentType.startsWith("audio/")) {
+                return MediaCategory.AUDIO;
             }
         }
         return MediaCategory.IMAGE; // default
@@ -329,15 +335,20 @@ public class FileService {
         return ALLOWED_VIDEO_EXTENSIONS.contains(extension);
     }
 
+    private boolean isAudioFile(String filename) {
+        String extension = getFileExtension(filename);
+        return ALLOWED_AUDIO_EXTENSIONS.contains(extension);
+    }
+
     /**
-     * Validate file type (image or video).
+     * Validate file type (image, video, or audio).
      *
      * @param filename the filename to validate
      * @throws FileUploadException if file type is not allowed
      */
     private void validateFileType(String filename) {
-        if (!isImageFile(filename) && !isVideoFile(filename)) {
-            throw new FileUploadException("File type not allowed. Only images and videos are accepted.");
+        if (!isImageFile(filename) && !isVideoFile(filename) && !isAudioFile(filename)) {
+            throw new FileUploadException("File type not allowed. Only images, videos, and audio files are accepted.");
         }
     }
 
