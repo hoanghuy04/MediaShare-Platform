@@ -10,6 +10,7 @@ import {
 import { useTheme } from '@hooks/useTheme';
 import { useAuth } from '@hooks/useAuth';
 import { PostCard } from './PostCard';
+import { PostCardSkeleton } from './PostCardSkeleton';
 import { FeedReelItem } from './FeedReelItem';
 import { CaughtUpNotice } from './CaughtUpNotice';
 import { SuggestedAccountCard } from './SuggestedAccountCard';
@@ -133,7 +134,15 @@ export const FeedList: React.FC<FeedListProps> = ({
   };
 
   const renderEmpty = () => {
-    if (isLoading) return <LoadingSpinner />;
+    if (isLoading) {
+      return (
+        <View>
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+        </View>
+      );
+    }
     return (
       <EmptyState
         icon="images-outline"

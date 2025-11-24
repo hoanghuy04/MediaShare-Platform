@@ -1,5 +1,18 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { webSocketService, WebSocketConfig, MessageCallbacks, ChatMessage } from '../services/websocket';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  useCallback,
+  useRef,
+} from 'react';
+import {
+  webSocketService,
+  WebSocketConfig,
+  MessageCallbacks,
+  ChatMessage,
+} from '../services/websocket';
 import { useAuth } from '../hooks/useAuth';
 import apiConfig from '../config/apiConfig';
 
@@ -10,12 +23,18 @@ interface WebSocketContextType {
   sendTyping: (receiverOrConversationId: string, isConversationId?: boolean) => void;
   sendStopTyping: (receiverOrConversationId: string, isConversationId?: boolean) => void;
   sendReadReceipt: (messageId: string, senderId: string) => void;
-  onMessage: (callback: (message: ChatMessage) => void) => void;
-  onTyping: (callback: (isTyping: boolean, userId: string, conversationId?: string) => void) => void;
-  onReadReceipt: (callback: (messageId: string, userId: string, conversationId?: string) => void) => void;
-  onUserOnline: (callback: (userId: string) => void) => void;
-  onUserOffline: (callback: (userId: string) => void) => void;
-  onConnectionStatusChange: (callback: (status: string) => void) => void;
+
+  // ⚠️ Các hàm onX bây giờ trả về hàm unsubscribe
+  onMessage: (callback: (message: ChatMessage) => void) => () => void;
+  onTyping: (
+    callback: (isTyping: boolean, userId: string, conversationId?: string) => void
+  ) => () => void;
+  onReadReceipt: (
+    callback: (messageId: string, userId: string, conversationId?: string) => void
+  ) => () => void;
+  onUserOnline: (callback: (userId: string) => void) => () => void;
+  onUserOffline: (callback: (userId: string) => void) => () => void;
+  onConnectionStatusChange: (callback: (status: string) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -24,78 +43,90 @@ interface WebSocketProviderProps {
   children: ReactNode;
 }
 
+type Subscribers = {
+  onMessage: Set<(message: ChatMessage) => void>;
+  onTyping: Set<(isTyping: boolean, userId: string, conversationId?: string) => void>;
+  onReadReceipt: Set<(messageId: string, userId: string, conversationId?: string) => void>;
+  onUserOnline: Set<(userId: string) => void>;
+  onUserOffline: Set<(userId: string) => void>;
+  onConnectionStatusChange: Set<(status: string) => void>;
+};
+
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
   const { user, token } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected' | 'reconnecting'>('disconnected');
-  const messageCallbacksRef = useRef<{
-    onMessage?: (message: ChatMessage) => void;
-    onTyping?: (isTyping: boolean, userId: string, conversationId?: string) => void;
-    onReadReceipt?: (messageId: string, userId: string, conversationId?: string) => void;
-    onUserOnline?: (userId: string) => void;
-    onUserOffline?: (userId: string) => void;
-    onConnectionStatusChange?: (status: string) => void;
-  }>({});
+  const [connectionStatus, setConnectionStatus] = useState<
+    'connected' | 'connecting' | 'disconnected' | 'reconnecting'
+  >('disconnected');
+
+  // 🔥 Dùng Set để hỗ trợ nhiều subscriber cho mỗi event
+  const subscribersRef = useRef<Subscribers>({
+    onMessage: new Set(),
+    onTyping: new Set(),
+    onReadReceipt: new Set(),
+    onUserOnline: new Set(),
+    onUserOffline: new Set(),
+    onConnectionStatusChange: new Set(),
+  });
 
   const connectWebSocket = useCallback(async () => {
     if (!user || !token) {
       return;
     }
 
-    // Use HTTP URL for SockJS (not ws://)
-    // Backend has context-path=/api, so WebSocket endpoint is /api/ws
+    // Backend có context-path=/api, endpoint WS = /api/ws
     const wsUrl = apiConfig.wsUrl || 'http://192.168.100.2:8080';
-    const fullUrl = `${wsUrl}/api/ws`; // Remove token from URL, will be sent via headers
-  
-  const config: WebSocketConfig = {
-    url: fullUrl,
-    userId: user.id,
-    username: user.username,
-    token: token,
-  };
+    const fullUrl = `${wsUrl}/api/ws`;
+
+    const config: WebSocketConfig = {
+      url: fullUrl,
+      userId: user.id,
+      username: user.username,
+      token: token,
+    };
 
     const callbacks: MessageCallbacks = {
       onMessage: (message: ChatMessage) => {
-        messageCallbacksRef.current.onMessage?.(message);
+        subscribersRef.current.onMessage.forEach(cb => cb(message));
       },
       onTyping: (isTyping: boolean, userId: string, conversationId?: string) => {
-        messageCallbacksRef.current.onTyping?.(isTyping, userId, conversationId);
+        subscribersRef.current.onTyping.forEach(cb => cb(isTyping, userId, conversationId));
       },
       onReadReceipt: (messageId: string, userId: string, conversationId?: string) => {
-        messageCallbacksRef.current.onReadReceipt?.(messageId, userId, conversationId);
+        subscribersRef.current.onReadReceipt.forEach(cb =>
+          cb(messageId, userId, conversationId)
+        );
       },
       onUserOnline: (userId: string) => {
-        messageCallbacksRef.current.onUserOnline?.(userId);
+        subscribersRef.current.onUserOnline.forEach(cb => cb(userId));
       },
       onUserOffline: (userId: string) => {
-        messageCallbacksRef.current.onUserOffline?.(userId);
+        subscribersRef.current.onUserOffline.forEach(cb => cb(userId));
       },
       onConnected: () => {
         setIsConnected(true);
         setConnectionStatus('connected');
-        messageCallbacksRef.current.onConnectionStatusChange?.('connected');
-        
-        // Show success notification
+        subscribersRef.current.onConnectionStatusChange.forEach(cb => cb('connected'));
         console.log('WebSocket đã kết nối thành công.');
       },
       onDisconnected: () => {
         setIsConnected(false);
         setConnectionStatus('disconnected');
-        messageCallbacksRef.current.onConnectionStatusChange?.('disconnected');
+        subscribersRef.current.onConnectionStatusChange.forEach(cb => cb('disconnected'));
       },
       onReconnecting: () => {
         setConnectionStatus('reconnecting');
-        messageCallbacksRef.current.onConnectionStatusChange?.('reconnecting');
+        subscribersRef.current.onConnectionStatusChange.forEach(cb => cb('reconnecting'));
       },
       onReconnected: () => {
         setConnectionStatus('connected');
-        messageCallbacksRef.current.onConnectionStatusChange?.('connected');
-        console.log('WebSocket đã kết nối thành công.');
+        subscribersRef.current.onConnectionStatusChange.forEach(cb => cb('connected'));
+        console.log('WebSocket đã kết nối lại thành công.');
       },
       onError: (error: string) => {
         console.error('WebSocket error:', error);
         setConnectionStatus('disconnected');
-        messageCallbacksRef.current.onConnectionStatusChange?.('disconnected');
+        subscribersRef.current.onConnectionStatusChange.forEach(cb => cb('disconnected'));
       },
     };
 
@@ -127,40 +158,76 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     webSocketService.sendMessage(receiverId, content);
   }, []);
 
-  const sendTyping = useCallback((receiverOrConversationId: string, isConversationId = false) => {
-    webSocketService.sendTyping(receiverOrConversationId, isConversationId);
-  }, []);
+  const sendTyping = useCallback(
+    (receiverOrConversationId: string, isConversationId = false) => {
+      webSocketService.sendTyping(receiverOrConversationId, isConversationId);
+    },
+    []
+  );
 
-  const sendStopTyping = useCallback((receiverOrConversationId: string, isConversationId = false) => {
-    webSocketService.sendStopTyping(receiverOrConversationId, isConversationId);
-  }, []);
+  const sendStopTyping = useCallback(
+    (receiverOrConversationId: string, isConversationId = false) => {
+      webSocketService.sendStopTyping(receiverOrConversationId, isConversationId);
+    },
+    []
+  );
 
   const sendReadReceipt = useCallback((messageId: string, senderId: string) => {
     webSocketService.sendReadReceipt(messageId, senderId);
   }, []);
 
-  const onMessage = useCallback((callback: (message: ChatMessage) => void) => {
-    messageCallbacksRef.current.onMessage = callback;
-  }, []);
+  // 🧹 Các hàm đăng ký listener, trả về hàm unsubscribe
+  const onMessage = useCallback(
+    (callback: (message: ChatMessage) => void) => {
+      subscribersRef.current.onMessage.add(callback);
+      return () => {
+        subscribersRef.current.onMessage.delete(callback);
+      };
+    },
+    []
+  );
 
-  const onTyping = useCallback((callback: (isTyping: boolean, userId: string, conversationId?: string) => void) => {
-    messageCallbacksRef.current.onTyping = callback;
-  }, []);
+  const onTyping = useCallback(
+    (callback: (isTyping: boolean, userId: string, conversationId?: string) => void) => {
+      subscribersRef.current.onTyping.add(callback);
+      return () => {
+        subscribersRef.current.onTyping.delete(callback);
+      };
+    },
+    []
+  );
 
-  const onReadReceipt = useCallback((callback: (messageId: string, userId: string, conversationId?: string) => void) => {
-    messageCallbacksRef.current.onReadReceipt = callback;
-  }, []);
+  const onReadReceipt = useCallback(
+    (
+      callback: (messageId: string, userId: string, conversationId?: string) => void
+    ) => {
+      subscribersRef.current.onReadReceipt.add(callback);
+      return () => {
+        subscribersRef.current.onReadReceipt.delete(callback);
+      };
+    },
+    []
+  );
 
   const onUserOnline = useCallback((callback: (userId: string) => void) => {
-    messageCallbacksRef.current.onUserOnline = callback;
+    subscribersRef.current.onUserOnline.add(callback);
+    return () => {
+      subscribersRef.current.onUserOnline.delete(callback);
+    };
   }, []);
 
   const onUserOffline = useCallback((callback: (userId: string) => void) => {
-    messageCallbacksRef.current.onUserOffline = callback;
+    subscribersRef.current.onUserOffline.add(callback);
+    return () => {
+      subscribersRef.current.onUserOffline.delete(callback);
+    };
   }, []);
 
   const onConnectionStatusChange = useCallback((callback: (status: string) => void) => {
-    messageCallbacksRef.current.onConnectionStatusChange = callback;
+    subscribersRef.current.onConnectionStatusChange.add(callback);
+    return () => {
+      subscribersRef.current.onConnectionStatusChange.delete(callback);
+    };
   }, []);
 
   const contextValue: WebSocketContextType = {

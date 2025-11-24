@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@hooks/useTheme';
 import { Input } from '@components/common/Input';
 import { Button } from '@components/common/Button';
-import { authAPI } from '@services/api';
+import { authAPI } from '@services/auth.service';
 import { showAlert } from '@utils/helpers';
 import { validateEmail } from '@utils/validators';
 

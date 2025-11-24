@@ -90,11 +90,16 @@ public class PostServiceImpl implements PostService {
     @Override
     public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable) {
         log.debug("Getting posts for user: {}", userId);
+        User currentUser = null;
+        try {
+            currentUser = securityUtil.getCurrentUser();
+        } catch (Exception e) {
+            log.debug("No authenticated user, likedByCurrentUser will be false for all posts");
+        }
 
-        Page<PostResponse> page = postRepository.findByAuthorId(userId, pageable)
-                .map(this::convertToPostResponse);
+        Page<Post> postPage = postRepository.findByAuthorId(userId, pageable);
 
-        return PageResponse.of(page);
+        return getPostResponsePageResponse(currentUser, postPage);
     }
 
     @Transactional(readOnly = true)

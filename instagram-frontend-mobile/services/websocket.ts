@@ -5,6 +5,7 @@ import { Message, UserProfile } from '../types';
 export interface ChatMessage {
   id?: string;
   type: 'CHAT' | 'JOIN' | 'LEAVE' | 'TYPING' | 'STOP_TYPING' | 'READ';
+  contentType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'STICKER'; 
   senderId: string;
   senderUsername?: string;
   senderProfileImage?: string;
@@ -243,7 +244,11 @@ class WebSocketService {
       (message: IMessage) => {
         try {
           const chatMessage: ChatMessage = JSON.parse(message.body);
-          this.callbacks.onReadReceipt?.(chatMessage.id || '', chatMessage.senderId, chatMessage.conversationId);
+          this.callbacks.onReadReceipt?.(
+            chatMessage.id || '',
+            chatMessage.senderId,
+            chatMessage.conversationId
+          );
         } catch (error) {
           console.error('Error parsing read receipt:', error);
         }
@@ -474,7 +479,6 @@ class WebSocketService {
    */
   private updateMessageStatus(chatMessage: ChatMessage): void {
     if (chatMessage.status) {
-      // Update any local message status tracking if needed
       console.log(`Message ${chatMessage.id} status: ${chatMessage.status}`);
     }
   }
@@ -502,5 +506,4 @@ class WebSocketService {
   }
 }
 
-// Export singleton instance
 export const webSocketService = new WebSocketService();

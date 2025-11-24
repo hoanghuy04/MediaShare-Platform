@@ -219,9 +219,9 @@ public class WebSocketMessageServiceImpl implements WebSocketMessageService {
                 .senderId(sender.getId())
                 .senderUsername(sender.getUsername())
                 .senderProfileImage(sender.getAvatar())
-                .conversationId(message.getConversationId()) // Add conversationId for frontend filtering
+                .conversationId(message.getConversationId())
                 .content(message.getContent())
-//                .mediaUrl(message.getMediaUrl())
+                .contentType(message.getType())
                 .timestamp(message.getCreatedAt())
                 .status(ChatMessage.MessageStatus.SENT)
                 .build();

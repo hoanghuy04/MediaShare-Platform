@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Text,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@hooks/useTheme';
 import { useAuth } from '@hooks/useAuth';
@@ -26,6 +26,7 @@ export default function UserPostsScreen() {
   const params = useLocalSearchParams();
   const flatListRef = useRef<FlatList>(null);
   const [scrolledToPost, setScrolledToPost] = useState(false);
+  const hasInitialized = useRef(false);
 
   const userId = params.userId as string || user?.id;
   const selectedPostId = params.postId as string;
@@ -43,10 +44,26 @@ export default function UserPostsScreen() {
   });
 
   useEffect(() => {
-    if (userId) {
+    if (userId && !hasInitialized.current) {
+      console.log('[Posts] Initial mount: Loading posts for userId:', userId);
+      console.log('[Posts] Current authenticated user:', user?.id, user?.username);
+      hasInitialized.current = true;
+      console.log("HEHEAWHEAAHEHEHAHEHEHEH")
+      console.log(posts);
       refresh();
+      
     }
-  }, [userId]);
+  }, [userId, refresh]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (hasInitialized.current) {
+        console.log('[Posts] useFocusEffect: Refreshing posts for userId:', userId);
+        console.log('[Posts] Current authenticated user:', user?.id, user?.username);
+        refresh();
+      }
+    }, [refresh, userId])
+  );
 
   // Scroll to selected post after data loads
   useEffect(() => {
@@ -65,18 +82,11 @@ export default function UserPostsScreen() {
     }
   }, [selectedPostId, posts, scrolledToPost]);
 
-  const handleLike = async (postId: string) => {
-    try {
-      await postLikeService.toggleLikePost(postId);
-      // Refresh to sync with server state
-      refresh();
-    } catch (error: any) {
-      showAlert('Lỗi', error.message || 'Không thể thực hiện thao tác');
-    }
-  };
+  // ❌ REMOVED - PostCard now manages like state via PostsContext
+  // const handleLike = async (postId: string) => { ... }
 
   const handleComment = (postId: string) => {
-    router.push(`/posts/${postId}/comments`);
+    // PostCard now handles this internally with CommentsModal
   };
 
   const handleShare = (postId: string) => {
@@ -105,8 +115,8 @@ export default function UserPostsScreen() {
   const renderItem = ({ item }: { item: PostResponse }) => (
     <PostCard
       post={item}
-      onLike={handleLike}
-      onComment={handleComment}
+      onLike={undefined}
+      onComment={undefined}
       onShare={handleShare}
       onBookmark={handleBookmark}
       disableNavigation
