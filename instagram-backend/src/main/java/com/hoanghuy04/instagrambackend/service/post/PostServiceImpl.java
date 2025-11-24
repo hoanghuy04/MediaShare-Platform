@@ -4,7 +4,8 @@ import com.hoanghuy04.instagrambackend.dto.request.CreatePostRequest;
 import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
-import com.hoanghuy04.instagrambackend.dto.response.UserResponse;
+import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
+import com.hoanghuy04.instagrambackend.mapper.UserMapper;
 import com.hoanghuy04.instagrambackend.entity.*;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
 import com.hoanghuy04.instagrambackend.enums.PostType;
@@ -26,35 +27,21 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Service class for post operations.
- * Handles post creation, updates, and queries.
- *
- * @author Instagram Backend Team
- * @version 1.0.0
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PostServiceImpl implements PostService {
 
     private final UserService userService;
+    private final UserMapper userMapper;
     private final PostRepository postRepository;
     private final FollowRepository followRepository;
     private final FileService fileService;
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
     private final MediaFileRepository mediaFileRepository;
-
     private final SecurityUtil securityUtil;
 
-
-    /**
-     * Create a new post.
-     *
-     * @param request the post creation request
-     * @return PostResponse
-     */
     @Transactional
     @Override
     public PostResponse createPost(CreatePostRequest request) {
@@ -77,12 +64,6 @@ public class PostServiceImpl implements PostService {
         return convertToPostResponse(post);
     }
 
-    /**
-     * Get post by ID.
-     *
-     * @param postId the post ID
-     * @return PostResponse
-     */
     @Transactional(readOnly = true)
     @Override
     public PostResponse getPost(String postId) {
@@ -94,12 +75,6 @@ public class PostServiceImpl implements PostService {
         return convertToPostResponse(post);
     }
 
-    /**
-     * Get all posts with pagination.
-     *
-     * @param pageable pagination information
-     * @return PageResponse of PostResponse
-     */
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getAllPosts(Pageable pageable) {
@@ -111,30 +86,22 @@ public class PostServiceImpl implements PostService {
         return PageResponse.of(page);
     }
 
-    /**
-     * Get posts by user.
-     *
-     * @param userId the user ID
-     * @param pageable pagination information
-     * @return PageResponse of PostResponse
-     */
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable) {
         log.debug("Getting posts for user: {}", userId);
+        User currentUser = null;
+        try {
+            currentUser = securityUtil.getCurrentUser();
+        } catch (Exception e) {
+            log.debug("No authenticated user, likedByCurrentUser will be false for all posts");
+        }
 
-        Page<PostResponse> page = postRepository.findByAuthorId(userId, pageable)
-                .map(this::convertToPostResponse);
+        Page<Post> postPage = postRepository.findByAuthorId(userId, pageable);
 
-        return PageResponse.of(page);
+        return getPostResponsePageResponse(currentUser, postPage);
     }
 
-    /**
-     * Get feed posts for user (posts from followed users).
-     *
-     * @param pageable pagination information
-     * @return PageResponse of PostResponse
-     */
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getFeedPosts(Pageable pageable) {
@@ -155,7 +122,7 @@ public class PostServiceImpl implements PostService {
                     .getContent()
                     .stream()
                     .map(Post::getId)
-                    .toList();
+                    .collect(Collectors.toList());
 
             List<Like> likes = likeRepository.findByUserAndTargetTypeAndTargetIdIn(
                     currentUser,
@@ -180,29 +147,14 @@ public class PostServiceImpl implements PostService {
         return PageResponse.of(dtoPage);
     }
 
-    /**
-     * Get feed posts for user (posts from followed users).
-     *
-     * @param pageable pagination information
-     * @return PageResponse of PostResponse
-     */
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
-
         Page<Post> postPage = postRepository.findByType(type, pageable);
-
         User currentUser = securityUtil.getCurrentUser();
-
         return getPostResponsePageResponse(currentUser, postPage);
     }
 
-    /**
-     * Get explore posts (random/popular posts).
-     *
-     * @param pageable pagination information
-     * @return PageResponse of PostResponse
-     */
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getExplore(Pageable pageable) {
@@ -214,13 +166,6 @@ public class PostServiceImpl implements PostService {
         return PageResponse.of(page);
     }
 
-    /**
-     * Update a post.
-     *
-     * @param postId the post ID
-     * @param request the update request
-     * @return updated PostResponse
-     */
     @Transactional
     @Override
     public PostResponse updatePost(String postId, CreatePostRequest request) {
@@ -230,7 +175,6 @@ public class PostServiceImpl implements PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
 
-        // Check if user is the author
         if (!post.getAuthor().getId().equals(userId)) {
             throw new UnauthorizedException("You are not authorized to update this post");
         }
@@ -247,15 +191,9 @@ public class PostServiceImpl implements PostService {
         return convertToPostResponse(post);
     }
 
-    /**
-     * Delete a post.
-     *
-     * @param postId the post ID
-     */
     @Transactional
     @Override
     public void deletePost(String postId) {
-
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
@@ -272,7 +210,6 @@ public class PostServiceImpl implements PostService {
         List<Comment> allComments = commentRepository.findByPost_Id(postId);
 
         if (allComments != null && !allComments.isEmpty()) {
-
             List<String> commentIds = allComments.stream()
                     .map(Comment::getId)
                     .collect(Collectors.toList());
@@ -288,23 +225,14 @@ public class PostServiceImpl implements PostService {
         List<String> mediaIds = post.getMediaFileIds();
 
         if (mediaIds != null && !mediaIds.isEmpty()) {
-
             List<MediaFile> medias = mediaFileRepository.findAllById(mediaIds);
 
-            medias.forEach(media -> {
-                fileService.deleteFile(media.getId());
-            });
+            medias.forEach(media -> fileService.deleteFile(media.getId()));
         }
 
         postRepository.delete(post);
     }
 
-    /**
-     * Get post entity by ID.
-     *
-     * @param postId the post ID
-     * @return Post entity
-     */
     @Transactional(readOnly = true)
     @Override
     public Post getPostEntityById(String postId) {
@@ -312,13 +240,36 @@ public class PostServiceImpl implements PostService {
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
     }
 
+    /**
+     * Convert Post -> PostResponse
+     * Và set luôn author.followingByCurrentUser dựa trên currentUser + Follow.
+     */
     private PostResponse convertToPostResponse(Post post) {
-        UserResponse authorResponse = userService.convertToUserResponse(post.getAuthor());
-        List<MediaFileResponse> mediaWithUrls = fileService.getMediaFileResponses(post.getMediaFileIds());
+        User author = post.getAuthor();
+        boolean following = false;
+
+        try {
+            User current = securityUtil.getCurrentUser();
+
+            if (current != null && author != null && !current.getId().equals(author.getId())) {
+                // ĐÃ ĐỔI: dùng existsByFollowerIdAndFollowingId thay cho findByFollowerAndFollowing
+                following = followRepository.existsByFollowerIdAndFollowingId(
+                        current.getId(),
+                        author.getId()
+                );
+            }
+        } catch (Exception e) {
+            following = false;
+        }
+
+        UserSummaryResponse authorSummary = userMapper.toUserSummary(author, following);
+
+        List<MediaFileResponse> mediaWithUrls =
+                fileService.getMediaFileResponses(post.getMediaFileIds());
 
         return PostResponse.builder()
                 .id(post.getId())
-                .author(authorResponse)
+                .author(authorSummary)
                 .caption(post.getCaption())
                 .type(post.getType())
                 .media(mediaWithUrls)
@@ -330,6 +281,4 @@ public class PostServiceImpl implements PostService {
                 .updatedAt(post.getUpdatedAt())
                 .build();
     }
-
 }
-

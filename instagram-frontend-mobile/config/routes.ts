@@ -35,12 +35,13 @@ export const API_ENDPOINTS = {
   DELETE_USER: (id: string) => `/api/users/${id}`,
   FOLLOW: (id: string) => `/api/users/${id}/follow`,
   UNFOLLOW: (id: string) => `/api/users/${id}/follow`, // DELETE method
-  FOLLOWERS: (id: string) => `/api/users/${id}/followers`,
-  FOLLOWING: (id: string) => `/api/users/${id}/following`,
+  FOLLOWERS: (id: string) => `/api/users/${id}/followers/search`,
+  FOLLOWING: (id: string) => `/api/users/${id}/following/search`,
   FOLLOWING_SUMMARY: (id: string) => `/api/users/${id}/following-summary`,
   MUTUAL_FOLLOWS: (id: string) => `/api/users/${id}/mutual-follows`,
   USER_STATS: (id: string) => `/api/users/${id}/stats`,
   IS_FOLLOWING: (id: string) => `/api/users/${id}/is-following`,
+  REMOVE_FOLLOWER: (id: string) => `/api/users/followers/${id}`,
 
   // Posts
   POSTS: '/api/posts',
@@ -51,6 +52,7 @@ export const API_ENDPOINTS = {
   TOGGLE_LIKE_POST: (id: string) => `api/posts/${id}/like`,
   POST_LIKES: (id: string) => `/api/posts/${id}/likes`,
   USER_POSTS: (userId: string) => `/api/posts/user/${userId}`,
+  POSTS_BY_TYPE: '/api/posts/type',
   FEED: '/api/posts/feed',
   EXPLORE: '/api/posts/explore',
   REELS: '/api/posts/reels',

@@ -18,6 +18,7 @@ interface UseInfiniteScrollReturn<T> {
   refresh: () => Promise<void>;
   reset: () => void;
   updateItem: (id: string, updater: (item: T) => T) => void;
+  removeItem: (id: string) => void;
 }
 
 export const useInfiniteScroll = <T>({
@@ -56,11 +57,10 @@ export const useInfiniteScroll = <T>({
       try {
         console.log(`Fetching data for page ${pageNum}, limit ${limitRef.current}`);
         const response = await fetchFuncRef.current(pageNum, limitRef.current);
-        
-        console.log('API response:', response);
+
         console.log('Response content:', response.content);
         console.log('Response hasNext:', response.hasNext);
-        
+
 
         if (isRefresh || pageNum === 0) {
           setData(response.content);
@@ -110,6 +110,10 @@ export const useInfiniteScroll = <T>({
     }));
   }, []);
 
+  const removeItem = useCallback((id: string) => {
+    setData(prev => prev.filter(item => (item as any).id !== id));
+  }, []);
+
   return {
     data,
     isLoading,
@@ -121,5 +125,6 @@ export const useInfiniteScroll = <T>({
     refresh,
     reset,
     updateItem,
+    removeItem,
   };
 };

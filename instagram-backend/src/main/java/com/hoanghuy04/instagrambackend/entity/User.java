@@ -66,18 +66,6 @@ public class User {
     private Set<UserRole> roles = new HashSet<>();
     
     /**
-     * List of user IDs who follow this user
-     */
-    @Builder.Default
-    private List<String> followers = new ArrayList<>();
-    
-    /**
-     * List of user IDs this user is following
-     */
-    @Builder.Default
-    private List<String> following = new ArrayList<>();
-    
-    /**
      * Flag indicating if the account is private
      */
     @Builder.Default
@@ -94,7 +82,13 @@ public class User {
      */
     @Builder.Default
     private boolean isActive = true;
-    
+
+    @Builder.Default
+    private long followersCount = 0L;
+
+    @Builder.Default
+    private long followingCount = 0L;
+
     /**
      * Timestamp when the user was created
      */

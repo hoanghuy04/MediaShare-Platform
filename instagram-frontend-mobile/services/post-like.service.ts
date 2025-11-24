@@ -7,6 +7,7 @@ export const postLikeService = {
     toggleLikePost: async (postId: string): Promise<PostLikeToggleResponse> => {
         try {
             const response = await axiosInstance.post(API_ENDPOINTS.TOGGLE_LIKE_POST(postId));
+            console.log("LIKE RESPONSE : ", response.data);
             return response.data;
         } catch (error: any) {
             console.error('[postLikeService] Error details:', {

@@ -8,7 +8,7 @@ import {
   Easing,
   Pressable,
 } from 'react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
@@ -44,12 +44,14 @@ const VideoComponent = ({
   isMuted,
   onToggleMute,
 }: VideoComponentProps) => {
-  console.log(data)
+  console.log(data);
   const [progress, setProgress] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekTime, setSeekTime] = useState(0);
   const [showMuteIcon, setShowMuteIcon] = useState(false);
+  const [duration, setDuration] = useState(0);
 
+  const videoRef = useRef<Video>(null);
   const singleTapTimer = useRef<any>(null);
   const currentProgressRef = useRef(0);
 
@@ -67,54 +69,52 @@ const VideoComponent = ({
   const thumbnailFile = data.media.find(m => m.category === MediaCategory.IMAGE);
   const thumbnailUrl = thumbnailFile ? thumbnailFile.url : mediaUrl;
 
-  const player = useVideoPlayer(isVideo ? mediaUrl : '', p => {
-    if (isVideo) {
-      p.loop = true;
-      p.timeUpdateEventInterval = 0.1;
-      p.muted = !isVisible || isMuted;
-    }
-  });
-
+  // Handle visibility changes
   useEffect(() => {
-    if (!player || !isVideo) return;
+    if (!videoRef.current || !isVideo) return;
 
-    if (isVisible && !isSeeking) {
-      player.play();
-      player.muted = isMuted;
-    } else {
-      player.pause();
-      if (!isVisible) player.muted = true;
-    }
-  }, [player, isVisible, isSeeking, isMuted, isVideo]);
-
-  useEffect(() => {
-    if (!player || !isVideo) return;
-
-    const subscription = player.addListener('timeUpdate', () => {
-      if (!isSeeking && player.duration > 0) {
-        const ratio = player.currentTime / player.duration;
-        currentProgressRef.current = ratio;
-
-        Animated.timing(animatedProgress, {
-          toValue: ratio,
-          duration: 100,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        }).start();
+    const handlePlayback = async () => {
+      try {
+        if (isVisible && !isSeeking) {
+          await videoRef.current?.playAsync();
+          await videoRef.current?.setIsMutedAsync(isMuted);
+        } else {
+          await videoRef.current?.pauseAsync();
+        }
+      } catch (error) {
+        console.error('Error controlling video playback:', error);
       }
-    });
-
-    return () => {
-      subscription.remove();
     };
-  }, [player, isSeeking, animatedProgress, isVideo]);
+
+    handlePlayback();
+  }, [isVisible, isSeeking, isMuted, isVideo]);
+
+  // Handle video status updates
+  const onPlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+
+    if (status.durationMillis) {
+      setDuration(status.durationMillis / 1000);
+    }
+
+    if (!isSeeking && status.durationMillis && status.positionMillis) {
+      const ratio = status.positionMillis / status.durationMillis;
+      currentProgressRef.current = ratio;
+
+      Animated.timing(animatedProgress, {
+        toValue: ratio,
+        duration: 100,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }).start();
+    }
+  };
 
   const onSlidingStart = () => {
     if (!isVideo) return;
     setIsSeeking(true);
     setProgress(currentProgressRef.current);
     animatedProgress.stopAnimation();
-    player.pause();
   };
 
   const onValueChange = (value: number) => {
@@ -122,20 +122,30 @@ const VideoComponent = ({
     animatedProgress.setValue(value);
     setProgress(value);
 
-    if (player.duration > 0) {
-      const time = value * player.duration;
+    if (duration > 0) {
+      const time = value * duration;
       setSeekTime(time);
-      player.currentTime = time;
     }
   };
 
-  const onSlidingComplete = (value: number) => {
-    if (!isVideo) return;
-    if (player.duration > 0) {
-      const newTime = value * player.duration;
-      player.currentTime = newTime;
+  const onSlidingComplete = async (value: number) => {
+    if (!isVideo || !videoRef.current) return;
+
+    try {
+      if (duration > 0) {
+        const newTime = value * duration * 1000;
+        await videoRef.current.setPositionAsync(newTime);
+      }
+
+      setIsSeeking(false);
+
+      if (isVisible) {
+        await videoRef.current.playAsync();
+      }
+    } catch (error) {
+      console.error('Error seeking video:', error);
+      setIsSeeking(false);
     }
-    setIsSeeking(false);
   };
 
   const toggleMute = () => {
@@ -188,11 +198,17 @@ const VideoComponent = ({
         <Pressable onPress={handlePress} style={StyleSheet.absoluteFill}>
           <View style={styles.videoCard}>
             {isVideo ? (
-              <VideoView
-                player={player}
+              <Video
+                ref={videoRef}
+                source={{ uri: mediaUrl }}
                 style={styles.video}
-                contentFit="contain"
-                nativeControls={false}
+                resizeMode={ResizeMode.CONTAIN}
+                isLooping
+                shouldPlay={isVisible && !isSeeking}
+                isMuted={isMuted}
+                onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+                progressUpdateIntervalMillis={100}
+                useNativeControls={false}
               />
             ) : (
               <Image

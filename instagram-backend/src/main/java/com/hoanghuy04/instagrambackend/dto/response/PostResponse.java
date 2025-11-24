@@ -21,7 +21,7 @@ public class PostResponse {
 
     private String id;
 
-    private UserResponse author;
+    private UserSummaryResponse author;
 
     private String caption;
 

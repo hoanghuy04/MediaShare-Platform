@@ -498,6 +498,8 @@ export default function ConversationScreen() {
         }
       }
 
+      console.log('✅ Typing indicator match, đang xử lý...');
+
       setTypingUsers(prev =>
         isTypingFlag
           ? prev.includes(uid)

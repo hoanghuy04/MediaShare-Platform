@@ -48,11 +48,28 @@ export const postService = {
 
   getUserPosts: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<PostResponse>> => {
     const response = await axiosInstance.get(API_ENDPOINTS.USER_POSTS(userId), {
-      params: { page, limit },
+      params: { page, size: limit },
     });
-    console.log('User posts response data:', response.data);
-    return response.data.data;
-    
+    // Filter for FEED type posts only
+    const allPosts = response.data.data;
+    const feedPosts = allPosts.content.filter((post: Post) => post.type === 'FEED');
+    return {
+      ...allPosts,
+      content: feedPosts,
+    };
+  },
+
+  getUserReels: async (userId: string, page = 0, limit = 20): Promise<PaginatedResponse<Post>> => {
+    const response = await axiosInstance.get(API_ENDPOINTS.USER_POSTS(userId), {
+      params: { page, size: limit },
+    });
+    // Filter for REEL type posts only
+    const allPosts = response.data.data;
+    const reels = allPosts.content.filter((post: Post) => post.type === 'REEL');
+    return {
+      ...allPosts,
+      content: reels,
+    };
   },
 
   createPost: async (data: CreatePostRequest): Promise<Post> => {
@@ -77,10 +94,9 @@ export const postService = {
       return response.data.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        console.log('Search posts endpoint not found, using explore posts as fallback');
-        return await postService.getExplorePosts(page, limit);
+        return postService.getExplorePosts(page, limit);
+        throw error;
       }
-      throw error;
     }
   },
 

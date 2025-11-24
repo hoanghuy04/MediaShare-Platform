@@ -6,49 +6,54 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DocumentReference;
 
 import java.time.LocalDateTime;
 
 /**
- * Entity representing a follow relationship between users.
- * Tracks follower-following relationships.
- * 
- * @author Instagram Backend Team
- * @version 1.0.0
+ * Follow relationship between two users.
+ * Instead of DocumentReference, we store plain IDs + denormalized usernames
+ * to keep the schema simple and queries efficient.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "follows")
-@CompoundIndex(name = "follower_following_idx", def = "{'follower': 1, 'following': 1}", unique = true)
 public class Follow {
-    
-    /**
-     * Unique identifier for the follow relationship
-     */
+
     @Id
     private String id;
-    
+
     /**
-     * Reference to the user who is following
+     * ID of the user who follows (follower).
      */
-    @DocumentReference
-    private User follower;
-    
+    @Indexed
+    private String followerId;
+
     /**
-     * Reference to the user being followed
+     * ID of the user being followed.
      */
-    @DocumentReference
-    private User following;
-    
+    @Indexed
+    private String followingId;
+
     /**
-     * Timestamp when the follow relationship was created
+     * Denormalized username of follower (for search).
+     */
+    @Indexed
+    private String followerUsername;
+
+    /**
+     * Denormalized username of following (for search).
+     */
+    @Indexed
+    private String followingUsername;
+
+    /**
+     * Timestamp when the follow relationship was created.
      */
     @CreatedDate
+    @Indexed
     private LocalDateTime createdAt;
 }
-

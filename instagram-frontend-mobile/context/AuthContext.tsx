@@ -13,6 +13,7 @@ interface AuthContextType {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,7 +87,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (credentials: LoginRequest) => {
     try {
       const response = await authAPI.login(credentials);
-      console.log('Login response:', response);
 
       // Validate token before storing
       if (!response.accessToken || typeof response.accessToken !== 'string') {
@@ -149,6 +149,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     storage.setUserData(updatedUser);
   };
 
+  const refreshUserData = async () => {
+    if (!user?.id) return;
+
+    try {
+      const freshUserData = await userService.getUserById(user.id);
+      setUser(freshUserData as unknown as User);
+      await storage.setUserData(freshUserData as unknown as User);
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -160,6 +172,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         register,
         logout,
         updateUser,
+        refreshUserData,
       }}
     >
       {children}

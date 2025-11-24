@@ -30,6 +30,7 @@ type GalleryPageProps = {
   height: number;
   gallery: GalleryAsset[];
   loadingGallery: boolean;
+  hasPermission?: boolean | null;
   onGoToCamera: () => void;
   onOpenPreview: (uri: string) => void;
   onOpenAlbumPicker?: () => void;
@@ -44,6 +45,7 @@ export function ReelGaleryView({
   height,
   gallery,
   loadingGallery,
+  hasPermission,
   onGoToCamera,
   onOpenPreview,
   onOpenAlbumPicker,
@@ -171,6 +173,18 @@ export function ReelGaleryView({
       {loadingGallery ? (
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
           <Text style={{ color: '#888' }}>Đang tải thư viện...</Text>
+        </View>
+      ) : hasPermission === false ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center', paddingHorizontal: 20 }}>
+          <Text style={{ color: '#888', textAlign: 'center', marginBottom: 12 }}>
+            Vui lòng cấp quyền truy cập thư viện ảnh để chọn video/ảnh.
+          </Text>
+          <TouchableOpacity
+            onPress={onGoToCamera}
+            style={{ padding: 10, backgroundColor: '#333', borderRadius: 8 }}
+          >
+            <Text style={{ color: '#fff' }}>Mở Camera</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
