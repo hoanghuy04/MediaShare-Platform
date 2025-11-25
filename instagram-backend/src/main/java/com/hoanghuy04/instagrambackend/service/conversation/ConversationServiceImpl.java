@@ -1,10 +1,10 @@
 package com.hoanghuy04.instagrambackend.service.conversation;
 
 import com.hoanghuy04.instagrambackend.constant.AppConstants;
+import com.hoanghuy04.instagrambackend.dto.request.UpdateNicknameRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
-import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.entity.Conversation;
 import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
@@ -285,7 +285,7 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Transactional
     @Override
-    public ConversationMember updateNickname(String conversationId, String requesterId, com.hoanghuy04.instagrambackend.dto.request.conversation.UpdateNicknameRequest request) {
+    public ConversationMember updateNickname(String conversationId, String requesterId, UpdateNicknameRequest request) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
 

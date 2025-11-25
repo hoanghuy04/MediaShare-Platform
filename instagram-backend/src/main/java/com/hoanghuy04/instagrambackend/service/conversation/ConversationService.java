@@ -1,15 +1,13 @@
 package com.hoanghuy04.instagrambackend.service.conversation;
 
+import com.hoanghuy04.instagrambackend.dto.request.UpdateNicknameRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
-import com.hoanghuy04.instagrambackend.entity.Message;
-import com.hoanghuy04.instagrambackend.entity.Conversation;
 import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Service interface for conversation operations.
@@ -139,7 +137,7 @@ public interface ConversationService {
      * @return the updated ConversationMember
      */
     @Transactional
-    ConversationMember updateNickname(String conversationId, String requesterId, com.hoanghuy04.instagrambackend.dto.request.conversation.UpdateNicknameRequest request);
+    ConversationMember updateNickname(String conversationId, String requesterId, UpdateNicknameRequest request);
 
     /**
      * Promote a member to admin role.

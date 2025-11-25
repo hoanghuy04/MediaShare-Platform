@@ -435,7 +435,8 @@ export default function MessagesScreen() {
                     styles.messageUsername,
                     {
                       color: theme.colors.text,
-                      fontWeight: isUnread ? '700' : '600',
+                      // fontWeight: isUnread ? '700' : '600',
+                      fontWeight: '600',
                     },
                   ]}
                 >
@@ -464,8 +465,11 @@ export default function MessagesScreen() {
               style={[
                 styles.messageText,
                 {
-                  fontWeight: isUnread ? '600' : '400',
-                  color: isUnread || isTyping ? theme.colors.text : theme.colors.textSecondary,
+                  // fontWeight: isUnread ? '600' : '400',
+                  // color: isUnread || isTyping ? theme.colors.text : theme.colors.textSecondary,
+                  // fontStyle: isTyping ? 'italic' : 'normal',
+                  fontWeight: '400',
+                  color: theme.colors.textSecondary,
                   fontStyle: isTyping ? 'italic' : 'normal',
                 },
               ]}
@@ -474,13 +478,13 @@ export default function MessagesScreen() {
               {displayText}
             </Text>
           </View>
-          {isUnread && !isTyping && (
+          {/* {isUnread && !isTyping && (
             <View style={styles.unreadContainer}>
               <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.unreadText}>{unreadCount}</Text>
               </View>
             </View>
-          )}
+          )} */}
         </TouchableOpacity>
       );
     }
