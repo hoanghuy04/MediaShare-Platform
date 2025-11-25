@@ -493,8 +493,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         /(^|\s)@ai-assistant\b/i.test(trimmed));
 
     if (willSendToAI) {
-      const clean = trimmed.replace(/^@ai-assistant\b\s*/i, '').trim() || trimmed;
-      onSendToAI?.(clean);
+      onSendToAI?.(trimmed);
     } else {
       onSend(trimmed);
     }

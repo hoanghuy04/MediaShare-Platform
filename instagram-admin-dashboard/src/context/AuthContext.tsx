@@ -1,100 +1,54 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api, authAPI, setAuthHeader } from "../lib/api";
-import { tokenStorage } from "../lib/tokenStorage";
-import type { AuthTokens, AuthUser } from "../types";
+import { createContext, useMemo, useState } from 'react'
+import { authApi } from '../services/api/authApi'
+import { authService } from '../services/authService'
+import type { AdminUser, LoginPayload } from '../types'
 
-type AuthState = {
-  user: AuthUser | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-  login: (usernameOrEmail: string, password: string) => Promise<void>;
-  logout: () => void;
-};
+interface AuthContextValue {
+  admin: AdminUser | null
+  token: string | null
+  isAuthenticated: boolean
+  loading: boolean
+  login: (payload: LoginPayload) => Promise<void>
+  logout: () => void
+}
 
-const AuthContext = createContext<AuthState>({
-  user: null,
-  loading: false,
-  isAuthenticated: false,
-  login: async () => {},
-  logout: () => {},
-});
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [admin, setAdmin] = useState<AdminUser | null>(() => authService.getAdmin())
+  const [token, setToken] = useState<string | null>(() => authService.getToken())
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const accessToken = tokenStorage.accessToken;
-    const refreshToken = tokenStorage.refreshToken;
-    if (accessToken && refreshToken) {
-      setLoading(true);
-      setAuthHeader(accessToken);
-      api
-        .get("/auth/me")
-        .then((res) => {
-          setUser(res.data?.data ?? res.data);
-        })
-        .catch(() => {
-          tokenStorage.clear();
-          setAuthHeader(null);
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const login = async (usernameOrEmail: string, password: string) => {
-    setLoading(true);
+  const login = async (payload: LoginPayload) => {
+    setLoading(true)
     try {
-      const data = await authAPI.login(usernameOrEmail, password);
-      const tokens: AuthTokens = {
-        accessToken: data?.accessToken ?? data?.data?.accessToken,
-        refreshToken: data?.refreshToken ?? data?.data?.refreshToken,
-      };
-      if (!tokens.accessToken || !tokens.refreshToken) {
-        throw new Error("Invalid token response");
-      }
-      setAuthHeader(tokens.accessToken);
-      const profile: AuthUser = data.user ?? data.data?.user ?? {
-        id: "admin",
-        username: usernameOrEmail,
-        email: data?.email ?? `${usernameOrEmail}@example.com`,
-        role: data?.user?.role ?? "ADMIN",
-        avatar: data?.user?.avatar,
-      };
-      tokenStorage.set(tokens.accessToken, tokens.refreshToken);
-      setUser(profile);
-    } catch (error) {
-      tokenStorage.clear();
-      setAuthHeader(null);
-      setUser(null);
-      throw error;
+      const response = await authApi.login(payload)
+      authService.saveSession(response)
+      setAdmin(response.admin)
+      setToken(response.accessToken)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const logout = () => {
-    tokenStorage.clear();
-    setAuthHeader(null);
-    setUser(null);
-  };
+    authService.clearSession()
+    setAdmin(null)
+    setToken(null)
+  }
 
   const value = useMemo(
     () => ({
-      user,
+      admin,
+      token,
+      isAuthenticated: Boolean(token),
       loading,
-      isAuthenticated: Boolean(user),
       login,
       logout,
     }),
-    [user, loading]
-  );
+    [admin, token, loading],
+  )
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-
-export const useAuthContext = () => useContext(AuthContext);
 

@@ -4,14 +4,16 @@ import com.hoanghuy04.instagrambackend.dto.request.AddMemberRequest;
 import com.hoanghuy04.instagrambackend.dto.request.CreateGroupRequest;
 import com.hoanghuy04.instagrambackend.dto.request.SendMessageRequest;
 import com.hoanghuy04.instagrambackend.dto.request.UpdateConversationRequest;
+import com.hoanghuy04.instagrambackend.dto.request.UpdateNicknameRequest;
 import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.InboxItemResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.ApiResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.entity.Conversation;
-import com.hoanghuy04.instagrambackend.entity.Message;
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
 import com.hoanghuy04.instagrambackend.enums.ConversationType;
+import com.hoanghuy04.instagrambackend.exception.BadRequestException;
 import com.hoanghuy04.instagrambackend.mapper.MessageMapper;
 import com.hoanghuy04.instagrambackend.repository.ConversationRepository;
 import com.hoanghuy04.instagrambackend.service.conversation.ConversationMessageService;
@@ -286,14 +288,14 @@ public class ConversationController {
 
     @PatchMapping("/{conversationId}/nickname")
     @Operation(summary = "Update a member's nickname in a conversation")
-    public ResponseEntity<ApiResponse<com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember>> updateNickname(
+    public ResponseEntity<ApiResponse<ConversationMember>> updateNickname(
             @PathVariable String conversationId,
-            @Valid @RequestBody com.hoanghuy04.instagrambackend.dto.request.conversation.UpdateNicknameRequest request) {
+            @Valid @RequestBody UpdateNicknameRequest request) {
         String requesterId = securityUtil.getCurrentUserId();
         log.info("Update nickname request for conversation: {} by user: {}, target: {}", 
                 conversationId, requesterId, request.getTargetUserId());
 
-        com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember updatedMember = 
+        ConversationMember updatedMember = 
                 conversationService.updateNickname(conversationId, requesterId, request);
 
         // Get updated conversation DTO for WebSocket event
@@ -326,7 +328,7 @@ public class ConversationController {
         log.info("Send direct message from user {} to user {}", senderId, request.getReceiverId());
 
         if (request.getReceiverId() == null || request.getReceiverId().isBlank()) {
-            throw new com.hoanghuy04.instagrambackend.exception.BadRequestException("receiverId is required for direct messages");
+            throw new BadRequestException("receiverId is required for direct messages");
         }
 
         MessageResponse message = conversationMessageService.sendMessage(

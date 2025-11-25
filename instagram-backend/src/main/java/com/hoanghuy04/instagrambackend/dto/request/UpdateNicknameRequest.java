@@ -1,4 +1,4 @@
-package com.hoanghuy04.instagrambackend.dto.request.conversation;
+package com.hoanghuy04.instagrambackend.dto.request;
 
 import lombok.Data;
 
