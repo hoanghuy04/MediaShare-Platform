@@ -1,9 +1,10 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@hooks/useTheme';
 
 export default function TabsLayout() {
   const { theme } = useTheme();
+  const router = useRouter();
 
   return (
     <Tabs
@@ -32,6 +33,12 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="create"
+        listeners={() => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push('/create');
+          },
+        })}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" size={size} color={color} />

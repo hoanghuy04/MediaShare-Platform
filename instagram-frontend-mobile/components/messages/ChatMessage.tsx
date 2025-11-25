@@ -48,6 +48,93 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${r},${g},${b},alpha)`.replace('alpha', String(alpha));
 };
 
+/* -------- POST SHARE UI -------- */
+const PostShareBubble = ({ postId }: { postId: string }) => {
+  const { theme } = useTheme();
+  const router = useRouter();
+  const [post, setPost] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchPost = async () => {
+      try {
+        const data = await import('../../services/post.service').then(m => m.postService.getPostById(postId));
+        if (mounted) setPost(data);
+      } catch (error) {
+        console.error('Failed to fetch post share:', error);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchPost();
+    return () => { mounted = false; };
+  }, [postId]);
+
+  const handlePress = () => {
+    if (!post) return;
+    router.push({
+      pathname: '/profile/posts',
+      params: { userId: post.author?.id, postId: post.id }
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.postShareContainer, styles.mediaPlaceholder]}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (!post) {
+    return (
+      <View style={[styles.postShareContainer, { padding: 12, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="alert-circle-outline" size={24} color={theme.colors.textSecondary} />
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+          Bài viết không tồn tại
+        </Text>
+      </View>
+    );
+  }
+
+  const media = post.media?.[0];
+  const imageUrl = media?.url || media?.thumbnail;
+
+  return (
+    <TouchableOpacity style={styles.postShareContainer} activeOpacity={0.9} onPress={handlePress}>
+      <View style={styles.postShareHeader}>
+        <Image
+          source={{ uri: post.author?.profile?.avatar || 'https://via.placeholder.com/30' }}
+          style={styles.postShareAvatar}
+        />
+        <Text style={[styles.postShareUsername, { color: theme.colors.text }]} numberOfLines={1}>
+          {post.author?.username}
+        </Text>
+      </View>
+
+      <View style={styles.postShareImageWrapper}>
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.postShareImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.postShareImage, { backgroundColor: '#eee' }]} />
+        )}
+        {media?.type === 'VIDEO' && (
+          <View style={styles.playIconOverlay}>
+            <Ionicons name="play" size={24} color="#fff" />
+          </View>
+        )}
+      </View>
+
+      {post.caption ? (
+        <Text style={[styles.postShareCaption, { color: theme.colors.text }]} numberOfLines={2}>
+          <Text style={{ fontWeight: '600' }}>{post.author?.username}</Text> {post.caption}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+};
+
 // waveform “fake” – chỉ để hiển thị giống UI Telegram
 const WAVE_BARS = [0.35, 0.6, 0.9, 0.5, 0.8, 0.4, 0.7, 1, 0.65, 0.45, 0.8, 0.55, 0.9, 0.6, 0.7];
 

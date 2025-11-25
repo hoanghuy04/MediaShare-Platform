@@ -32,6 +32,7 @@ import { Avatar } from '../common/Avatar'; // Giữ component Avatar của bạn
 import { userService } from '../../services/user.service'; // Giữ service của bạn
 import { UserSummaryResponse } from '../../types/user'; // Giữ type của bạn
 import { useAuth } from '../../context/AuthContext';
+import { messageAPI } from '../../services/message.service';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -134,11 +135,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
         return () => clearTimeout(timeout);
     }, [searchQuery]);
 
-    // Keyboard Handling: Đẩy modal lên full khi gõ phím
+    // Keyboard Handling: Đẩy modal lên full khi gõ phím (Chỉ iOS)
     useEffect(() => {
-        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-        const sub = Keyboard.addListener(showEvent, () => scrollTo(SNAP_TOP));
-        return () => sub.remove();
+        if (Platform.OS === 'ios') {
+            const showEvent = 'keyboardWillShow';
+            const sub = Keyboard.addListener(showEvent, () => scrollTo(SNAP_TOP));
+            return () => sub.remove();
+        }
     }, [scrollTo]);
 
     // --- ACTIONS ---
@@ -152,14 +155,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
     };
 
     const handleSend = async () => {
-        if (selectedUsers.size === 0 && !messageText) return;
+        if (selectedUsers.size === 0) return;
         setSending(true);
         try {
-            console.log('Sending...', Array.from(selectedUsers), messageText);
-            await new Promise(resolve => setTimeout(resolve, 500));
+            const users = Array.from(selectedUsers);
+            await Promise.all(users.map(async (userId) => {
+                // 1. Gửi tin nhắn chia sẻ bài viết
+                await messageAPI.sendDirectMessage(userId, postId, 'POST_SHARE');
+
+                // 2. Gửi tin nhắn văn bản (nếu có)
+                if (messageText.trim()) {
+                    await messageAPI.sendDirectMessage(userId, messageText.trim(), 'TEXT');
+                }
+            }));
+
             handleClose();
         } catch (error) {
-            console.error(error);
+            console.error('Failed to send messages:', error);
         } finally {
             setSending(false);
         }
