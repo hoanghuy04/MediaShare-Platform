@@ -117,13 +117,15 @@ export const ReelGrid: React.FC<ReelGridProps> = ({
 
 const styles = StyleSheet.create({
   row: {
-    gap: 2,
+    gap: 4,
   },
   gridItem: {
     width: ITEM_SIZE,
     height: ITEM_SIZE,
-    marginBottom: 2,
+    marginBottom: 4,
     position: 'relative',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   image: {
     width: '100%',
