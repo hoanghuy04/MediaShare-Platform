@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
-  Keyboard,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LocationSearchScreen } from '../../../components/create/reels/LocationSearchScreen';
 import CaptionInputScreen from '../../../components/common/CaptionInputScreen';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * 1.78;
 
@@ -48,18 +47,8 @@ export default function ReelPostScreen() {
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
 
-  const [mentionSuggestions, setMentionSuggestions] = useState<MentionUserResponse[]>([]);
-  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
-  const [mentionSearchQuery, setMentionSearchQuery] = useState('');
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [isSearchingMentions, setIsSearchingMentions] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<any>({});
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  const insets = useSafeAreaInsets();
   const isSubmittingRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
-  const captionInputRef = useRef<TextInput | null>(null);
 
   const player = useVideoPlayer(mediaType === 'video' && mediaUri ? mediaUri : null, player => {
     if (mediaType === 'video') {
@@ -68,115 +57,6 @@ export default function ReelPostScreen() {
       player.muted = true;
     }
   });
-
-  useEffect(() => {
-    const showSubscription = Keyboard.addListener('keyboardDidShow', e => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardHeight(0);
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, []);
-
-  // Recalculate position when keyboard changes or dropdown visibility changes
-  useEffect(() => {
-    if (showMentionDropdown) {
-      measureInputPosition();
-    }
-  }, [keyboardHeight, showMentionDropdown, mentionSuggestions]);
-
-  useEffect(() => {
-    console.log('[Post] Mention effect triggered - showMentionDropdown:', showMentionDropdown, 'query:', mentionSearchQuery);
-
-    const searchMentions = async () => {
-      console.log('[Post] Starting mention search with query:', mentionSearchQuery);
-      setIsSearchingMentions(true);
-      try {
-        const result = await mentionService.searchUsers(mentionSearchQuery, 0, 10);
-        console.log('[Post] Search result:', result);
-        setMentionSuggestions(result.content || []);
-        // Remeasure after results load as it might affect rendering
-        setTimeout(measureInputPosition, 100);
-      } catch (error) {
-        console.error('[Post] Error searching mentions:', error);
-        setMentionSuggestions([]);
-      } finally {
-        setIsSearchingMentions(false);
-      }
-    };
-
-    // Only search if dropdown is visible AND query has at least 1 character
-    if (showMentionDropdown && mentionSearchQuery.length > 0) {
-      const timeoutId = setTimeout(searchMentions, 300);
-      return () => clearTimeout(timeoutId);
-    } else {
-      setMentionSuggestions([]);
-      setIsSearchingMentions(false);
-    }
-  }, [mentionSearchQuery, showMentionDropdown]);
-
-  const handleCaptionChange = (text: string) => {
-    console.log('[Post] Caption changed:', text, 'cursorPos:', cursorPosition);
-    setCaption(text);
-
-    // Always use text.length as cursor position when typing (state lags behind)
-    const effectiveCursorPos = text.length;
-    const textBeforeCursor = text.substring(0, effectiveCursorPos);
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-
-    console.log('[Post] effectiveCursorPos:', effectiveCursorPos, 'textBeforeCursor:', textBeforeCursor, 'lastAtIndex:', lastAtIndex);
-
-    if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-      const hasSpaceOrNewline = /[\s\n]/.test(textAfterAt);
-
-      console.log('[Post] Found @ at index:', lastAtIndex, 'textAfterAt:', textAfterAt, 'hasSpaceOrNewline:', hasSpaceOrNewline);
-
-      // Only show dropdown if there's at least 1 character after @ AND no space/newline
-      if (!hasSpaceOrNewline && textAfterAt.length > 0) {
-        console.log('[Post] Opening dropdown with query:', textAfterAt);
-        setMentionSearchQuery(textAfterAt);
-        setShowMentionDropdown(true);
-        return;
-      }
-    }
-
-    console.log('[Post] Closing dropdown');
-    setShowMentionDropdown(false);
-    setMentionSearchQuery('');
-  };
-
-  const handleSelectionChange = (event: any) => {
-    setCursorPosition(event.nativeEvent.selection.end);
-  };
-
-  const handleSelectMention = (user: MentionUserResponse) => {
-    const textBeforeCursor = caption.substring(0, cursorPosition);
-    const textAfterCursor = caption.substring(cursorPosition);
-
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-
-    if (lastAtIndex !== -1) {
-      const before = caption.substring(0, lastAtIndex);
-      const newCaption = before + '@' + user.username + ' ' + textAfterCursor;
-
-      setCaption(newCaption);
-      setShowMentionDropdown(false);
-      setMentionSearchQuery('');
-
-      const newCursorPos = lastAtIndex + user.username.length + 2;
-      setCursorPosition(newCursorPos);
-
-      setTimeout(() => {
-        captionInputRef.current?.focus();
-      }, 100);
-    }
-  };
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -367,16 +247,6 @@ export default function ReelPostScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
-
-      {/* Mention Dropdown - Positioned absolutely over content */}
-      <MentionDropdown
-        visible={showMentionDropdown}
-        suggestions={mentionSuggestions}
-        isSearching={isSearchingMentions}
-        searchQuery={mentionSearchQuery}
-        onSelectMention={handleSelectMention}
-        dropdownStyle={dropdownStyle}
-      />
 
       <View style={styles.bottomBar}>
         <View style={styles.bottomRow}>
