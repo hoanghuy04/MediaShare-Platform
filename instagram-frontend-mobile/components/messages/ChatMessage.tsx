@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Message, MessageRef } from '../../types/message';
 import { MessageType } from '../../types/enum.type';
 import { useTheme } from '../../hooks/useTheme';
+import { LinkableText } from './LinkableText';
 
 type BubblePalette = {
   bubbleIn: string;
@@ -407,14 +408,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
     // TEXT
     return (
-      <Text
+      <LinkableText
+        text={message.content}
         style={[
           styles.content,
           { color: isOwn ? colors.bubbleTextOut : colors.bubbleTextIn },
         ]}
-      >
-        {message.content}
-      </Text>
+        linkStyle={{
+          color: isOwn ? colors.bubbleTextOut : colors.bubbleTextIn,
+          fontWeight: '600',
+          opacity: 0.9,
+        }}
+      />
     );
   };
 

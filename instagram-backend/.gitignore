@@ -56,9 +56,6 @@ out/
 .env.*.local
 *.env
 
-### Uploads ###
-uploads/
-
 ### Operating System ###
 # macOS
 .DS_Store
@@ -97,8 +94,6 @@ $RECYCLE.BIN/
 .Trash-*
 
 ### Application Specific ###
-# Upload directories
-uploads/
 temp/
 
 # Logs

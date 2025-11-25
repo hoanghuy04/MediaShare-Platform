@@ -270,7 +270,8 @@ export const ConversationProvider: React.FC<{
         case 'MEMBER_REMOVED':
         case 'MEMBER_PROMOTED':
         case 'MEMBER_DEMOTED':
-          // Refresh conversation to get updated participant list
+        case 'NICKNAME_UPDATED':
+          // Refresh conversation to get updated participant list and nicknames
           refreshConversation(conversationId);
           break;
 

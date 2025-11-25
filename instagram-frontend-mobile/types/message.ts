@@ -17,6 +17,7 @@ export interface ConversationMember {
   joinedAt: string;
   leftAt?: string;
   role: 'ADMIN' | 'MEMBER';
+  nickname?: string; // Optional per-conversation nickname
 }
 
 // Last message info
