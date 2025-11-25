@@ -9,6 +9,9 @@ import {
     Dimensions,
     ActivityIndicator,
     Pressable,
+    KeyboardAvoidingView,
+    Platform,
+    Keyboard,
 } from 'react-native';
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,20 +20,24 @@ import Animated, {
     useAnimatedStyle,
     withSpring,
     withTiming,
+    interpolate,
+    Extrapolation,
     Easing,
     useAnimatedScrollHandler,
+    useAnimatedReaction,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
-import { Avatar } from '../common/Avatar';
-import { userService } from '../../services/user.service';
-import { UserSummaryResponse } from '../../types/user';
+import { Avatar } from '../common/Avatar'; // Giữ component Avatar của bạn
+import { userService } from '../../services/user.service'; // Giữ service của bạn
+import { UserSummaryResponse } from '../../types/user'; // Giữ type của bạn
 import { useAuth } from '../../context/AuthContext';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// Cấu hình Snap Points giống CommentsModal
 const SNAP_TOP = 0;
-const SNAP_HALF = SCREEN_HEIGHT * 0.5;
+const SNAP_HALF = SCREEN_HEIGHT * 0.4; // Cách top 40% -> Modal cao 60%
 const SNAP_CLOSE = SCREEN_HEIGHT;
 
 type ShareModalProps = {
@@ -43,18 +50,19 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
     const insets = useSafeAreaInsets();
     const { user: currentUser } = useAuth();
 
+    // --- DATA STATE ---
     const [searchQuery, setSearchQuery] = useState('');
     const [mutualFollows, setMutualFollows] = useState<UserSummaryResponse[]>([]);
     const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
+    const [messageText, setMessageText] = useState('');
 
+    // --- ANIMATION STATE ---
     const translateY = useSharedValue(SNAP_CLOSE);
     const context = useSharedValue({ y: 0 });
     const scrollY = useSharedValue(0);
     const touchStart = useSharedValue(0);
-
-    const flatListRef = useRef<FlatList<UserSummaryResponse>>(null);
 
     const onScroll = useAnimatedScrollHandler({
         onScroll: (event) => {
@@ -62,10 +70,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
         },
     });
 
-    // Load mutual follows
+    // --- LOGIC LOAD DATA ---
     const loadMutualFollows = async (query = '') => {
         if (!currentUser?.id) return;
-
         setLoading(true);
         try {
             const result = await userService.getMutualFollows(currentUser.id, query, 0, 20);
@@ -78,27 +85,42 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
         }
     };
 
-    const scrollTo = useCallback(
-        (destination: number) => {
-            'worklet';
-            translateY.value = withSpring(destination, {
-                damping: 50,
-                stiffness: 300,
-                mass: 1,
-                overshootClamping: true,
-            });
-        },
-        [translateY]
-    );
+    // --- ANIMATION HELPERS ---
+    const scrollTo = useCallback((destination: number) => {
+        'worklet';
+        translateY.value = withSpring(destination, {
+            damping: 50,
+            stiffness: 300,
+            mass: 1,
+            overshootClamping: true,
+        });
+    }, [translateY]);
 
+    const closeSheet = useCallback(() => {
+        'worklet';
+        translateY.value = withTiming(SNAP_CLOSE, {
+            duration: 250,
+            easing: Easing.out(Easing.quad),
+        }, (finished) => {
+            if (finished) scheduleOnRN(onClose);
+        });
+    }, [onClose, translateY]);
+
+    const handleClose = useCallback(() => {
+        Keyboard.dismiss();
+        closeSheet();
+    }, [closeSheet]);
+
+    // --- EFFECTS ---
     useEffect(() => {
         if (visible) {
             translateY.value = SNAP_CLOSE;
-            setTimeout(() => {
-                scrollTo(SNAP_HALF);
-            }, 50);
+            // Mở lên ở mức SNAP_HALF (giữa màn hình)
+            setTimeout(() => scrollTo(SNAP_HALF), 50);
+
             setSelectedUsers(new Set());
             setSearchQuery('');
+            setMessageText('');
             loadMutualFollows();
         } else {
             translateY.value = SNAP_CLOSE;
@@ -106,68 +128,45 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
     }, [visible]);
 
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (visible) {
-                loadMutualFollows(searchQuery);
-            }
+        const timeout = setTimeout(() => {
+            if (visible) loadMutualFollows(searchQuery);
         }, 300);
-
-        return () => clearTimeout(delayDebounceFn);
+        return () => clearTimeout(timeout);
     }, [searchQuery]);
 
-    const closeSheet = useCallback(() => {
-        'worklet';
-        translateY.value = withTiming(
-            SNAP_CLOSE,
-            {
-                duration: 250,
-                easing: Easing.out(Easing.quad),
-            },
-            (finished) => {
-                if (finished) {
-                    scheduleOnRN(onClose);
-                }
-            }
-        );
-    }, [onClose, translateY]);
+    // Keyboard Handling: Đẩy modal lên full khi gõ phím
+    useEffect(() => {
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const sub = Keyboard.addListener(showEvent, () => scrollTo(SNAP_TOP));
+        return () => sub.remove();
+    }, [scrollTo]);
 
-    const handleClose = useCallback(() => {
-        closeSheet();
-    }, [closeSheet]);
-
+    // --- ACTIONS ---
     const handleToggleUser = (userId: string) => {
         setSelectedUsers((prev) => {
             const newSet = new Set(prev);
-            if (newSet.has(userId)) {
-                newSet.delete(userId);
-            } else {
-                newSet.add(userId);
-            }
+            if (newSet.has(userId)) newSet.delete(userId);
+            else newSet.add(userId);
             return newSet;
         });
     };
 
     const handleSend = async () => {
-        if (selectedUsers.size === 0) return;
-
+        if (selectedUsers.size === 0 && !messageText) return;
         setSending(true);
         try {
-            // TODO: Implement send to users API
-            console.log('Sending post to users:', Array.from(selectedUsers));
-
-            // Show success message
+            console.log('Sending...', Array.from(selectedUsers), messageText);
             await new Promise(resolve => setTimeout(resolve, 500));
-            closeSheet();
+            handleClose();
         } catch (error) {
-            console.error('Failed to send:', error);
+            console.error(error);
         } finally {
             setSending(false);
         }
     };
 
-    // Pan gesture similar to CommentsModal
+    // --- GESTURES ---
     const nativeGesture = Gesture.Native();
-
     const panGesture = Gesture.Pan()
         .manualActivation(true)
         .onTouchesDown((e, stateManager) => {
@@ -180,22 +179,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
 
             if (translateY.value > effectiveTop + 2) {
                 stateManager.activate();
-                return;
-            }
-
-            if (scrollY.value <= 0) {
-                if (deltaY > 5) {
-                    stateManager.activate();
-                } else if (deltaY < -5) {
-                    stateManager.fail();
-                }
+            } else if (scrollY.value <= 0) {
+                if (deltaY > 5) stateManager.activate();
+                else if (deltaY < -5) stateManager.fail();
             } else {
                 stateManager.fail();
             }
         })
-        .onStart(() => {
-            context.value = { y: translateY.value };
-        })
+        .onStart(() => { context.value = { y: translateY.value }; })
         .onUpdate((event) => {
             const effectiveTop = insets.top;
             let newY = context.value.y + event.translationY;
@@ -203,30 +194,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
             translateY.value = newY;
         })
         .onEnd((event) => {
-            const effectiveTop = insets.top;
-            if (event.translationY > 100 || event.velocityY > 500) {
-                closeSheet();
-            } else if (event.translationY < -50 || event.velocityY < -500) {
-                scrollTo(effectiveTop);
+            if (event.velocityY > 1000) {
+                if (translateY.value > SNAP_HALF) closeSheet();
+                else scrollTo(SNAP_HALF);
+            } else if (event.velocityY < -1000) {
+                scrollTo(SNAP_TOP);
             } else {
-                if (translateY.value < SNAP_HALF / 2) {
-                    scrollTo(effectiveTop);
-                } else {
-                    scrollTo(SNAP_HALF);
-                }
+                if (translateY.value < SNAP_HALF / 2) scrollTo(SNAP_TOP);
+                else if (translateY.value < (SNAP_HALF + SNAP_CLOSE) / 2) scrollTo(SNAP_HALF);
+                else closeSheet();
             }
         });
 
-    const composedGesture = Gesture.Simultaneous(nativeGesture, panGesture);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: translateY.value }],
+    // --- STYLES ANIMATION ---
+    // Key Logic: Animate HEIGHT thay vì TOP để giữ footer dính đáy
+    const rStyle = useAnimatedStyle(() => ({
+        height: SCREEN_HEIGHT - translateY.value,
     }));
 
     const backdropOpacity = useAnimatedStyle(() => ({
-        opacity: visible ? 1 - (translateY.value / SNAP_CLOSE) : 0,
+        opacity: interpolate(translateY.value, [SNAP_HALF, SNAP_CLOSE], [1, 0], Extrapolation.CLAMP),
     }));
 
+    // --- RENDER HELPERS ---
     const renderUserItem = ({ item }: { item: UserSummaryResponse }) => (
         <View style={styles.userCard}>
             <TouchableOpacity
@@ -235,130 +225,100 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
                 style={styles.userCardInner}
             >
                 <View style={styles.userAvatarContainer}>
-                    <Avatar
-                        uri={item.profile?.avatar}
-                        name={item.username}
-                        size={64}
-                    />
+                    <Avatar uri={item.profile?.avatar} name={item.username} size={64} />
                     {selectedUsers.has(item.id) && (
                         <View style={styles.checkmarkContainer}>
                             <Ionicons name="checkmark-circle" size={24} color="#4D5DF7" />
                         </View>
                     )}
                 </View>
-                <Text style={styles.userName} numberOfLines={1}>
-                    {item.username}
-                </Text>
+                <Text style={styles.userName} numberOfLines={1}>{item.username}</Text>
             </TouchableOpacity>
         </View>
     );
 
-    const renderHeader = () => (
-        <View>
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <View style={styles.searchInputWrapper}>
-                    <Ionicons name="search" size={18} color="#8e8e8e" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Tìm kiếm"
-                        placeholderTextColor="#8e8e8e"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={18} color="#8e8e8e" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-                <TouchableOpacity style={styles.settingsButton}>
-                    <MaterialCommunityIcons name="tune-variant" size={20} color="#000" />
-                </TouchableOpacity>
+    const renderHeaderList = () => (
+        <View style={styles.searchContainer}>
+            <View style={styles.searchInputWrapper}>
+                <Ionicons name="search" size={18} color="#8e8e8e" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Tìm kiếm"
+                    placeholderTextColor="#8e8e8e"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                        <Ionicons name="close-circle" size={18} color="#8e8e8e" />
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
 
-    const renderEmpty = () => {
-        if (loading) {
-            return (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#4D5DF7" />
-                </View>
-            );
-        }
-        return (
-            <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Không tìm thấy người dùng</Text>
-            </View>
-        );
-    };
-
     if (!visible) return null;
 
     return (
-        <Modal
-            visible={visible}
-            transparent
-            animationType="none"
-            onRequestClose={handleClose}
-            statusBarTranslucent
-        >
-            <GestureHandlerRootView style={{ flex: 1 }}>
-                <View style={styles.modalContainer}>
-                    <Pressable style={StyleSheet.absoluteFill} onPress={handleClose}>
-                        <Animated.View style={[styles.backdrop, backdropOpacity]} />
-                    </Pressable>
+        <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
+            <GestureHandlerRootView style={styles.modalOverlay}>
+                {/* Backdrop */}
+                <Animated.View style={[styles.backdrop, backdropOpacity]} pointerEvents="box-none">
+                    <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+                </Animated.View>
 
-                    <GestureDetector gesture={composedGesture}>
-                        <Animated.View
-                            style={[
-                                styles.sheetContainer,
-                                {
-                                    height: SCREEN_HEIGHT,
-                                    paddingBottom: insets.bottom || 20,
-                                },
-                                animatedStyle,
-                            ]}
-                        >
-                            {/* Handle */}
+                {/* Main Sheet */}
+                <GestureDetector gesture={panGesture}>
+                    <Animated.View style={[styles.modalContent, rStyle]}>
+
+                        {/* 1. Header & Handle */}
+                        <View style={styles.headerArea}>
                             <View style={styles.handleContainer}>
                                 <View style={styles.handle} />
                             </View>
-
-                            {/* Header */}
-                            <View style={styles.header}>
-                                <Text style={styles.title}>Gửi</Text>
-                                <TouchableOpacity
-                                    style={styles.closeButton}
-                                    onPress={handleClose}
-                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                >
+                            <View style={styles.headerTitleRow}>
+                                <Text style={styles.headerTitle}>Gửi</Text>
+                                <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
                                     <Ionicons name="close" size={28} color="#000" />
                                 </TouchableOpacity>
                             </View>
+                        </View>
 
-                            {/* Content */}
-                            <FlatList
-                                ref={flatListRef}
-                                data={mutualFollows}
-                                renderItem={renderUserItem}
-                                keyExtractor={(item) => item.id}
-                                numColumns={3}
-                                ListHeaderComponent={renderHeader}
-                                ListEmptyComponent={renderEmpty}
-                                onScroll={onScroll}
-                                scrollEventThrottle={16}
-                                showsVerticalScrollIndicator={false}
-                                contentContainerStyle={styles.flatListContent}
-                                columnWrapperStyle={styles.columnWrapper}
-                            />
+                        {/* 2. Body List (Scrollable) */}
+                        <View style={styles.bodyWrapper}>
+                            <GestureDetector gesture={nativeGesture}>
+                                <FlatList
+                                    data={mutualFollows}
+                                    renderItem={renderUserItem}
+                                    keyExtractor={(item) => item.id}
+                                    numColumns={3}
+                                    ListHeaderComponent={renderHeaderList}
+                                    onScroll={onScroll}
+                                    scrollEventThrottle={16}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={styles.flatListContent}
+                                    columnWrapperStyle={styles.columnWrapper}
+                                    keyboardDismissMode="on-drag"
+                                />
+                            </GestureDetector>
+                        </View>
 
-                            {/* Footer Actions */}
-                            <View style={styles.footer}>
+                        {/* 3. Footer Input (Always at bottom) */}
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                            style={styles.footerWrapper}
+                        >
+                            <View style={[styles.footerContainer, { paddingBottom: insets.bottom || 12 }]}>
                                 {selectedUsers.size > 0 ? (
-                                    <View style={styles.sendContainer}>
-                                        <Text style={styles.sendLabel}>Soạn tin nhắn...</Text>
+                                    // Giao diện khi ĐÃ CHỌN người: Input tin nhắn + Nút Gửi
+                                    <View style={styles.messageInputContainer}>
+                                        <TextInput
+                                            style={styles.messageInput}
+                                            placeholder="Soạn tin nhắn..."
+                                            placeholderTextColor="#8e8e8e"
+                                            value={messageText}
+                                            onChangeText={setMessageText}
+                                        />
                                         <TouchableOpacity
                                             style={[styles.sendButton, sending && styles.sendButtonDisabled]}
                                             onPress={handleSend}
@@ -372,109 +332,93 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
-                                    <View style={styles.actionButtons}>
-                                        <TouchableOpacity style={styles.actionButton}>
-                                            <View style={[styles.actionIconContainer, { backgroundColor: '#0084FF' }]}>
-                                                <FontAwesome5 name="facebook-messenger" size={24} color="#fff" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Messenger</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity style={styles.actionButton}>
-                                            <View style={[styles.actionIconContainer, { backgroundColor: '#E5E5E5' }]}>
-                                                <Ionicons name="add-circle-outline" size={28} color="#000" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Thêm vào tin</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity style={styles.actionButton}>
-                                            <View style={[styles.actionIconContainer, { backgroundColor: '#E5E5E5' }]}>
-                                                <Ionicons name="link-outline" size={28} color="#000" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>Sao chép liên kết</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity style={styles.actionButton}>
-                                            <View style={[styles.actionIconContainer, { backgroundColor: '#000' }]}>
-                                                <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold' }}>𝕏</Text>
-                                            </View>
-                                            <Text style={styles.actionLabel}>X</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity style={styles.actionButton}>
-                                            <View style={[styles.actionIconContainer, { backgroundColor: '#25D366' }]}>
-                                                <FontAwesome5 name="whatsapp" size={24} color="#fff" />
-                                            </View>
-                                            <Text style={styles.actionLabel}>WhatsApp</Text>
-                                        </TouchableOpacity>
+                                    // Giao diện khi CHƯA CHỌN người: Các nút Social Actions
+                                    <View style={styles.socialActions}>
+                                        <SocialButton icon="facebook-messenger" color="#0084FF" label="Messenger" type="fa5" />
+                                        <SocialButton icon="add-circle-outline" color="#000" bg="#E5E5E5" label="Thêm vào tin" type="ion" />
+                                        <SocialButton icon="link-outline" color="#000" bg="#E5E5E5" label="Sao chép" type="ion" />
+                                        <SocialButton icon="whatsapp" color="#25D366" label="WhatsApp" type="fa5" />
                                     </View>
                                 )}
                             </View>
-                        </Animated.View>
-                    </GestureDetector>
-                </View>
+                        </KeyboardAvoidingView>
+
+                    </Animated.View>
+                </GestureDetector>
             </GestureHandlerRootView>
         </Modal>
     );
 };
 
+// Helper Component cho nút Social
+const SocialButton = ({ icon, color, bg, label, type }: any) => (
+    <TouchableOpacity style={styles.actionButton}>
+        <View style={[styles.actionIconContainer, { backgroundColor: bg || color }]}>
+            {type === 'fa5' ? (
+                <FontAwesome5 name={icon} size={24} color={bg ? color : "#fff"} />
+            ) : (
+                <Ionicons name={icon} size={28} color={bg ? color : "#fff"} />
+            )}
+        </View>
+        <Text style={styles.actionLabel}>{label}</Text>
+    </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
-    modalContainer: {
+    modalOverlay: {
         flex: 1,
+        justifyContent: 'flex-end', // Đẩy modal xuống đáy
     },
     backdrop: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
     },
-    sheetContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
+    modalContent: {
         backgroundColor: '#fff',
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
-        overflow: 'hidden',
+        position: 'absolute',
+        width: '100%',
+        bottom: 0,
+        overflow: 'hidden', // Quan trọng để bo góc
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 5,
     },
-    handleContainer: {
-        alignItems: 'center',
-        paddingVertical: 10,
+    // HEADER AREA
+    headerArea: {
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#EFEFEF',
+        zIndex: 10,
     },
-    handle: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#C7C7CC',
-        borderRadius: 2,
-    },
-    header: {
+    handleContainer: { alignItems: 'center', paddingVertical: 10 },
+    handle: { width: 40, height: 4, backgroundColor: '#C7C7CC', borderRadius: 2 },
+    headerTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
+        paddingBottom: 10,
         position: 'relative',
     },
-    title: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#000',
+    headerTitle: { fontSize: 16, fontWeight: '700', color: '#000' },
+    closeButton: { position: 'absolute', right: 16, top: -4 },
+
+    // BODY AREA
+    bodyWrapper: {
+        flex: 1, // Chiếm toàn bộ khoảng trống còn lại
+        backgroundColor: '#fff',
     },
-    closeButton: {
-        position: 'absolute',
-        right: 16,
-        top: 8,
+    flatListContent: {
+        paddingBottom: 20,
+        paddingTop: 10,
     },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 8,
-    },
+    columnWrapper: { paddingHorizontal: 8 },
+    searchContainer: { paddingHorizontal: 16, marginBottom: 10 },
     searchInputWrapper: {
-        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F2F2F2',
@@ -482,116 +426,61 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         height: 36,
     },
-    searchIcon: {
-        marginRight: 8,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 14,
-        color: '#000',
-    },
-    settingsButton: {
-        padding: 8,
-    },
-    flatListContent: {
-        paddingBottom: 20,
-    },
-    columnWrapper: {
-        paddingHorizontal: 8,
-    },
-    loadingContainer: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyContainer: {
-        paddingVertical: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyText: {
-        fontSize: 14,
-        color: '#8e8e8e',
-    },
-    userCard: {
-        width: SCREEN_WIDTH / 3,
-        paddingHorizontal: 8,
-        paddingVertical: 12,
-    },
-    userCardInner: {
-        alignItems: 'center',
-    },
-    userAvatarContainer: {
-        position: 'relative',
-        marginBottom: 8,
-    },
+    searchIcon: { marginRight: 8 },
+    searchInput: { flex: 1, fontSize: 14, color: '#000' },
+
+    // USER CARD
+    userCard: { width: SCREEN_WIDTH / 3, paddingHorizontal: 8, paddingVertical: 12 },
+    userCardInner: { alignItems: 'center' },
+    userAvatarContainer: { position: 'relative', marginBottom: 8 },
     checkmarkContainer: {
-        position: 'absolute',
-        bottom: 0,
-        right: 0,
+        position: 'absolute', bottom: 0, right: 0, backgroundColor: '#fff', borderRadius: 12,
+    },
+    userName: { fontSize: 12, color: '#000', textAlign: 'center' },
+
+    // FOOTER AREA
+    footerWrapper: {
         backgroundColor: '#fff',
-        borderRadius: 12,
-    },
-    userName: {
-        fontSize: 12,
-        color: '#000',
-        textAlign: 'center',
-        maxWidth: '100%',
-    },
-    footer: {
         borderTopWidth: 1,
         borderTopColor: '#EFEFEF',
+    },
+    footerContainer: {
         paddingHorizontal: 16,
         paddingTop: 12,
-        backgroundColor: '#fff',
     },
-    sendContainer: {
+
+    // Message Input
+    messageInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingBottom: 12,
+        gap: 12,
     },
-    sendLabel: {
-        fontSize: 14,
-        color: '#8e8e8e',
+    messageInput: {
         flex: 1,
+        height: 40,
+        backgroundColor: '#F2F2F2',
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        fontSize: 14,
+        color: '#000',
     },
     sendButton: {
         backgroundColor: '#4D5DF7',
-        paddingHorizontal: 24,
-        paddingVertical: 10,
-        borderRadius: 8,
-        minWidth: 80,
-        alignItems: 'center',
-    },
-    sendButtonDisabled: {
-        backgroundColor: '#B0B0B0',
-    },
-    sendButtonText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    actionButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingBottom: 12,
-    },
-    actionButton: {
-        alignItems: 'center',
-        width: 70,
-    },
-    actionIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        paddingHorizontal: 20,
+        height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
     },
-    actionLabel: {
-        fontSize: 11,
-        color: '#000',
-        textAlign: 'center',
+    sendButtonDisabled: { backgroundColor: '#B0B0B0' },
+    sendButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
+    // Social Actions
+    socialActions: { flexDirection: 'row', justifyContent: 'space-around' },
+    actionButton: { alignItems: 'center', width: 70 },
+    actionIconContainer: {
+        width: 50, height: 50, borderRadius: 25,
+        alignItems: 'center', justifyContent: 'center', marginBottom: 6,
     },
+    actionLabel: { fontSize: 11, color: '#000', textAlign: 'center' },
 });

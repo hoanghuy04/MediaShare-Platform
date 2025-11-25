@@ -21,6 +21,7 @@ import {
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { ReelCameraView } from '@components/create/reels/ReelCameraView';
 import { ReelGaleryView } from '@components/create/reels/ReelGaleryView';
 
@@ -33,8 +34,14 @@ type GalleryAsset = {
   duration?: number;
 };
 
-export default function ReelsCreationScreen() {
+type ReelsCreationScreenProps = {
+  isFocused?: boolean;
+};
+
+export default function ReelsCreationScreen({ isFocused = true }: ReelsCreationScreenProps) {
   const router = useRouter();
+  const isRouteFocused = useIsFocused();
+  const shouldEnableCamera = isFocused && isRouteFocused;
 
   const scrollViewRef = useRef<ScrollView | null>(null);
   const cameraRef = useRef<CameraView | null>(null);
@@ -177,6 +184,7 @@ export default function ReelsCreationScreen() {
 
         const video = await cam.recordAsync({
           maxDuration: 60,
+          quality: '720p',
         });
 
         if (video?.uri) {
@@ -376,6 +384,7 @@ export default function ReelsCreationScreen() {
           recordState={recordState}
           gallery={gallery}
           isVisible={isOnCameraPage}
+          isFocused={shouldEnableCamera}
           onToggleFlash={toggleTorch}
           onAvatarPress={goToGallery}
           onRecordPress={handleRecordPress}

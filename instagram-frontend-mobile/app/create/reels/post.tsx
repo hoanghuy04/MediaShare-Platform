@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -46,17 +46,35 @@ export default function ReelPostScreen() {
   const [showCaptionInput, setShowCaptionInput] = useState(false);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
+  const [isReady, setIsReady] = useState(false);
 
   const isSubmittingRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
 
-  const player = useVideoPlayer(mediaType === 'video' && mediaUri ? mediaUri : null, player => {
-    if (mediaType === 'video') {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const player = useVideoPlayer(isReady && mediaType === 'video' && mediaUri ? mediaUri : null, player => {
+    if (isReady && mediaType === 'video') {
       player.loop = true;
       player.play();
       player.muted = true;
     }
   });
+
+  useEffect(() => {
+    if (player && isReady) {
+      if (showCaptionInput) {
+        player.pause();
+      } else {
+        player.play();
+      }
+    }
+  }, [showCaptionInput, player, isReady]);
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -161,11 +179,17 @@ export default function ReelPostScreen() {
         <View style={styles.previewSection}>
           <View style={styles.previewContainer}>
             {mediaType === 'video' ? (
-              <VideoView
-                style={styles.previewMedia}
-                player={player}
-                nativeControls={false}
-              />
+              isReady && !showCaptionInput ? (
+                <VideoView
+                  style={styles.previewMedia}
+                  player={player}
+                  nativeControls={false}
+                />
+              ) : (
+                <View style={[styles.previewMedia, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
+                  {!isReady && <ActivityIndicator color="#999" />}
+                </View>
+              )
             ) : (
               <Image source={{ uri: mediaUri }} style={styles.previewMedia} resizeMode="cover" />
             )}

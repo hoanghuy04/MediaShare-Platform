@@ -33,6 +33,7 @@ type CameraPageProps = {
   onClose: () => void;
   onCameraReady?: () => void;
   scrollSimultaneousRef?: React.RefObject<any>;
+  isFocused?: boolean;
 };
 
 const MIN_ZOOM = 0;
@@ -50,6 +51,7 @@ export function ReelCameraView(props: CameraPageProps) {
     recordState,
     gallery,
     isVisible,
+    isFocused = true,
     onToggleFlash,
     onAvatarPress,
     onRecordPress,
@@ -101,15 +103,17 @@ export function ReelCameraView(props: CameraPageProps) {
     <View style={[styles.page, { height, width }]}>
       <GestureDetector gesture={pinchGesture}>
         <View style={StyleSheet.absoluteFill}>
-          <CameraView
-            ref={cameraRef}
-            style={StyleSheet.absoluteFill}
-            facing={cameraType}
-            enableTorch={torch}
-            zoom={internalZoom}
-            mode="video"
-            onCameraReady={onCameraReady}
-          />
+          {isFocused && (
+            <CameraView
+              ref={cameraRef}
+              style={StyleSheet.absoluteFill}
+              facing={cameraType}
+              enableTorch={torch}
+              zoom={internalZoom}
+              mode="video"
+              onCameraReady={onCameraReady}
+            />
+          )}
         </View>
       </GestureDetector>
 
