@@ -133,7 +133,6 @@ export const userService = {
     } catch (error) {
       console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
 
-      // ✅ Fix: Extract content array from PaginatedResponse
       const [followersPage, followingPage] = await Promise.all([
         userService.getUserFollowers(userId),
         userService.getUserFollowing(userId),

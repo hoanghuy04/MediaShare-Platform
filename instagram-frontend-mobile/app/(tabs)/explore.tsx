@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useTheme } from '../../hooks/useTheme';
 import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 import { postService } from '../../services/post.service';
@@ -26,6 +27,7 @@ const itemSize = (screenWidth - 4) / 3; // 3 columns with 2px gaps
 export default function ExploreScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const [videoThumbnails, setVideoThumbnails] = useState<{ [key: string]: string }>({});
 
   const {
     data: posts,
@@ -59,25 +61,61 @@ export default function ExploreScreen() {
     }
   };
 
-  const renderGridItem = ({ item }: { item: Post; index: number }) => {
-    const firstMedia = item.media[0];
-    const isVideo =
-      firstMedia?.type === 'VIDEO' || firstMedia?.type === 'video';
+  const generateThumbnail = async (item: Post) => {
+    const videoMedia = item.media?.find(m => m.category === 'VIDEO' || m.category === 'video');
+    const imageMedia = item.media?.find(m => m.category === 'IMAGE' || m.category === 'image');
+    
+    if (videoMedia && !videoThumbnails[item.id] && !imageMedia) {
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(videoMedia.url, { time: 0 });
+        setVideoThumbnails(prev => ({ ...prev, [item.id]: uri }));
+      } catch (error) {
+        console.log('Error generating thumbnail for', item.id, error);
+      }
+    }
+  };
+
+  const ExploreGridItem = ({ item }: { item: Post }) => {
+    const isReel = item.type === 'REEL';
     const hasMultipleMedia = item.media.length > 1;
+
+    // Generate thumbnail for reels
+    React.useEffect(() => {
+      if (isReel) {
+        generateThumbnail(item);
+      }
+    }, [item.id]);
+
+    // Get thumbnail URL - match ReelGrid logic exactly
+    const videoMedia = item.media?.find(m => m.category === 'VIDEO' || m.category === 'video');
+    const imageMedia = item.media?.find(m => m.category === 'IMAGE' || m.category === 'image');
+    const thumbnailUri = videoThumbnails[item.id] || imageMedia?.url || videoMedia?.url || item.media?.[0]?.url;
 
     return (
       <TouchableOpacity
         style={[styles.gridItem, { width: itemSize, height: itemSize }]}
-        onPress={() => router.push(`/posts/${item.id}`)}
+        onPress={() => {
+          if (isReel) {
+            router.push({
+              pathname: '/profile/reels',
+              params: { userId: item.author.id, reelId: item.id }
+            });
+          } else {
+            router.push({
+              pathname: '/profile/posts',
+              params: { userId: item.author.id, postId: item.id }
+            });
+          }
+        }}
         activeOpacity={0.9}
       >
         <Image
-          source={{ uri: firstMedia?.url }}
+          source={{ uri: thumbnailUri }}
           style={styles.gridImage}
           resizeMode="cover"
         />
 
-        {isVideo && (
+        {isReel && (
           <View style={styles.videoIndicator}>
             <Ionicons name="play" size={14} color="white" />
           </View>
@@ -85,11 +123,15 @@ export default function ExploreScreen() {
 
         {hasMultipleMedia && (
           <View style={styles.multipleIndicator}>
-            <Ionicons name="albums" size={14} color="white" />
+            <Ionicons name="copy-outline" size={14} color="white" />
           </View>
         )}
       </TouchableOpacity>
     );
+  };
+
+  const renderGridItem = ({ item }: { item: Post; index: number }) => {
+    return <ExploreGridItem item={item} />;
   };
 
   const renderEmpty = () => {
@@ -203,16 +245,17 @@ const styles = StyleSheet.create({
   gridContainer: {
     paddingTop: 6,
     paddingBottom: 16,
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
   },
   row: {
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: 4,
+    gap: 4,
   },
   gridItem: {
     backgroundColor: '#f3f4f6',
     position: 'relative',
-    borderRadius: 6,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   gridImage: {

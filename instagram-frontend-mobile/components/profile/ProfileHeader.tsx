@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,10 @@ import { Avatar } from '../common/Avatar';
 import { formatNumber } from '../../utils/formatters';
 import { FollowButton } from '../common/FollowButton';
 import { MessageButton } from '../common/MessageButton';
+import { QRCodeModal } from './QRCodeModal';
+import { QRScanner } from './QRScanner';
+import { UserPreviewModal } from './UserPreviewModal';
+import { userService } from '../../services/user.service';
 
 interface ProfileHeaderProps {
   profile: UserResponse;
@@ -26,6 +30,15 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   const { theme } = useTheme();
   const router = useRouter();
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showUserPreview, setShowUserPreview] = useState(false);
+  const [scannedUser, setScannedUser] = useState<{
+    userId: string;
+    username: string;
+    fullName?: string;
+    avatar?: string;
+  } | null>(null);
 
   const fullName =
     profile.profile?.firstName && profile.profile?.lastName
@@ -47,6 +60,42 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
   const handleFollowingPress = () => {
     router.push(`/users/${profile.id}/follows?tab=following`);
+  };
+
+  const handleScanSuccess = async (userId: string) => {
+    try {
+      // Fetch user data from API
+      const userData = await userService.getUserById(userId);
+      const userFullName =
+        userData.profile?.firstName && userData.profile?.lastName
+          ? `${userData.profile.firstName} ${userData.profile.lastName}`
+          : userData.profile?.firstName || userData.username;
+      
+      setScannedUser({
+        userId: userData.id,
+        username: userData.username,
+        fullName: userFullName,
+        avatar: userData.profile?.avatar,
+      });
+      setShowUserPreview(true);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      // Still show preview with userId only
+      setScannedUser({
+        userId,
+        username: userId,
+        fullName: undefined,
+        avatar: undefined,
+      });
+      setShowUserPreview(true);
+    }
+  };
+
+  const handleViewScannedProfile = () => {
+    if (scannedUser) {
+      setShowUserPreview(false);
+      router.push(`/users/${scannedUser.userId}`);
+    }
   };
 
   return (
@@ -118,6 +167,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 styles.primaryButton,
                 { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
               ]}
+              onPress={() => setShowQRCode(true)}
             >
               <Text style={[styles.buttonText, { color: theme.colors.text }]}>
                 Chia sẻ trang cá nhân
@@ -128,8 +178,9 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 styles.iconButton,
                 { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
               ]}
+              onPress={() => setShowScanner(true)}
             >
-              <Ionicons name="person-add-outline" size={20} color={theme.colors.text} />
+              <Ionicons name="qr-code-outline" size={20} color={theme.colors.text} />
             </TouchableOpacity>
           </>
         ) : (
@@ -161,6 +212,36 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </>
         )}
       </View>
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        visible={showQRCode}
+        onClose={() => setShowQRCode(false)}
+        userId={profile.id}
+        username={profile.username}
+        fullName={fullName}
+        avatar={profile.profile?.avatar}
+      />
+
+      {/* QR Scanner */}
+      <QRScanner
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanSuccess={handleScanSuccess}
+      />
+
+      {/* User Preview Modal */}
+      {scannedUser && (
+        <UserPreviewModal
+          visible={showUserPreview}
+          onClose={() => setShowUserPreview(false)}
+          onViewProfile={handleViewScannedProfile}
+          userId={scannedUser.userId}
+          username={scannedUser.username}
+          fullName={scannedUser.fullName}
+          avatar={scannedUser.avatar}
+        />
+      )}
     </View>
   );
 };

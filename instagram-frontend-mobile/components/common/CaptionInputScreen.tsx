@@ -191,10 +191,8 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
     >
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <BlurView
-          intensity={30}
-          tint="light"
-          style={[styles.blurContainer, { paddingTop: insets.top }]}
+        <View
+          style={[styles.blurContainer, { paddingTop: insets.top, backgroundColor: 'rgba(255,255,255,0.95)' }]}
         >
           <View style={styles.modalInner}>
             <View
@@ -251,7 +249,7 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
               </View>
             )}
           </View>
-        </BlurView>
+        </View>
       </SafeAreaView>
     </Modal>
   );
