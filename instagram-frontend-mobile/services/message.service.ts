@@ -8,6 +8,18 @@ import {
   ConversationMember,
 } from '../types';
 
+// Invite Link Types
+export interface InviteLinkResponse {
+  conversationId: string;
+  token: string;
+  url: string;
+  createdAt: string;
+  expiresAt: string | null;
+  maxUses: number | null;
+  usedCount: number;
+  active: boolean;
+}
+
 // Message API
 export const messageAPI = {
   getInbox: async (page = 0, limit = 20): Promise<PaginatedResponse<InboxItem>> => {
@@ -145,6 +157,50 @@ export const messageAPI = {
     const response = await axiosInstance.patch(
       API_ENDPOINTS.CONVERSATION_NICKNAME(conversationId),
       { targetUserId, nickname }
+    );
+    return response.data.data;
+  },
+
+  // Invite Link APIs
+  getInviteLink: async (conversationId: string): Promise<InviteLinkResponse | null> => {
+    const response = await axiosInstance.get(
+      API_ENDPOINTS.GET_INVITE_LINK(conversationId)
+    );
+    return response.data.data; // Can be null if no active link
+  },
+
+  createOrRotateInviteLink: async (
+    conversationId: string,
+    payload?: { maxUses?: number; expiresAt?: string }
+  ): Promise<InviteLinkResponse> => {
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.CREATE_INVITE_LINK(conversationId),
+      payload || {}
+    );
+    return response.data.data;
+  },
+
+  revokeInviteLink: async (conversationId: string): Promise<void> => {
+    await axiosInstance.delete(
+      API_ENDPOINTS.REVOKE_INVITE_LINK(conversationId)
+    );
+  },
+
+  updateInviteLinkActive: async (
+    conversationId: string,
+    active: boolean
+  ): Promise<InviteLinkResponse> => {
+    const response = await axiosInstance.put(
+      API_ENDPOINTS.UPDATE_INVITE_LINK_ACTIVE(conversationId),
+      { active }
+    );
+    return response.data.data;
+  },
+
+  joinByInviteToken: async (token: string): Promise<Conversation> => {
+    const response = await axiosInstance.post(
+      API_ENDPOINTS.JOIN_BY_INVITE_TOKEN(token),
+      null
     );
     return response.data.data;
   },

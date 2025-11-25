@@ -56,9 +56,6 @@ out/
 .env.*.local
 *.env
 
-### Uploads ###
-uploads/
-
 ### Operating System ###
 # macOS
 .DS_Store

@@ -5,9 +5,9 @@ import {
   Text,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
@@ -56,11 +56,11 @@ export default function PendingMessagesScreen() {
 
     const mr = item.messageRequest;
     const selfId = currentUser.id;
-    
+
     // Get the other user (not the current user)
     // In PendingMessagesScreen, currentUser is receiver, other is sender
     const other = mr.sender?.id === selfId ? mr.receiver : mr.sender;
-    
+
     if (!other || !mr.sender?.id || !mr.receiver?.id) {
       showAlert('Lỗi', 'Không thể xác định người nhận');
       return;
@@ -98,10 +98,10 @@ export default function PendingMessagesScreen() {
     if (item.type === 'MESSAGE_REQUEST' && item.messageRequest) {
       const mr = item.messageRequest;
       const selfId = currentUser.id;
-      
+
       // Get the other user (not the current user)
       const other = mr.sender?.id === selfId ? mr.receiver : mr.sender;
-      
+
       if (!other) {
         return null;
       }
@@ -110,10 +110,10 @@ export default function PendingMessagesScreen() {
       const avatar = other.avatar;
       const lastMessageContent = mr.lastMessageContent || 'Gửi yêu cầu nhắn tin';
       const timestamp = mr.lastMessageTimestamp || mr.createdAt;
-      
+
       // Prefix "You: " if current user is the sender
-      const displayText = mr.sender?.id === selfId 
-        ? `You: ${lastMessageContent}` 
+      const displayText = mr.sender?.id === selfId
+        ? `You: ${lastMessageContent}`
         : lastMessageContent;
 
       return (
@@ -167,26 +167,24 @@ export default function PendingMessagesScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons
-        name="mail-open-outline"
-        size={64}
-        color={theme.colors.textSecondary}
-      />
-      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-        Không có tin nhắn đang chờ
-      </Text>
-      <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
-        Tin nhắn từ người không theo dõi bạn sẽ xuất hiện ở đây
-      </Text>
+        <Ionicons
+          name="mail-open-outline"
+          size={64}
+          color={theme.colors.textSecondary}
+        />
+        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+          Không có tin nhắn đang chờ
+        </Text>
+        <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>
+          Tin nhắn từ người không theo dõi bạn sẽ xuất hiện ở đây
+        </Text>
     </View>
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
-      <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {renderHeader()}
-        
+
         <FlatList<InboxItem>
           data={inboxItems || []}
           renderItem={renderInboxItem}
@@ -201,8 +199,7 @@ export default function PendingMessagesScreen() {
           ListEmptyComponent={!isLoading ? renderEmptyState : null}
           showsVerticalScrollIndicator={false}
         />
-      </SafeAreaView>
-    </View>
+    </SafeAreaView>
   );
 }
 

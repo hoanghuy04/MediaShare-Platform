@@ -400,4 +400,101 @@ public class ConversationController {
         conversationMessageService.deleteConversationForUser(conversationId, userId);
         return ResponseEntity.ok(ApiResponse.success("Conversation deleted successfully", null));
     }
+
+    @GetMapping("/join/{token}")
+    @Operation(summary = "Handle invite link from browser - redirects to app or shows web page")
+    public ResponseEntity<String> handleInviteLink(@PathVariable String token) {
+        log.info("Handle invite link for token: {}", token);
+        
+        // Return HTML page that will try to open the app via deep link
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Join Conversation - Instagram</title>
+                <style>
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    }
+                    .container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 20px;
+                        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                        text-align: center;
+                        max-width: 400px;
+                    }
+                    h1 {
+                        color: #333;
+                        margin-bottom: 20px;
+                        font-size: 24px;
+                    }
+                    p {
+                        color: #666;
+                        margin-bottom: 30px;
+                        line-height: 1.6;
+                    }
+                    .button {
+                        display: inline-block;
+                        padding: 12px 30px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 25px;
+                        font-weight: 600;
+                        transition: transform 0.2s;
+                    }
+                    .button:hover {
+                        transform: scale(1.05);
+                    }
+                    .spinner {
+                        border: 3px solid #f3f3f3;
+                        border-top: 3px solid #667eea;
+                        border-radius: 50%;
+                        width: 40px;
+                        height: 40px;
+                        animation: spin 1s linear infinite;
+                        margin: 20px auto;
+                    }
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>📱 Join Group Conversation</h1>
+                    <p>Opening Instagram app...</p>
+                    <div class="spinner"></div>
+                    <p style="font-size: 14px; margin-top: 20px;">
+                        If the app doesn't open automatically, please click the button below:
+                    </p>
+                    <a href="instagram://join/%s" class="button">Open in App</a>
+                </div>
+                <script>
+                    // Try to open the app via deep link
+                    window.location.href = 'instagram://join/%s';
+                    
+                    // Fallback: if app doesn't open in 3 seconds, stay on page
+                    setTimeout(function() {
+                        console.log('App did not open, showing manual button');
+                    }, 3000);
+                </script>
+            </body>
+            </html>
+            """.formatted(token, token);
+        
+        return ResponseEntity.ok()
+                .header("Content-Type", "text/html; charset=UTF-8")
+                .body(html);
+    }
 }
