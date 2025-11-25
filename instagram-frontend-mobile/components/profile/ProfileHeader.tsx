@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { UserResponse } from '../../types/user';
-import { useTheme } from '@hooks/useTheme';
+import { useTheme } from '../../hooks/useTheme';
 import { Avatar } from '../common/Avatar';
-import { formatNumber } from '@utils/formatters';
+import { formatNumber } from '../../utils/formatters';
 import { FollowButton } from '../common/FollowButton';
 import { MessageButton } from '../common/MessageButton';
 
@@ -137,6 +137,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             <FollowButton
               userId={profile.id}
               initialIsFollowing={profile.followingByCurrentUser}
+              onFollowChange={onFollow}
               variant="primary"
               size="medium"
               style={{ flex: 1 }}

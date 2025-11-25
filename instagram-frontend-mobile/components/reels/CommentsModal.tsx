@@ -9,6 +9,7 @@ import {
   Dimensions,
   Platform,
   Keyboard,
+  KeyboardAvoidingView,
   TouchableOpacity,
   Pressable,
   Animated as RNAnimated,
@@ -939,29 +940,36 @@ const CommentsModal = ({
             </View>
           </GestureDetector>
 
-          {/* Mention Suggestions Overlay */}
-          {showMentionSuggestions && (
-            <View style={styles.mentionSuggestionsContainer}>
-              <MentionSuggestions
-                query={currentMentionQuery}
-                onSelect={handleMentionSelect}
-                onClose={() => setShowMentionSuggestions(false)}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            style={styles.footerWrapper}
+          >
+            <View style={styles.footerContainer}>
+              {/* Mention Suggestions Overlay */}
+              {showMentionSuggestions && (
+                <MentionSuggestions
+                  query={currentMentionQuery}
+                  onSelect={handleMentionSelect}
+                  onClose={() => setShowMentionSuggestions(false)}
+                  style={styles.mentionSuggestions}
+                />
+              )}
+
+              <CommentInput
+                commentText={commentText}
+                onChangeText={setCommentText}
+                onSend={handleSendComment}
+                onFocus={handleInputFocus}
+                inputRef={inputRef}
+                userAvatar={currentUser?.avatar}
+                replyingTo={replyingTo}
+                onCancelReply={handleCancelReply}
+                submitting={submitting}
+                onSelectionChange={handleSelectionChange}
               />
             </View>
-          )}
-
-          <CommentInput
-            commentText={commentText}
-            onChangeText={setCommentText}
-            onSend={handleSendComment}
-            onFocus={handleInputFocus}
-            inputRef={inputRef}
-            userAvatar={currentUser?.avatar}
-            replyingTo={replyingTo}
-            onCancelReply={handleCancelReply}
-            submitting={submitting}
-            onSelectionChange={handleSelectionChange}
-          />
+          </KeyboardAvoidingView>
         </Animated.View>
 
         <CommentActionMenu
@@ -1051,17 +1059,25 @@ const styles = StyleSheet.create({
   commentBlock: {
     marginBottom: 12,
   },
-  mentionSuggestionsContainer: {
+  footerWrapper: {
+    width: '100%',
+    zIndex: 1000,
+  },
+  footerContainer: {
+    position: 'relative',
+    width: '100%',
+  },
+  mentionSuggestions: {
     position: 'absolute',
-    bottom: 80, // Adjust based on input height
+    bottom: '100%', // Position above the input
     left: 0,
     right: 0,
-    maxHeight: 200,
+    maxHeight: SCREEN_HEIGHT * 0.5,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
-    zIndex: 1000,
-    elevation: 5,
+    elevation: 10,
+    zIndex: 2000,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,

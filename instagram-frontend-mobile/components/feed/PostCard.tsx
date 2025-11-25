@@ -28,6 +28,7 @@ import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
+import { followEventManager } from '../../utils/followEventManager';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
@@ -318,8 +319,28 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
-  const authorData = post.author as UserSummaryResponse;
-  const initiallyFollowing = authorData.followingByCurrentUser || false;
+  const [isFollowing, setIsFollowing] = useState(() => {
+    const cached = followEventManager.getStatus(post.author.id);
+    return cached !== undefined ? cached : (post.author.followingByCurrentUser || false);
+  });
+
+  useEffect(() => {
+    const cached = followEventManager.getStatus(post.author.id);
+    if (cached !== undefined) {
+      setIsFollowing(cached);
+    } else {
+      setIsFollowing(post.author.followingByCurrentUser || false);
+    }
+  }, [post.author.followingByCurrentUser, post.author.id]);
+
+  useEffect(() => {
+    const unsubscribe = followEventManager.subscribe((userId, status) => {
+      if (userId === post.author.id) {
+        setIsFollowing(status);
+      }
+    });
+    return unsubscribe;
+  }, [post.author.id]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -332,9 +353,9 @@ export const PostCard: React.FC<PostCardProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {!initiallyFollowing && post.author.id !== user?.id && (
+          {!isFollowing && post.author.id !== user?.id && (
             <FollowButton
-              userId={authorData.id}
+              userId={post.author.id}
               initialIsFollowing={false}
               variant="grey"
               size="small"

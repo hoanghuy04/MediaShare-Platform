@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,48 +7,48 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Image,
+    StyleProp,
+    ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { mentionService } from '../../services/mention.service';
 import { MentionUserResponse } from '../../types/mention.type';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 
 interface MentionSuggestionsProps {
     query: string;
     onSelect: (user: MentionUserResponse) => void;
     onClose: () => void;
+    style?: StyleProp<ViewStyle>;
 }
 
 const MentionSuggestions: React.FC<MentionSuggestionsProps> = ({
     query,
     onSelect,
     onClose,
+    style,
 }) => {
-    const [suggestions, setSuggestions] = useState<MentionUserResponse[]>([]);
-    const [loading, setLoading] = useState(false);
+    const fetchUsers = useCallback(
+        async (page: number, limit: number) => {
+            return await mentionService.searchUsers(query, page, limit);
+        },
+        [query]
+    );
+
+    const {
+        data: suggestions,
+        isLoading,
+        isLoadingMore,
+        loadMore,
+        refresh,
+    } = useInfiniteScroll<MentionUserResponse>({
+        fetchFunc: fetchUsers,
+        limit: 10,
+    });
 
     useEffect(() => {
-        loadSuggestions();
-    }, [query]);
-
-    const loadSuggestions = async () => {
-        setLoading(true);
-        try {
-            if (query.trim().length > 0) {
-                const result = await mentionService.searchUsers(query, 0, 10);
-                setSuggestions(result.content || []);
-            } else {
-                // Optionally load recent mentions or suggested users when query is empty
-                // For now, we can just search with empty string if the API supports it, or show nothing
-                const result = await mentionService.searchUsers('', 0, 10);
-                setSuggestions(result.content || []);
-            }
-        } catch (error) {
-            console.error('[MentionSuggestions] Error loading suggestions:', error);
-            setSuggestions([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+        refresh();
+    }, [query, refresh]);
 
     const renderItem = ({ item }: { item: MentionUserResponse }) => (
         <TouchableOpacity
@@ -80,26 +80,42 @@ const MentionSuggestions: React.FC<MentionSuggestionsProps> = ({
         </TouchableOpacity>
     );
 
-    if (loading) {
+    const renderFooter = () => {
+        if (!isLoadingMore) return null;
         return (
-            <View style={styles.loadingContainer}>
+            <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color="#c7c7c7" />
+            </View>
+        );
+    };
+
+    if (isLoading && suggestions.length === 0) {
+        return (
+            <View style={[styles.container, style, styles.loadingContainer]}>
                 <ActivityIndicator size="large" color="#c7c7c7" />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, style]}>
             <FlatList
                 data={suggestions}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
                 style={styles.list}
                 showsVerticalScrollIndicator={false}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={renderFooter}
+                keyboardShouldPersistTaps="always"
+                nestedScrollEnabled={true}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>Không tìm thấy người dùng</Text>
-                    </View>
+                    !isLoading ? (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>Không tìm thấy người dùng</Text>
+                        </View>
+                    ) : null
                 }
             />
         </View>
@@ -156,10 +172,12 @@ const styles = StyleSheet.create({
         color: '#8e8e8e',
     },
     loadingContainer: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 60,
+    },
+    footerLoader: {
+        paddingVertical: 10,
+        alignItems: 'center',
     },
     emptyContainer: {
         padding: 40,
