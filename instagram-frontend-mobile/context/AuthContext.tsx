@@ -4,6 +4,7 @@ import { authAPI } from '@services/auth.service';
 import { userService } from '@services/user.service';
 import { secureStorage, storage } from '@services/storage';
 import { User, LoginRequest, RegisterRequest } from '@types';
+import { useUpload } from './UploadContext';
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +38,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const segments = useSegments();
+  const { clearAllUploads } = useUpload();
 
   useEffect(() => {
     loadUser();
@@ -137,6 +139,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear upload state before clearing auth
+      clearAllUploads();
+
       await secureStorage.removeToken();
       await storage.removeUserData();
       setToken(null);

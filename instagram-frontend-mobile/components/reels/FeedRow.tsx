@@ -283,24 +283,11 @@ const FeedRow = ({
     setToastVisible(true);
   };
 
-  const videoContainerStyle = useAnimatedStyle(() => {
-    if (!modalTranslateY) return { flex: 1 };
 
-    const stopPoint = height * 0.5;
-
-    return {
-      height: interpolate(
-        modalTranslateY.value,
-        [stopPoint, height],
-        [stopPoint, height],
-        Extrapolation.CLAMP
-      ),
-    };
-  });
 
   return (
     <View style={[styles.container, { height: height }]}>
-      <Reanimated.View style={[styles.videoContainer, videoContainerStyle]}>
+      <Reanimated.View style={styles.videoContainer}>
         <VideoComponent
           data={data}
           isVisible={isVisible}
@@ -404,6 +391,7 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     width: '100%',
+    height: '100%',
     position: 'relative',
   },
   heartContainer: {

@@ -8,13 +8,18 @@ import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostLikeUserResponse;
 import com.hoanghuy04.instagrambackend.entity.Comment;
 import com.hoanghuy04.instagrambackend.entity.Like;
+import com.hoanghuy04.instagrambackend.entity.Mention;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
+import com.hoanghuy04.instagrambackend.enums.MentionTargetType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.CommentRepository;
 import com.hoanghuy04.instagrambackend.repository.LikeRepository;
+import com.hoanghuy04.instagrambackend.repository.MentionRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
+import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.util.MentionUtil;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -23,8 +28,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,8 +39,10 @@ public class PostCommentServiceImpl implements PostCommentService {
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final LikeRepository likeRepository;
+    private final MentionRepository mentionRepository;
+    private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
-
+    private final MentionUtil mentionUtil;
 
     @Transactional
     @Override
@@ -61,14 +66,12 @@ public class PostCommentServiceImpl implements PostCommentService {
         }
 
         String rawText = request.getText() != null ? request.getText().trim() : "";
-        List<String> mentions = extractMentions(rawText);
 
         Comment comment = Comment.builder()
                 .post(post)
                 .author(currentUser)
                 .text(rawText)
                 .parentComment(parent)
-                .mentions(mentions)
                 .totalLikes(0L)
                 .totalReply(0L)
                 .pinned(false)
@@ -79,10 +82,14 @@ public class PostCommentServiceImpl implements PostCommentService {
         post.setTotalComments(post.getTotalComments() + 1);
         postRepository.save(post);
 
+        syncMentionsForComment(saved.getId(), rawText, currentUser.getId());
+
         return mapToCommentResponse(saved, false);
     }
 
-
+    // ==============================
+    // GET COMMENTS
+    // ==============================
     @Transactional(readOnly = true)
     @Override
     public PageResponse<CommentResponse> getComments(String postId, Pageable pageable) {
@@ -96,6 +103,9 @@ public class PostCommentServiceImpl implements PostCommentService {
         return mapCommentPageWithLikeInfo(page, currentUser);
     }
 
+    // ==============================
+    // GET REPLIES
+    // ==============================
     @Transactional(readOnly = true)
     @Override
     public PageResponse<CommentResponse> getReplies(String postId, String parentCommentId, Pageable pageable) {
@@ -116,6 +126,9 @@ public class PostCommentServiceImpl implements PostCommentService {
         return mapCommentPageWithLikeInfo(page, currentUser);
     }
 
+    // ==============================
+    // TOGGLE LIKE COMMENT
+    // ==============================
     @Transactional
     @Override
     public CommentLikeToggleResponse toggleLikeComment(String postId, String commentId) {
@@ -161,7 +174,9 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .build();
     }
 
-
+    // ==============================
+    // TOGGLE PIN COMMENT
+    // ==============================
     @Transactional
     @Override
     public CommentPinToggleResponse togglePinComment(String postId, String commentId) {
@@ -210,6 +225,9 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .build();
     }
 
+    // ==============================
+    // DELETE COMMENT
+    // ==============================
     @Transactional
     @Override
     public void deleteComment(String postId, String commentId) {
@@ -232,35 +250,47 @@ public class PostCommentServiceImpl implements PostCommentService {
 
         long decrement = 1L;
 
+        // Nếu là comment cha -> xoá cả replies + likes + mentions của replies
         if (comment.getParentComment() == null) {
             List<Comment> replies = commentRepository.findByParentComment_Id(commentId);
 
-            for (Comment reply : replies) {
-                likeRepository.deleteByTargetTypeAndTargetId(
-                        LikeTargetType.COMMENT,
-                        reply.getId()
-                );
-            }
+            if (!replies.isEmpty()) {
+                List<String> replyIds = replies.stream().map(Comment::getId).toList();
 
-            commentRepository.deleteAll(replies);
-            decrement += replies.size();
+                // xoá like của replies
+                replyIds.forEach(id ->
+                        likeRepository.deleteByTargetTypeAndTargetId(LikeTargetType.COMMENT, id)
+                );
+
+                // xoá mentions của replies
+                replyIds.forEach(id ->
+                        mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, id)
+                );
+
+                commentRepository.deleteAll(replies);
+                decrement += replies.size();
+            }
         } else {
             Comment parent = comment.getParentComment();
             parent.setTotalReply(Math.max(0, parent.getTotalReply() - 1));
             commentRepository.save(parent);
         }
 
+        // update totalComments
         post.setTotalComments(Math.max(0, post.getTotalComments() - decrement));
         postRepository.save(post);
 
-        likeRepository.deleteByTargetTypeAndTargetId(
-                LikeTargetType.COMMENT,
-                commentId
-        );
+        // xoá likes + mentions của chính comment
+        likeRepository.deleteByTargetTypeAndTargetId(LikeTargetType.COMMENT, commentId);
+        mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, commentId);
 
+        // xoá comment
         commentRepository.delete(comment);
     }
 
+    // ==============================
+    // MAP COMMENT PAGE
+    // ==============================
     private PageResponse<CommentResponse> mapCommentPageWithLikeInfo(Page<Comment> page, User currentUser) {
         List<Comment> comments = page.getContent();
         List<String> commentIds = comments.stream()
@@ -290,6 +320,9 @@ public class PostCommentServiceImpl implements PostCommentService {
         return PageResponse.of(dtoPage);
     }
 
+    // ==============================
+    // MAP COMMENT -> DTO
+    // ==============================
     private CommentResponse mapToCommentResponse(Comment comment, boolean likedByCurrentUser) {
         User author = comment.getAuthor();
 
@@ -307,9 +340,9 @@ public class PostCommentServiceImpl implements PostCommentService {
                 ? comment.getParentComment().getId()
                 : null;
 
-        List<String> mentions = comment.getMentions() != null
-                ? comment.getMentions()
-                : Collections.emptyList();
+        // mentions hiện tại ta không lấy từ entity nữa,
+        // FE có thể tự parse từ text, hoặc sau này có thể query MentionRepository nếu cần.
+        List<String> mentions = Collections.emptyList();
 
         return CommentResponse.builder()
                 .id(comment.getId())
@@ -328,22 +361,33 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .build();
     }
 
-    private List<String> extractMentions(String text) {
-        if (text == null || text.isBlank()) {
-            return Collections.emptyList();
+    private void syncMentionsForComment(
+            String commentId,
+            String text,
+            String createdByUserId
+    ) {
+        // Xoá mentions cũ của comment
+        mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, commentId);
+
+        List<String> usernames = mentionUtil.extractMentionUsernames(text);
+        if (usernames.isEmpty()) {
+            return;
         }
 
-        Pattern pattern = Pattern.compile("@([A-Za-z0-9_\\.]+)");
-        Matcher matcher = pattern.matcher(text);
-
-        List<String> usernames = new ArrayList<>();
-        while (matcher.find()) {
-            String username = matcher.group(1);
-            if (username != null && !username.isBlank()) {
-                usernames.add(username);
-            }
+        List<User> users = userRepository.findByUsernameIn(usernames);
+        if (users.isEmpty()) {
+            return;
         }
 
-        return usernames;
+        List<Mention> mentions = users.stream()
+                .map(u -> Mention.builder()
+                        .targetType(MentionTargetType.COMMENT)
+                        .targetId(commentId)
+                        .mentionedUserId(u.getId())
+                        .createdByUserId(createdByUserId)
+                        .build())
+                .toList();
+
+        mentionRepository.saveAll(mentions);
     }
 }

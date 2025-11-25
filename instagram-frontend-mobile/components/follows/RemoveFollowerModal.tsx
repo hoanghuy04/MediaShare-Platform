@@ -162,7 +162,7 @@ export const RemoveFollowerModal: React.FC<RemoveFollowerModalProps> = ({
                                                 { color: theme.colors.gray },
                                             ]}
                                         >
-                                            Social Trio sẽ không cho{' '}
+                                            Sudo sẽ không cho{' '}
                                             {follower?.username} biết rằng bạn
                                             đã xóa họ khỏi danh sách người theo
                                             dõi mình.

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Instagram Mobile",
-    "slug": "instagram-frontend-mobile",
+    "name": "Sudo Mobile",
+    "slug": "Sudo-frontend-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "instagram",
+    "scheme": "Sudo",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -14,14 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.instagram.mobile"
+      "bundleIdentifier": "com.Sudo.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.instagram.mobile",
+      "package": "com.Sudo.mobile",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -49,8 +49,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Instagram to access your photos.",
-          "savePhotosPermission": "Allow Instagram to save photos.",
+          "photosPermission": "Allow Sudo to access your photos.",
+          "savePhotosPermission": "Allow Sudo to save photos.",
           "isAccessMediaLocationEnabled": true
         }
       ],
@@ -60,15 +60,16 @@
           "icon": "./assets/icon.png",
           "color": "#ffffff"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "dev": {
-        "apiUrl": "http://192.168.100.2:8080",
-        "wsUrl": "http://192.168.100.2:8080"
+        "apiUrl": "http://172.29.29.223:8080",
+        "wsUrl": "http://172.29.29.223:8080"
       },
       "prod": {
         "apiUrl": "https://your-production-api.com",

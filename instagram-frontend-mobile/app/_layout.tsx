@@ -12,9 +12,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
         <ThemeProvider>
-          <AuthProvider>
-            <AppProvider>
-              <UploadProvider>
+          <UploadProvider>
+            <AuthProvider>
+              <AppProvider>
                 <PostCreationProvider>
                   <Stack screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="(auth)" />
@@ -26,11 +26,11 @@ export default function RootLayout() {
                     <Stack.Screen name="join/[token]" />
                   </Stack>
                 </PostCreationProvider>
-              </UploadProvider>
-            </AppProvider>
-          </AuthProvider>
+              </AppProvider>
+            </AuthProvider>
+          </UploadProvider>
         </ThemeProvider>
       </ErrorBoundary>
-    </GestureHandlerRootView>
+    </GestureHandlerRootView >
   );
 }

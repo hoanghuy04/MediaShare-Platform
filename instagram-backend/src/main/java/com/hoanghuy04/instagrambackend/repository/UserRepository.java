@@ -70,4 +70,9 @@ public interface UserRepository extends MongoRepository<User, String> {
     Page<User> searchUsers(String username, String firstName, String lastName, Pageable pageable);
 
     List<User> findByUsernameContainingIgnoreCase(String username);
+
+    @Query("{ 'usernameSearch': { $regex: ?0, $options: 'i' } }")
+    List<User> findByUsernameSearchRegex(String regex, Pageable pageable);
+
+    List<User> findByUsernameIn(List<String> usernames);
 }
