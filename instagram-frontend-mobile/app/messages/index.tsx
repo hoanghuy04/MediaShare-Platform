@@ -23,7 +23,7 @@ import { messageAPI } from '../../services/message.service';
 import { messageRequestAPI } from '../../services/message-request.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
-import { Conversation, Message, InboxItem, UserResponse } from '../../types';
+import { Conversation, Message, InboxItem, UserResponse, LastMessage } from '../../types';
 import {
   getConversationName,
   getConversationAvatar,
@@ -450,9 +450,13 @@ export default function MessagesScreen() {
                   />
                 )}
               </View>
-              {lastMessage?.timestamp && (
+              {(latestMessage || lastMessage) && (
                 <Text style={[styles.messageTime, { color: theme.colors.textSecondary }]}>
-                  {formatMessageTime(lastMessage.timestamp)}
+                  {formatMessageTime(
+                    latestMessage 
+                      ? ('createdAt' in latestMessage ? latestMessage.createdAt : (latestMessage as LastMessage).timestamp)
+                      : lastMessage?.timestamp || ''
+                  )}
                 </Text>
               )}
             </View>

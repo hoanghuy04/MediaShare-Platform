@@ -23,14 +23,17 @@
       },
       "package": "com.Sudo.mobile",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "READ_MEDIA_AUDIO",
-        "ACCESS_MEDIA_LOCATION",
-        "NOTIFICATIONS"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {
@@ -40,6 +43,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-av",
       [
         "expo-image-picker",
         {
@@ -60,20 +64,23 @@
           "icon": "./assets/icon.png",
           "color": "#ffffff"
         }
-      ],
-      "expo-audio"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "dev": {
-        "apiUrl": "http://172.29.29.223:8080",
-        "wsUrl": "http://172.29.29.223:8080"
+        "apiUrl": "https://mediashare-platform.onrender.com",
+        "wsUrl": "https://mediashare-platform.onrender.com"
       },
       "prod": {
-        "apiUrl": "https://your-production-api.com",
-        "wsUrl": "https://your-production-api.com"
+        "apiUrl": "https://mediashare-platform.onrender.com",
+        "wsUrl": "https://mediashare-platform.onrender.com"
+      },
+      "router": {},
+      "eas": {
+        "projectId": "6e0ce76f-9177-46da-a1cf-402394f657e0"
       }
     }
   }
