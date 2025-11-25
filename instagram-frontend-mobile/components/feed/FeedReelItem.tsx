@@ -10,10 +10,13 @@ import { Avatar } from '../common/Avatar';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { PostLikesModal } from './PostLikesModal';
 import { PostCommentsModal } from './PostCommentsModal';
+import { ShareModal } from './ShareModal';
 import { useAuth } from '../../context/AuthContext';
 
 import { MediaCategory } from '../../types/enum.type';
 import { postLikeService } from '../../services/post-like.service';
+import { followEventManager } from '../../utils/followEventManager';
+import { formatDate } from '../../utils/formatters';
 
 const { width } = Dimensions.get('window');
 const MEDIA_HEIGHT = width * (16 / 9);
@@ -26,6 +29,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
   const [isLiked, setIsLiked] = useState(post.likedByCurrentUser);
   const [totalLike, setTotalLike] = useState(post.totalLike);
@@ -139,14 +143,14 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
 
     try {
       const response = await postLikeService.toggleLikePost(post.id);
-      
+
       if (response?.liked !== undefined) {
         setIsLiked(response.liked);
         if (response.liked !== nextLiked) {
           setTotalLike(prev => response.liked ? prev + 1 : Math.max(0, prev - 1));
         }
       }
-      
+
       await onLike?.(post.id);
     } catch (error) {
       console.error('Failed to toggle like:', error);
@@ -165,17 +169,46 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
   const initiallyFollowing = authorData.followingByCurrentUser || false;
   const avatarUrl = authorData.profile?.avatar;
 
+  const [isFollowing, setIsFollowing] = useState(() => {
+    const cached = followEventManager.getStatus(post.author.id);
+    return cached !== undefined ? cached : (post.author.followingByCurrentUser || false);
+  });
+
+  useEffect(() => {
+    const cached = followEventManager.getStatus(post.author.id);
+    if (cached !== undefined) {
+      setIsFollowing(cached);
+    } else {
+      setIsFollowing(post.author.followingByCurrentUser || false);
+    }
+  }, [post.author.followingByCurrentUser, post.author.id]);
+
+  useEffect(() => {
+    const unsubscribe = followEventManager.subscribe((userId, status) => {
+      if (userId === post.author.id) {
+        setIsFollowing(status);
+      }
+    });
+    return unsubscribe;
+  }, [post.author.id]);
+
   const renderCaption = () => {
     const caption = post.caption || '';
     const words = caption.split(/\s+/);
     const isLongCaption = words.length > 30;
     const contentToRender = !isExpanded && isLongCaption ? words.slice(0, 30).join(' ') : caption;
 
-    const styledContent = contentToRender.split(' ').map((word, index) => {
-      const isHashtag = word.startsWith('#');
+    const styledContent = contentToRender.split(/((?:#|@)\w+)/g).map((part, index) => {
+      if (part.startsWith('#') || part.startsWith('@')) {
+        return (
+          <Text key={index} style={styles.hashtagText}>
+            {part}
+          </Text>
+        );
+      }
       return (
-        <Text key={index} style={isHashtag ? styles.hashtagText : styles.captionText}>
-          {word}{' '}
+        <Text key={index} style={styles.captionText}>
+          {part}
         </Text>
       );
     });
@@ -209,12 +242,14 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
           <View style={styles.textContainer}>
             <View style={styles.usernameRow}>
               <TouchableOpacity onPress={() => router.push({ pathname: '/users/[id]', params: { id: post.author.id } })}>
-                <Text style={styles.username}>
-                  {post.author.username}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.username, { marginRight: 10 }]}>
+                    {post.author.username}
+                  </Text>
+                </View>
               </TouchableOpacity>
 
-              {!initiallyFollowing && post.author.id !== user?.id && (
+              {!isFollowing && post.author.id !== user?.id && (
                 <>
 
                   <FollowButton
@@ -289,9 +324,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
                 color={isLiked ? '#ed4956' : '#000'}
               />
             </Animated.View>
-            {totalLike > 0 && (
-              <Text style={styles.actionCount}>{totalLike > 999 ? `${(totalLike / 1000).toFixed(1)}K` : totalLike}</Text>
-            )}
+            <Text style={styles.actionCount}>{totalLike > 999 ? `${(totalLike / 1000).toFixed(1)}K` : totalLike}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionIcon} onPress={() => setShowCommentsModal(true)}>
             <Ionicons
@@ -300,12 +333,11 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
               color="#000"
               style={{ transform: [{ scaleX: -1 }] }}
             />
-            {post.totalComment > 0 && (
-              <Text style={styles.actionCount}>{post.totalComment > 999 ? `${(post.totalComment / 1000).toFixed(1)}K` : post.totalComment}</Text>
-            )}
+            <Text style={styles.actionCount}>{post.totalComment > 999 ? `${(post.totalComment / 1000).toFixed(1)}K` : post.totalComment}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIcon}>
+          <TouchableOpacity style={styles.actionIcon} onPress={() => setShowShareModal(true)}>
             <Feather name="send" size={26} color="#000" />
+            <Text style={styles.actionCount}>0</Text>
           </TouchableOpacity>
         </View>
         <TouchableOpacity>
@@ -353,6 +385,12 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
         postAuthorId={post.author.id}
         onClose={() => setShowCommentsModal(false)}
       />
+
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        postId={post.id}
+      />
     </View>
   );
 };
@@ -393,12 +431,13 @@ const styles = StyleSheet.create({
 
   textContainer: {
     justifyContent: 'center',
+
   },
 
   usernameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
   },
   username: {
     color: '#fff',
@@ -407,6 +446,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+    marginRight: 20
   },
   dotSeparator: { color: '#fff', marginHorizontal: 5, fontSize: 12 },
   followText: {
@@ -486,7 +526,7 @@ const styles = StyleSheet.create({
   boldText: { fontWeight: '600' },
   captionContainer: { marginBottom: 4 },
   captionText: { fontSize: 14, color: '#000', lineHeight: 20 },
-  hashtagText: { fontSize: 14, color: '#00376b', lineHeight: 20 },
+  hashtagText: { fontSize: 14, color: '#4D5DF7', lineHeight: 20 },
   captionUsername: { fontWeight: '700', color: '#000' },
   moreText: { color: '#8e8e8e', fontWeight: '500' },
   dateText: { fontSize: 12, color: '#8e8e8e', marginTop: 2 },

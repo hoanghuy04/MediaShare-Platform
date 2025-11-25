@@ -113,19 +113,18 @@ export function ReelCameraView(props: CameraPageProps) {
         </View>
       </GestureDetector>
 
-      {isVisible && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <TopOverlay torch={torch} onToggleFlash={onToggleFlash} onClose={onClose} />
+      {/* Render overlay always but hide with opacity to prevent mount/unmount lag */}
+      <View style={[StyleSheet.absoluteFill, { opacity: isVisible ? 1 : 0 }]} pointerEvents={isVisible ? 'box-none' : 'none'}>
+        <TopOverlay torch={torch} onToggleFlash={onToggleFlash} onClose={onClose} />
 
-          <BottomOverlay
-            recordState={recordState}
-            gallery={gallery}
-            onRecordPress={onRecordPress}
-            onToggleCameraType={onToggleCameraType}
-            onGoToGallery={onGoToGallery}
-          />
-        </View>
-      )}
+        <BottomOverlay
+          recordState={recordState}
+          gallery={gallery}
+          onRecordPress={onRecordPress}
+          onToggleCameraType={onToggleCameraType}
+          onGoToGallery={onGoToGallery}
+        />
+      </View>
     </View>
   );
 }

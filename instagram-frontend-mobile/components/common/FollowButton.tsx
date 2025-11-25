@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     TouchableOpacity,
     Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { userService } from '../../services/user.service';
+import { followEventManager } from '../../utils/followEventManager';
 
 const BUTTON_VARIANTS = {
     primary: {
@@ -66,17 +67,32 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
     notFollowingText = 'Theo dõi',
 }) => {
     const { theme } = useTheme();
-    const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
+    const [isFollowing, setIsFollowing] = useState(() => {
+        const cached = followEventManager.getStatus(userId);
+        return cached !== undefined ? cached : initialIsFollowing;
+    });
     const [loading, setLoading] = useState(false);
 
     const variantConfig = BUTTON_VARIANTS[variant];
+
+    useEffect(() => {
+        const unsubscribe = followEventManager.subscribe((id, status) => {
+            if (id === userId) {
+                setIsFollowing(status);
+            }
+        });
+        return unsubscribe;
+    }, [userId]);
 
     const handleToggleFollow = async () => {
         if (loading) return;
 
         const previousState = isFollowing;
         const newState = !isFollowing;
+
+        // Optimistic update
         setIsFollowing(newState);
+        followEventManager.emit(userId, newState);
         setLoading(true);
 
         console.log('[FollowButton] Toggling follow for userId:', userId);
@@ -86,11 +102,15 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
             console.log('[FollowButton] Toggle follow response:', response);
 
             const finalState = response.followingByCurrentUser;
-            setIsFollowing(finalState);
+            if (finalState !== newState) {
+                setIsFollowing(finalState);
+                followEventManager.emit(userId, finalState);
+            }
             onFollowChange?.(finalState);
         } catch (error) {
             console.error('[FollowButton] Error toggling follow:', error);
             setIsFollowing(previousState);
+            followEventManager.emit(userId, previousState);
         } finally {
             setLoading(false);
         }

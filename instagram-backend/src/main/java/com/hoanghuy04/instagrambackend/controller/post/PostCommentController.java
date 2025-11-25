@@ -50,7 +50,7 @@ public class PostCommentController {
             @PathVariable String commentId,
             @PageableDefault(
                     sort = "createdAt",
-                    direction = Sort.Direction.DESC
+                    direction = Sort.Direction.ASC
             ) Pageable pageable
     ) {
         return ResponseEntity.ok(ApiResponse.success(postCommentService.getReplies(postId, commentId, pageable)));
