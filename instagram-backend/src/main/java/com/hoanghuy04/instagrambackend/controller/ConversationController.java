@@ -284,6 +284,40 @@ public class ConversationController {
         return ResponseEntity.ok(ApiResponse.success("Admin demoted to member successfully", null));
     }
 
+    @PatchMapping("/{conversationId}/nickname")
+    @Operation(summary = "Update a member's nickname in a conversation")
+    public ResponseEntity<ApiResponse<com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember>> updateNickname(
+            @PathVariable String conversationId,
+            @Valid @RequestBody com.hoanghuy04.instagrambackend.dto.request.conversation.UpdateNicknameRequest request) {
+        String requesterId = securityUtil.getCurrentUserId();
+        log.info("Update nickname request for conversation: {} by user: {}, target: {}", 
+                conversationId, requesterId, request.getTargetUserId());
+
+        com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember updatedMember = 
+                conversationService.updateNickname(conversationId, requesterId, request);
+
+        // Get updated conversation DTO for WebSocket event
+        ConversationResponse dto = conversationMessageService.getConversationAsDTO(conversationId, requesterId);
+        
+        // Broadcast WebSocket event to all participants
+        List<String> participantIds = dto.getParticipants().stream()
+                .map(p -> p.getUserId())
+                .collect(Collectors.toList());
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("targetUserId", request.getTargetUserId());
+        data.put("nickname", updatedMember.getNickname());
+        data.put("updatedBy", requesterId);
+        data.put("conversation", dto);
+        webSocketMessageService.pushConversationUpdate(
+                conversationId,
+                participantIds,
+                "NICKNAME_UPDATED",
+                data
+        );
+
+        return ResponseEntity.ok(ApiResponse.success("Nickname updated successfully", updatedMember));
+    }
+
     @PostMapping("/direct/messages")
     @Operation(summary = "Send a direct message to a user (auto-creates conversation)")
     public ResponseEntity<ApiResponse<MessageResponse>> sendDirectMessage(

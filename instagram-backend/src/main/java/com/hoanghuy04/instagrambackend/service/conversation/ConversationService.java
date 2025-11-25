@@ -4,6 +4,7 @@ import com.hoanghuy04.instagrambackend.dto.response.ConversationResponse;
 import com.hoanghuy04.instagrambackend.dto.response.MessageResponse;
 import com.hoanghuy04.instagrambackend.entity.Message;
 import com.hoanghuy04.instagrambackend.entity.Conversation;
+import com.hoanghuy04.instagrambackend.entity.conversation.ConversationMember;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -130,11 +131,21 @@ public interface ConversationService {
     );
 
     /**
+     * Update a member's nickname in a conversation.
+     *
+     * @param conversationId the conversation ID
+     * @param requesterId the user ID requesting the update
+     * @param request the update request containing targetUserId and nickname
+     * @return the updated ConversationMember
+     */
+    @Transactional
+    ConversationMember updateNickname(String conversationId, String requesterId, com.hoanghuy04.instagrambackend.dto.request.conversation.UpdateNicknameRequest request);
+
+    /**
      * Promote a member to admin role.
      *
      * @param conversationId the conversation ID
      * @param userId the user ID to promote
-     * @param promotedBy the admin who promotes
      */
     @Transactional
     void promoteMemberToAdmin(String conversationId, String userId);
@@ -144,7 +155,6 @@ public interface ConversationService {
      *
      * @param conversationId the conversation ID
      * @param userId the user ID to demote
-     * @param demotedBy the admin who demotes
      */
     @Transactional
     void demoteAdminToMember(String conversationId, String userId);
