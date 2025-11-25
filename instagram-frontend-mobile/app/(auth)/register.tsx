@@ -67,7 +67,7 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.logoContainer}>
-          <Text style={[styles.logo, { color: theme.colors.text }]}>Instagram</Text>
+          <Text style={[styles.logo, { color: theme.colors.text }]}>Sudo</Text>
           <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
             Sign up to see photos and videos from your friends.
           </Text>

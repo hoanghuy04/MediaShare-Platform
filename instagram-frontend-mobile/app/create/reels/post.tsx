@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,10 +18,13 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useUpload } from '@/context/UploadContext';
 import { useAuth } from '@/context/AuthContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LocationSearchScreen } from '@/components/create/reels/LocationSearchScreen';
+import { MentionDropdown } from '@/components/common/MentionDropdown';
+import { mentionService } from '@/services/mention.service';
+import { MentionUserResponse } from '@/types/mention.type';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PREVIEW_WIDTH = SCREEN_WIDTH * 0.4;
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * 1.78;
 
@@ -34,7 +38,6 @@ export default function ReelPostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user } = useAuth();
-
   const { startUpload } = useUpload();
 
   const rawUri = params.mediaUri as string;
@@ -45,8 +48,16 @@ export default function ReelPostScreen() {
   const [showLocationSearch, setShowLocationSearch] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
 
-  const isSubmittingRef = useRef(false);
+  const [mentionSuggestions, setMentionSuggestions] = useState<MentionUserResponse[]>([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSearchQuery, setMentionSearchQuery] = useState('');
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [isSearchingMentions, setIsSearchingMentions] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<any>({});
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
+  const insets = useSafeAreaInsets();
+  const isSubmittingRef = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
   const captionInputRef = useRef<TextInput | null>(null);
 
@@ -57,6 +68,115 @@ export default function ReelPostScreen() {
       player.muted = true;
     }
   });
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', e => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  // Recalculate position when keyboard changes or dropdown visibility changes
+  useEffect(() => {
+    if (showMentionDropdown) {
+      measureInputPosition();
+    }
+  }, [keyboardHeight, showMentionDropdown, mentionSuggestions]);
+
+  useEffect(() => {
+    console.log('[Post] Mention effect triggered - showMentionDropdown:', showMentionDropdown, 'query:', mentionSearchQuery);
+
+    const searchMentions = async () => {
+      console.log('[Post] Starting mention search with query:', mentionSearchQuery);
+      setIsSearchingMentions(true);
+      try {
+        const result = await mentionService.searchUsers(mentionSearchQuery, 0, 10);
+        console.log('[Post] Search result:', result);
+        setMentionSuggestions(result.content || []);
+        // Remeasure after results load as it might affect rendering
+        setTimeout(measureInputPosition, 100);
+      } catch (error) {
+        console.error('[Post] Error searching mentions:', error);
+        setMentionSuggestions([]);
+      } finally {
+        setIsSearchingMentions(false);
+      }
+    };
+
+    // Only search if dropdown is visible AND query has at least 1 character
+    if (showMentionDropdown && mentionSearchQuery.length > 0) {
+      const timeoutId = setTimeout(searchMentions, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setMentionSuggestions([]);
+      setIsSearchingMentions(false);
+    }
+  }, [mentionSearchQuery, showMentionDropdown]);
+
+  const handleCaptionChange = (text: string) => {
+    console.log('[Post] Caption changed:', text, 'cursorPos:', cursorPosition);
+    setCaption(text);
+
+    // Always use text.length as cursor position when typing (state lags behind)
+    const effectiveCursorPos = text.length;
+    const textBeforeCursor = text.substring(0, effectiveCursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    console.log('[Post] effectiveCursorPos:', effectiveCursorPos, 'textBeforeCursor:', textBeforeCursor, 'lastAtIndex:', lastAtIndex);
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      const hasSpaceOrNewline = /[\s\n]/.test(textAfterAt);
+
+      console.log('[Post] Found @ at index:', lastAtIndex, 'textAfterAt:', textAfterAt, 'hasSpaceOrNewline:', hasSpaceOrNewline);
+
+      // Only show dropdown if there's at least 1 character after @ AND no space/newline
+      if (!hasSpaceOrNewline && textAfterAt.length > 0) {
+        console.log('[Post] Opening dropdown with query:', textAfterAt);
+        setMentionSearchQuery(textAfterAt);
+        setShowMentionDropdown(true);
+        return;
+      }
+    }
+
+    console.log('[Post] Closing dropdown');
+    setShowMentionDropdown(false);
+    setMentionSearchQuery('');
+  };
+
+  const handleSelectionChange = (event: any) => {
+    setCursorPosition(event.nativeEvent.selection.end);
+  };
+
+  const handleSelectMention = (user: MentionUserResponse) => {
+    const textBeforeCursor = caption.substring(0, cursorPosition);
+    const textAfterCursor = caption.substring(cursorPosition);
+
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const before = caption.substring(0, lastAtIndex);
+      const newCaption = before + '@' + user.username + ' ' + textAfterCursor;
+
+      setCaption(newCaption);
+      setShowMentionDropdown(false);
+      setMentionSearchQuery('');
+
+      const newCursorPos = lastAtIndex + user.username.length + 2;
+      setCursorPosition(newCursorPos);
+
+      setTimeout(() => {
+        captionInputRef.current?.focus();
+      }, 100);
+    }
+  };
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -87,7 +207,6 @@ export default function ReelPostScreen() {
     }
 
     isSubmittingRef.current = true;
-
     router.replace('/(tabs)/feed');
 
     setTimeout(() => {
@@ -135,6 +254,38 @@ export default function ReelPostScreen() {
     return pieces.join(' · ');
   };
 
+  const measureInputPosition = () => {
+    captionInputRef.current?.measure((x, y, width, height, pageX, pageY) => {
+      const dropdownHeight = 250; // Max height
+      // Calculate space below the input
+      // Screen Height - (Input Y position + Input Height) - Keyboard Height
+      const spaceBelow = SCREEN_HEIGHT - (pageY + height) - keyboardHeight;
+
+      // Adjust pageY by insets.top because MentionDropdown is inside SafeAreaView
+      // SafeAreaView pushes content down by insets.top, so absolute 0 is at insets.top on screen
+      const relativePageY = pageY - insets.top;
+
+      let top = 0;
+
+      // Logic: If keyboard is hidden (height < 50) AND enough space below -> Show Below
+      // Otherwise -> Show Above
+      if (keyboardHeight < 50 && spaceBelow >= dropdownHeight) {
+        // Show BELOW input
+        setDropdownStyle({ top: relativePageY + height });
+      } else {
+        // Show ABOVE input - using bottom positioning relative to SafeAreaView
+        // This makes the dropdown grow upwards from the anchor point
+        setDropdownStyle({ bottom: SCREEN_HEIGHT - insets.bottom - relativePageY });
+      }
+
+      console.log('[Post] Measuring input:', { pageY, height, spaceBelow, keyboardHeight });
+    });
+  };
+
+  const handleCaptionInputLayout = () => {
+    measureInputPosition();
+  };
+
   if (!mediaUri) {
     return (
       <View style={styles.container}>
@@ -179,14 +330,15 @@ export default function ReelPostScreen() {
           </View>
         </View>
 
-        <View style={styles.captionSection}>
+        <View style={styles.captionSection} onLayout={handleCaptionInputLayout}>
           <TextInput
             ref={captionInputRef}
             style={styles.captionInput}
             placeholder="Viết phụ đề và thêm hashtag..."
             placeholderTextColor="#999"
             value={caption}
-            onChangeText={setCaption}
+            onChangeText={handleCaptionChange}
+            onSelectionChange={handleSelectionChange}
             multiline
             maxLength={2200}
           />
@@ -249,6 +401,16 @@ export default function ReelPostScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* Mention Dropdown - Positioned absolutely over content */}
+      <MentionDropdown
+        visible={showMentionDropdown}
+        suggestions={mentionSuggestions}
+        isSearching={isSearchingMentions}
+        searchQuery={mentionSearchQuery}
+        onSelectMention={handleSelectMention}
+        dropdownStyle={dropdownStyle}
+      />
 
       <View style={styles.bottomBar}>
         <View style={styles.bottomRow}>
@@ -363,6 +525,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
+    flex: 1,
   },
   rowMainText: {
     fontSize: 16,
@@ -405,6 +568,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
+  // Bottom bar
   bottomBar: {
     position: 'absolute',
     left: 0,

@@ -5,15 +5,17 @@ import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
-import com.hoanghuy04.instagrambackend.mapper.UserMapper;
 import com.hoanghuy04.instagrambackend.entity.*;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
+import com.hoanghuy04.instagrambackend.enums.MentionTargetType;
 import com.hoanghuy04.instagrambackend.enums.PostType;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
+import com.hoanghuy04.instagrambackend.mapper.UserMapper;
 import com.hoanghuy04.instagrambackend.repository.*;
 import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
+import com.hoanghuy04.instagrambackend.util.MentionUtil;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,9 +24,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,7 +34,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PostServiceImpl implements PostService {
 
-    private final UserService userService;
     private final UserMapper userMapper;
     private final PostRepository postRepository;
     private final FollowRepository followRepository;
@@ -40,7 +41,10 @@ public class PostServiceImpl implements PostService {
     private final LikeRepository likeRepository;
     private final CommentRepository commentRepository;
     private final MediaFileRepository mediaFileRepository;
+    private final UserRepository userRepository;
+    private final MentionRepository mentionRepository;
     private final SecurityUtil securityUtil;
+    private final MentionUtil mentionUtil;
 
     @Transactional
     @Override
@@ -61,16 +65,16 @@ public class PostServiceImpl implements PostService {
         post = postRepository.save(post);
         log.info("Post created successfully: {}", post.getId());
 
+        syncMentions(MentionTargetType.POST, post.getId(), request.getCaption(), author.getId());
+
         return convertToPostResponse(post);
     }
 
     @Transactional(readOnly = true)
     @Override
     public PostResponse getPost(String postId) {
-        log.debug("Getting post by ID: {}", postId);
-
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
         return convertToPostResponse(post);
     }
@@ -78,91 +82,46 @@ public class PostServiceImpl implements PostService {
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getAllPosts(Pageable pageable) {
-        log.debug("Getting all posts");
-
         Page<PostResponse> page = postRepository.findAll(pageable)
                 .map(this::convertToPostResponse);
-
         return PageResponse.of(page);
     }
 
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getUserPosts(String userId, Pageable pageable) {
-        log.debug("Getting posts for user: {}", userId);
+
         User currentUser = null;
         try {
             currentUser = securityUtil.getCurrentUser();
-        } catch (Exception e) {
-            log.debug("No authenticated user, likedByCurrentUser will be false for all posts");
-        }
+        } catch (Exception ignored) {}
 
         Page<Post> postPage = postRepository.findByAuthorId(userId, pageable);
 
-        return getPostResponsePageResponse(currentUser, postPage);
+        return buildPostResponsePage(currentUser, postPage);
     }
 
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getFeedPosts(Pageable pageable) {
-        String userId = securityUtil.getCurrentUserId();
-        log.debug("Getting feed posts for user: {}", userId);
-
         User currentUser = securityUtil.getCurrentUser();
         Page<Post> postPage = postRepository.findAll(pageable);
-
-        return getPostResponsePageResponse(currentUser, postPage);
-    }
-
-    private PageResponse<PostResponse> getPostResponsePageResponse(User currentUser, Page<Post> postPage) {
-        Set<String> likedPostIds;
-
-        if (currentUser != null && !postPage.isEmpty()) {
-            List<String> postIds = postPage
-                    .getContent()
-                    .stream()
-                    .map(Post::getId)
-                    .collect(Collectors.toList());
-
-            List<Like> likes = likeRepository.findByUserAndTargetTypeAndTargetIdIn(
-                    currentUser,
-                    LikeTargetType.POST,
-                    postIds
-            );
-
-            likedPostIds = likes.stream()
-                    .map(Like::getTargetId)
-                    .collect(Collectors.toSet());
-        } else {
-            likedPostIds = Collections.emptySet();
-        }
-
-        Page<PostResponse> dtoPage = postPage.map(post -> {
-            boolean liked = currentUser != null && likedPostIds.contains(post.getId());
-            PostResponse dto = convertToPostResponse(post);
-            dto.setLikedByCurrentUser(liked);
-            return dto;
-        });
-
-        return PageResponse.of(dtoPage);
+        return buildPostResponsePage(currentUser, postPage);
     }
 
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getPostsByType(PostType type, Pageable pageable) {
-        Page<Post> postPage = postRepository.findByType(type, pageable);
         User currentUser = securityUtil.getCurrentUser();
-        return getPostResponsePageResponse(currentUser, postPage);
+        Page<Post> postPage = postRepository.findByType(type, pageable);
+        return buildPostResponsePage(currentUser, postPage);
     }
 
     @Transactional(readOnly = true)
     @Override
     public PageResponse<PostResponse> getExplore(Pageable pageable) {
-        log.debug("Getting explore posts");
-
         Page<PostResponse> page = postRepository.findAll(pageable)
                 .map(this::convertToPostResponse);
-
         return PageResponse.of(page);
     }
 
@@ -170,10 +129,9 @@ public class PostServiceImpl implements PostService {
     @Override
     public PostResponse updatePost(String postId, CreatePostRequest request) {
         String userId = securityUtil.getCurrentUserId();
-        log.info("Updating post: {}", postId);
 
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
         if (!post.getAuthor().getId().equals(userId)) {
             throw new UnauthorizedException("You are not authorized to update this post");
@@ -186,7 +144,8 @@ public class PostServiceImpl implements PostService {
         post.setLocation(request.getLocation());
 
         post = postRepository.save(post);
-        log.info("Post updated successfully: {}", postId);
+
+        syncMentions(MentionTargetType.POST, postId, request.getCaption(), userId);
 
         return convertToPostResponse(post);
     }
@@ -198,52 +157,50 @@ public class PostServiceImpl implements PostService {
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
 
         User current = securityUtil.getCurrentUser();
-        boolean owner = post.getAuthor() != null
-                && post.getAuthor().getId().equals(current.getId());
 
-        if (!owner) {
-            throw new RuntimeException("You don't have permission to delete this post");
+        if (!post.getAuthor().getId().equals(current.getId())) {
+            throw new UnauthorizedException("You don't have permission to delete this post");
         }
 
         likeRepository.deleteByTargetTypeAndTargetId(LikeTargetType.POST, postId);
 
         List<Comment> allComments = commentRepository.findByPost_Id(postId);
+        if (!allComments.isEmpty()) {
+            List<String> commentIds = allComments.stream().map(Comment::getId).toList();
 
-        if (allComments != null && !allComments.isEmpty()) {
-            List<String> commentIds = allComments.stream()
-                    .map(Comment::getId)
-                    .collect(Collectors.toList());
+            likeRepository.deleteByTargetTypeAndTargetIdIn(LikeTargetType.COMMENT, commentIds);
 
-            likeRepository.deleteByTargetTypeAndTargetIdIn(
-                    LikeTargetType.COMMENT,
-                    commentIds
+            // delete mentions inside comments
+            commentIds.forEach(id ->
+                    mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, id)
             );
 
             commentRepository.deleteAll(allComments);
         }
 
-        List<String> mediaIds = post.getMediaFileIds();
+        // delete post mentions
+        mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.POST, postId);
 
-        if (mediaIds != null && !mediaIds.isEmpty()) {
-            List<MediaFile> medias = mediaFileRepository.findAllById(mediaIds);
-
-            medias.forEach(media -> fileService.deleteFile(media.getId()));
-        }
+        // delete media
+        List<MediaFile> medias = mediaFileRepository.findAllById(post.getMediaFileIds());
+        medias.forEach(media -> fileService.deleteFile(media.getId()));
 
         postRepository.delete(post);
     }
 
+    // ==============================
+    // GET POST ENTITY
+    // ==============================
     @Transactional(readOnly = true)
     @Override
     public Post getPostEntityById(String postId) {
         return postRepository.findById(postId)
-                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
     }
 
-    /**
-     * Convert Post -> PostResponse
-     * Và set luôn author.followingByCurrentUser dựa trên currentUser + Follow.
-     */
+    // ==============================
+    // CONVERT TO DTO
+    // ==============================
     private PostResponse convertToPostResponse(Post post) {
         User author = post.getAuthor();
         boolean following = false;
@@ -251,28 +208,24 @@ public class PostServiceImpl implements PostService {
         try {
             User current = securityUtil.getCurrentUser();
 
-            if (current != null && author != null && !current.getId().equals(author.getId())) {
-                // ĐÃ ĐỔI: dùng existsByFollowerIdAndFollowingId thay cho findByFollowerAndFollowing
+            if (current != null && !current.getId().equals(author.getId())) {
                 following = followRepository.existsByFollowerIdAndFollowingId(
                         current.getId(),
                         author.getId()
                 );
             }
-        } catch (Exception e) {
-            following = false;
-        }
+
+        } catch (Exception ignored) {}
 
         UserSummaryResponse authorSummary = userMapper.toUserSummary(author, following);
-
-        List<MediaFileResponse> mediaWithUrls =
-                fileService.getMediaFileResponses(post.getMediaFileIds());
+        List<MediaFileResponse> media = fileService.getMediaFileResponses(post.getMediaFileIds());
 
         return PostResponse.builder()
                 .id(post.getId())
                 .author(authorSummary)
                 .caption(post.getCaption())
                 .type(post.getType())
-                .media(mediaWithUrls)
+                .media(media)
                 .totalComment(post.getTotalComments())
                 .totalLike(post.getTotalLikes())
                 .tags(post.getTags())
@@ -280,5 +233,54 @@ public class PostServiceImpl implements PostService {
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();
+    }
+
+    private void syncMentions(
+            MentionTargetType targetType,
+            String targetId,
+            String caption,
+            String createdByUserId
+    ) {
+        // Remove old mentions
+        mentionRepository.deleteByTargetTypeAndTargetId(targetType, targetId);
+
+        List<String> usernames = mentionUtil.extractMentionUsernames(caption);
+        if (usernames.isEmpty()) {
+            return;
+        }
+
+        List<User> users = userRepository.findByUsernameIn(usernames);
+        if (users.isEmpty()) {
+            return;
+        }
+
+        List<Mention> mentions = users.stream()
+                .map(u -> Mention.builder()
+                        .targetType(targetType)
+                        .targetId(targetId)
+                        .createdByUserId(createdByUserId)
+                        .mentionedUserId(u.getId())
+                        .build())
+                .toList();
+
+        mentionRepository.saveAll(mentions);
+    }
+
+    private PageResponse<PostResponse> buildPostResponsePage(User currentUser, Page<Post> page) {
+        Set<String> likedPostIds = currentUser != null
+                ? likeRepository.findByUserAndTargetTypeAndTargetIdIn(
+                currentUser,
+                LikeTargetType.POST,
+                page.stream().map(Post::getId).toList()
+        ).stream().map(Like::getTargetId).collect(Collectors.toSet())
+                : Collections.emptySet();
+
+        Page<PostResponse> dtoPage = page.map(post -> {
+            PostResponse dto = convertToPostResponse(post);
+            dto.setLikedByCurrentUser(likedPostIds.contains(post.getId()));
+            return dto;
+        });
+
+        return PageResponse.of(dtoPage);
     }
 }
