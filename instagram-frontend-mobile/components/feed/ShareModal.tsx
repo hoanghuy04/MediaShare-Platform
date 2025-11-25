@@ -237,7 +237,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ visible, onClose, postId
                 style={styles.userCardInner}
             >
                 <View style={styles.userAvatarContainer}>
-                    <Avatar uri={item.profile?.avatar} name={item.username} size={64} />
+                    <Avatar uri={item.avatar} name={item.username} size={64} />
                     {selectedUsers.has(item.id) && (
                         <View style={styles.checkmarkContainer}>
                             <Ionicons name="checkmark-circle" size={24} color="#4D5DF7" />

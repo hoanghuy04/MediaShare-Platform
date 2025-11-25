@@ -167,7 +167,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
 
   const authorData = post.author as UserSummaryResponse;
   const initiallyFollowing = authorData.followingByCurrentUser || false;
-  const avatarUrl = authorData.profile?.avatar;
+  const avatarUrl = authorData?.avatar;
 
   const [isFollowing, setIsFollowing] = useState(() => {
     const cached = followEventManager.getStatus(post.author.id);

@@ -13,7 +13,8 @@ interface AvatarProps {
 export const Avatar: React.FC<AvatarProps> = ({ uri, name = '', size = 40, style }) => {
   const { theme } = useTheme();
   const initials = getInitials(name);
-  const backgroundColor = uri ? 'transparent' : getRandomColor(name || 'User');
+  const backgroundColor = uri ? 'transparent' : "#acb8beff";
+;
 
   return (
     <View

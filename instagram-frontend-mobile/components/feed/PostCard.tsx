@@ -349,7 +349,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       <Animated.View style={[styles.header, uiAnimatedStyle]}>
         <View style={styles.userInfo}>
           <TouchableOpacity onPress={handleUserPress} style={styles.userInfoLeft}>
-            <Avatar uri={post.author.profile?.avatar} name={post.author.username} size={32} />
+            <Avatar uri={post.author.avatar} name={post.author.username} size={32} />
             <Text style={[styles.username, { color: theme.colors.text }]}>
               {post.author.username}
             </Text>

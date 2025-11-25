@@ -1,7 +1,7 @@
 import apiClient from './apiClient'
 import type { ApiResponse, AuthResponse, LoginPayload } from '../../types'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 const delay = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -32,8 +32,8 @@ export const authApi = {
     if (USE_MOCK) {
       return mockLogin(payload)
     }
-    const { data } = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', payload)
-    return data.data
+    const { data } = await apiClient.post<AuthResponse>('/auth/login', payload)
+    return data
   },
 }
 

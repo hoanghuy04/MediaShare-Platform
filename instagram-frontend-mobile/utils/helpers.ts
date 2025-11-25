@@ -76,16 +76,17 @@ export const getInitials = (name: string): string => {
     return 'U';
   }
   const names = name.trim().split(' ');
-  if (names.length === 1) {
-    return names[0].substring(0, 1).toUpperCase();
-  }
-  return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+  // if (names.length === 1) {
+  //   return names[0].substring(0, 1).toUpperCase();
+  // }
+  // return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+  return names[0].substring(0, 1).toUpperCase();
 };
 
 export const getRandomColor = (seed?: string): string => {
   const colors = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788',
+    '#F7DC6F', '#BB8FCE', '#acb8beff', '#F8B739', '#52B788',
     '#E63946', '#A8DADC', '#457B9D', '#E76F51', '#2A9D8F'
   ];
   

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sudo Mobile",
     "slug": "Sudo-frontend-mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "Sudo",
@@ -72,12 +72,12 @@
     },
     "extra": {
       "dev": {
-        "apiUrl": "https://mediashare-platform.onrender.com",
-        "wsUrl": "https://mediashare-platform.onrender.com"
+        "apiUrl": "http://192.168.100.2:8080",
+        "wsUrl": "http://192.168.100.2:8080"
       },
       "prod": {
-        "apiUrl": "https://mediashare-platform.onrender.com",
-        "wsUrl": "https://mediashare-platform.onrender.com"
+        "apiUrl": "http://192.168.100.2:8080",
+        "wsUrl": "http://192.168.100.2:8080"
       },
       "router": {},
       "eas": {

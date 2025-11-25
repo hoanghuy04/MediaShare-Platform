@@ -34,7 +34,7 @@ export interface PostLikeToggleResponse {
 export interface PostLikeUserResponse {
   id: string;
   username: string;
-  avatarUrl: string;
+  avatar: string;
 }
 
 

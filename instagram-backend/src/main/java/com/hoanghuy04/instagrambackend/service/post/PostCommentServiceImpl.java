@@ -334,7 +334,7 @@ public class PostCommentServiceImpl implements PostCommentService {
         PostLikeUserResponse authorDto = new PostLikeUserResponse();
         authorDto.setId(author.getId());
         authorDto.setUsername(author.getUsername());
-        authorDto.setAvatarUrl(avatarUrl);
+        authorDto.setAvatar(avatarUrl);
 
         String parentId = comment.getParentComment() != null
                 ? comment.getParentComment().getId()

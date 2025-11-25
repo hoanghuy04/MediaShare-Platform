@@ -161,7 +161,7 @@ public class FileService {
             return null;
         }
 
-        if (fileId.startsWith("http://") || fileId.startsWith("https://")) {
+        if (fileId.startsWith("http://") || fileId.startsWith("https://") || fileId.isEmpty()) {
             // If it's already a URL, return as is
             return MediaFileResponse.builder()
                     .id(null)

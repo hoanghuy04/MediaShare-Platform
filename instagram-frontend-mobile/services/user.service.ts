@@ -1,7 +1,7 @@
 import axiosInstance from '../config/axiosInstance';
 import { API_ENDPOINTS } from '../config/routes';
 import { UserResponse, UpdateUserRequest, UserStatsResponse, FollowToggleResponse, FollowerUserResponse, SimpleUserResponse, UserSummaryResponse } from '../types/user';
-import { PaginatedResponse } from '../types';
+import { PaginatedResponse, PostLikeUserResponse } from '../types';
 
 export const userService = {
 
@@ -39,13 +39,15 @@ export const userService = {
   /**
    * Get user followers
    */
-  getUserFollowers: async (userId: string): Promise<PaginatedResponse<UserResponse>> => {
+  getUserFollowers: async (userId: string): Promise<PaginatedResponse<PostLikeUserResponse>> => {
     const response = await axiosInstance.get(`${API_ENDPOINTS.USERS}/${userId}/followers`);
     return response.data.data;
   },
 
-  getUserFollowing: async (userId: string): Promise<PaginatedResponse<UserResponse>> => {
+  getUserFollowing: async (userId: string): Promise<PaginatedResponse<PostLikeUserResponse>> => {
     const response = await axiosInstance.get(`${API_ENDPOINTS.USERS}/${userId}/following`);
+      console.log("_____________________________________Following Strip_____________________________________:", response.data.data?.content);
+    
     return response.data.data;
   },
 
@@ -120,7 +122,7 @@ export const userService = {
       id: user.id,
       username: user.username,
       email: user.email,
-      profile: user.profile,
+      avatar: user.profile?.avatar || '',
       isVerified: !!user.isVerified,
       followingByCurrentUser: user.followingByCurrentUser ?? false,
     });
@@ -132,33 +134,6 @@ export const userService = {
       return response.data.data;
     } catch (error) {
       console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
-
-      const [followersPage, followingPage] = await Promise.all([
-        userService.getUserFollowers(userId),
-        userService.getUserFollowing(userId),
-      ]);
-
-      const followers = followersPage.content || [];
-      const following = followingPage.content || [];
-
-      const followerIds = new Set(followers.map(u => u.id));
-      let mutuals = following.filter(u => followerIds.has(u.id));
-
-      if (query.trim()) {
-        const lowerQuery = query.toLowerCase();
-        mutuals = mutuals.filter(user => {
-          const username = user.username?.toLowerCase() || '';
-          const firstName = user.profile?.firstName?.toLowerCase() || '';
-          const lastName = user.profile?.lastName?.toLowerCase() || '';
-          return (
-            username.includes(lowerQuery) ||
-            firstName.includes(lowerQuery) ||
-            lastName.includes(lowerQuery)
-          );
-        });
-      }
-
-      return mutuals.map(mapToSummary);
     }
   },
 };
