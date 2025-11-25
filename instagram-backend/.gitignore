@@ -94,8 +94,6 @@ $RECYCLE.BIN/
 .Trash-*
 
 ### Application Specific ###
-# Upload directories
-uploads/
 temp/
 
 # Logs
