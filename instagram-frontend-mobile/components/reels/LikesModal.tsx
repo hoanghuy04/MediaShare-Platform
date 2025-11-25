@@ -26,6 +26,7 @@ import { PostLikeUserResponse } from '../../types/post.type';
 import { postLikeService } from '../../services/post-like.service';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../styles/colors';
+import { Avatar } from '../common/Avatar';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -194,10 +195,11 @@ const LikesModal = ({ visible, onClose, postId, totalLikes }: PostLikesModalProp
 
         return (
             <View style={styles.likeItem}>
-                <Image
-                    source={{ uri: item.avatarUrl || 'https://i.pravatar.cc/150?u=1' }}
+                {/* <Image
+                    source={{ uri: item.avatar || 'https://i.pravatar.cc/150?u=1' }}
                     style={styles.avatar}
-                />
+                /> */}
+                <Avatar uri={item.avatar} name={item.username}/>
                 <View style={styles.userInfo}>
                     <Text style={styles.username}>{item.username}</Text>
                     <Text style={styles.name}>{item.username}</Text>

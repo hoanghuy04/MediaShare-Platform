@@ -11,18 +11,28 @@ export interface Comment {
   createdAt: string
 }
 
+export interface PostOwner {
+  id: string
+  username: string
+  avatarUrl?: string
+}
+
+export interface PostMedia {
+  id?: string
+  url: string
+  category?: 'IMAGE' | 'VIDEO' | 'AUDIO'
+  contentType?: string
+}
+
 export interface Post {
   id: string
   caption: string
-  thumbnailUrl: string
-  mediaUrl: string
   type: PostType
   likeCount: number
   commentCount: number
   createdAt: string
-  ownerId: string
-  ownerUsername: string
-  ownerAvatar: string
+  owner: PostOwner
+  media: PostMedia[]
   visibility: PostVisibility
 }
 

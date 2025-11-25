@@ -6,7 +6,7 @@ export interface GroupMember {
   id: string
   username: string
   fullName: string
-  avatarUrl: string
+  avatarUrl?: string
   role: 'admin' | 'member'
 }
 
@@ -17,10 +17,10 @@ export interface GroupConversation {
   memberCount: number
   messageCount: number
   createdAt: string
-  updatedAt: string
+  lastActivityAt?: string
   status: GroupStatus
-  ownerId: string
-  ownerName: string
+  ownerId?: string
+  ownerName?: string
 }
 
 export interface GroupListFilters {

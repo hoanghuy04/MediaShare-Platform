@@ -108,7 +108,7 @@ public class PostLikeServiceImpl implements PostLikeService {
             PostLikeUserResponse dto = new PostLikeUserResponse();
             dto.setId(user.getId());
             dto.setUsername(user.getUsername());
-            dto.setAvatarUrl(avatarUrl);
+            dto.setAvatar(avatarUrl);
 
             return dto;
         });
@@ -127,7 +127,7 @@ public class PostLikeServiceImpl implements PostLikeService {
         PostLikeUserResponse dto = new PostLikeUserResponse();
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
-        dto.setAvatarUrl(avatarUrl);
+        dto.setAvatar(avatarUrl);
 
         return dto;
     }

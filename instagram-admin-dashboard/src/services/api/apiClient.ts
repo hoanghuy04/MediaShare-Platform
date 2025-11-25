@@ -5,7 +5,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 15000,
 })
 
 apiClient.interceptors.request.use((config) => {
@@ -15,6 +15,24 @@ apiClient.interceptors.request.use((config) => {
   }
   return config
 })
+
+apiClient.interceptors.response.use(
+  (response) => {
+    const payload = response.data
+    if (payload && typeof payload === 'object' && 'success' in payload && 'data' in payload) {
+      return { ...response, data: payload.data }
+    }
+    return response
+  },
+  (error) => {
+    const message =
+      error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      error?.message ||
+      'Có lỗi xảy ra khi gọi API'
+    return Promise.reject(new Error(message))
+  },
+)
 
 export default apiClient
 

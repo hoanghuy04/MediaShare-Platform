@@ -15,5 +15,5 @@ import lombok.*;
 public class PostLikeUserResponse {
     private String id;
     private String username;
-    private String avatarUrl;
+    private String avatar;
 }

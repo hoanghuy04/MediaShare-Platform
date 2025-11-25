@@ -21,6 +21,7 @@ import { userService } from '@/services/user.service';
 import { fileService } from '@/services/file.service';
 import { showAlert } from '@utils/helpers';
 import { UpdateUserRequest } from '@/types/user';
+import { getInitials } from '../../utils/helpers';
 
 export default function EditProfileScreen() {
   const { theme } = useTheme();
@@ -70,20 +71,20 @@ export default function EditProfileScreen() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const getAvatarBackgroundColor = (name: string) => {
-    const colors = [
-      '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-      '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788',
-      '#E63946', '#A8DADC', '#457B9D', '#E76F51', '#2A9D8F'
-    ];
-    const index = (name.charCodeAt(0) + name.length) % colors.length;
-    return colors[index];
-  };
+  // const getAvatarBackgroundColor = (name: string) => {
+    // const colors = [
+    //   '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+    //   '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788',
+    //   '#E63946', '#A8DADC', '#457B9D', '#E76F51', '#2A9D8F'
+    // ];
+  //   const index = (name.charCodeAt(0) + name.length) % colors.length;
+  //   return colors[index];
+  // };
 
-  const getInitials = () => {
-    const firstName = formData.firstName || user?.profile?.firstName || user?.username || 'U';
-    return firstName.charAt(0).toUpperCase();
-  };
+  // const getInitials = () => {
+  //   const firstName = formData.firstName || user?.profile?.firstName || user?.username || 'U';
+  //   return firstName.charAt(0).toUpperCase();
+  // };
 
   const handlePickAvatar = async () => {
     try {
@@ -175,9 +176,9 @@ export default function EditProfileScreen() {
             ) : (
               <View style={[
                 styles.avatar, 
-                { backgroundColor: getAvatarBackgroundColor(formData.firstName || user?.username || 'User') }
+                { backgroundColor: "#acb8beff" }
               ]}>
-                <Text style={styles.avatarInitial}>{getInitials()}</Text>
+                <Text style={styles.avatarInitial}>{getInitials(formData.firstName || user?.username || 'User')}</Text>
               </View>
             )}
             {uploadingAvatar && (

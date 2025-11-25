@@ -9,6 +9,7 @@ import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,7 @@ public class FollowServiceImpl implements FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
+    private final FileService fileService;
 
     @Transactional
     @Override
@@ -95,12 +97,12 @@ public class FollowServiceImpl implements FollowService {
             User follower = userRepository.findById(followerId)
                     .orElse(null);
 
-            String avatarUrl = null;
+            String avatar = null;
             String username = follow.getFollowerUsername();
 
             if (follower != null) {
                 if (follower.getProfile() != null) {
-                    avatarUrl = follower.getProfile().getAvatar();
+                    avatar = follower.getProfile().getAvatar();
                 }
                 username = follower.getUsername();
             }
@@ -108,7 +110,7 @@ public class FollowServiceImpl implements FollowService {
             PostLikeUserResponse dto = new PostLikeUserResponse();
             dto.setId(followerId);
             dto.setUsername(username);
-            dto.setAvatarUrl(avatarUrl);
+            dto.setAvatar(fileService.getMediaFileResponse(avatar).getUrl());
 
             return dto;
         });
@@ -143,7 +145,7 @@ public class FollowServiceImpl implements FollowService {
             PostLikeUserResponse dto = new PostLikeUserResponse();
             dto.setId(followingId);
             dto.setUsername(username);
-            dto.setAvatarUrl(avatarUrl);
+            dto.setAvatar(fileService.getMediaFileResponse(avatarUrl).getUrl());
 
             return dto;
         });
@@ -248,7 +250,7 @@ public class FollowServiceImpl implements FollowService {
             return PostLikeUserResponse.builder()
                     .id(followingId)
                     .username(followingUsername)
-                    .avatarUrl(avatarUrl)
+                    .avatar(avatarUrl)
                     .build();
         });
 

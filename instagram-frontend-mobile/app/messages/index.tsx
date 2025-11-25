@@ -23,7 +23,7 @@ import { messageAPI } from '../../services/message.service';
 import { messageRequestAPI } from '../../services/message-request.service';
 import { showAlert } from '../../utils/helpers';
 import { Avatar } from '../../components/common/Avatar';
-import { Conversation, Message, InboxItem, UserResponse, LastMessage } from '../../types';
+import { Conversation, Message, InboxItem, UserResponse, LastMessage, PostLikeUserResponse } from '../../types';
 import {
   getConversationName,
   getConversationAvatar,
@@ -42,7 +42,7 @@ export default function MessagesScreen() {
   }>({});
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: boolean }>({});
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  const [followingStrip, setFollowingStrip] = useState<UserResponse[]>([]);
+  const [followingStrip, setFollowingStrip] = useState<PostLikeUserResponse[]>([]);
   const [isLoadingFollowing, setIsLoadingFollowing] = useState(false);
   const typingTimeouts = useRef<{ [conversationId: string]: number }>({});
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -342,7 +342,7 @@ export default function MessagesScreen() {
               activeOpacity={0.75}
             >
               <Avatar
-                uri={item.profile?.avatar}
+                uri={item.avatar}
                 name={item.username}
                 size={70}
                 style={styles.followingAvatar}

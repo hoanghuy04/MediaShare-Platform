@@ -36,7 +36,7 @@ export interface UserSummaryResponse {
   id: string;
   username: string;
   email?: string;
-  profile?: UserProfile;
+  avatar?: string;
   isVerified: boolean;
   followingByCurrentUser: boolean;
 }
