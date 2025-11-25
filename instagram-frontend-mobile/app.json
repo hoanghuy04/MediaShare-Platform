@@ -32,8 +32,8 @@
         "android.permission.ACCESS_MEDIA_LOCATION",
         "android.permission.NOTIFICATIONS",
         "android.permission.RECORD_AUDIO",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
       ]
     },
     "web": {
@@ -43,6 +43,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-av",
       [
         "expo-image-picker",
         {
@@ -71,16 +72,16 @@
     },
     "extra": {
       "dev": {
-        "apiUrl": "http://172.20.34.176:8080",
-        "wsUrl": "http://172.20.34.176:8080"
+        "apiUrl": "https://mediashare-platform.onrender.com",
+        "wsUrl": "https://mediashare-platform.onrender.com"
       },
       "prod": {
-        "apiUrl": "https://your-production-api.com",
-        "wsUrl": "https://your-production-api.com"
+        "apiUrl": "https://mediashare-platform.onrender.com",
+        "wsUrl": "https://mediashare-platform.onrender.com"
       },
       "router": {},
       "eas": {
-        "projectId": "5b327a23-8bfb-4b31-80c2-4a9496b0896e"
+        "projectId": "6e0ce76f-9177-46da-a1cf-402394f657e0"
       }
     }
   }

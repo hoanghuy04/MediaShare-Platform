@@ -1131,6 +1131,7 @@ export default function ConversationScreen() {
           styles.container,
           { backgroundColor: theme.colors.background },
         ]}
+        edges={['top']}
       >
         <ConversationHeader
           headerBg={hexToRgba(chatPalette.headerBg, 0.92)}
@@ -1172,10 +1173,12 @@ export default function ConversationScreen() {
         styles.container,
         { backgroundColor: theme.colors.background },
       ]}
+      edges={['top']}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ConversationHeader
           headerBg={hexToRgba(chatPalette.headerBg, 0.92)}

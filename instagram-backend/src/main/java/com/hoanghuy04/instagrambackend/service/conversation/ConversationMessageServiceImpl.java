@@ -197,6 +197,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
                 .receiver(receiver)
                 .type(type)
                 .content(content)
+                .createdAt(LocalDateTime.now())
                 .build();
 
         message = messageRepository.save(message);

@@ -352,8 +352,9 @@ public class ConversationServiceImpl implements ConversationService {
                 .type(message.getType())
                 .content(previewText)
                 .senderId(message.getSender().getId())
-                .timestamp(message.getCreatedAt())
+                .timestamp(LocalDateTime.now())
                 .build();
+
         conversation.setLastMessage(lastMessage);
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
