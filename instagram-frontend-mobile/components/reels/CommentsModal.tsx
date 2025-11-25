@@ -9,6 +9,7 @@ import {
   Dimensions,
   Platform,
   Keyboard,
+  KeyboardAvoidingView,
   TouchableOpacity,
   Pressable,
   Animated as RNAnimated,
@@ -50,6 +51,8 @@ import {
 } from './comments';
 import { CommentItemWrapper } from './comments/CommentItemWrapper';
 import { Toast } from './comments/Toast';
+import { MentionUserResponse } from '../../types/mention.type';
+import MentionSuggestions from '../common/MentionSuggestions';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -107,6 +110,11 @@ const CommentsModal = ({
     width: number;
     height: number;
   } | null>(null);
+
+  // Mention state
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [currentMentionQuery, setCurrentMentionQuery] = useState('');
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   const flatListRef = useRef<FlatList<CommentWithReplies>>(null);
   const inputRef = useRef<TextInput>(null);
@@ -272,6 +280,8 @@ const CommentsModal = ({
       Keyboard.dismiss();
       // Reset translateY to SNAP_CLOSE when modal closes
       translateY.value = SNAP_CLOSE;
+      setShowMentionSuggestions(false);
+      setCurrentMentionQuery('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, postId]);
@@ -432,6 +442,54 @@ const CommentsModal = ({
         setComments(prev => prev.map(c => (c.id === comment.id ? { ...c, ...comment } : c)));
       }
     }
+  };
+
+  // ------- MENTION LOGIC -------
+  const handleSelectionChange = (event: any) => {
+    const { selection } = event.nativeEvent;
+    setCursorPosition(selection.start);
+  };
+
+  useEffect(() => {
+    const textBeforeCursor = commentText.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      const hasSpace = textAfterAt.includes(' ') || textAfterAt.includes('\n');
+
+      // Only show suggestions if there is at least one character after @
+      if (!hasSpace && textAfterAt.length > 0) {
+        setCurrentMentionQuery(textAfterAt);
+        setShowMentionSuggestions(true);
+      } else {
+        setShowMentionSuggestions(false);
+      }
+    } else {
+      setShowMentionSuggestions(false);
+    }
+  }, [commentText, cursorPosition]);
+
+  const handleMentionSelect = (user: MentionUserResponse) => {
+    const textBeforeCursor = commentText.substring(0, cursorPosition);
+    const textAfterCursor = commentText.substring(cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const beforeAt = commentText.substring(0, lastAtIndex);
+      const newCommentText = `${beforeAt}@${user.username} ${textAfterCursor}`;
+      setCommentText(newCommentText);
+
+      // Move cursor after inserted mention
+      const newCursorPos = lastAtIndex + user.username.length + 2; // +2 for @ and space
+      setCursorPosition(newCursorPos);
+
+      // We can't easily set cursor position on controlled TextInput from here without a ref method
+      // But updating state usually works if the input handles it, or we just let the user type
+    }
+
+    setShowMentionSuggestions(false);
+    setCurrentMentionQuery('');
   };
 
   // ------- SEND COMMENT -------
@@ -882,17 +940,36 @@ const CommentsModal = ({
             </View>
           </GestureDetector>
 
-          <CommentInput
-            commentText={commentText}
-            onChangeText={setCommentText}
-            onSend={handleSendComment}
-            onFocus={handleInputFocus}
-            inputRef={inputRef}
-            userAvatar={currentUser?.avatar}
-            replyingTo={replyingTo}
-            onCancelReply={handleCancelReply}
-            submitting={submitting}
-          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            style={styles.footerWrapper}
+          >
+            <View style={styles.footerContainer}>
+              {/* Mention Suggestions Overlay */}
+              {showMentionSuggestions && (
+                <MentionSuggestions
+                  query={currentMentionQuery}
+                  onSelect={handleMentionSelect}
+                  onClose={() => setShowMentionSuggestions(false)}
+                  style={styles.mentionSuggestions}
+                />
+              )}
+
+              <CommentInput
+                commentText={commentText}
+                onChangeText={setCommentText}
+                onSend={handleSendComment}
+                onFocus={handleInputFocus}
+                inputRef={inputRef}
+                userAvatar={currentUser?.avatar}
+                replyingTo={replyingTo}
+                onCancelReply={handleCancelReply}
+                submitting={submitting}
+                onSelectionChange={handleSelectionChange}
+              />
+            </View>
+          </KeyboardAvoidingView>
         </Animated.View>
 
         <CommentActionMenu
@@ -922,8 +999,6 @@ const CommentsModal = ({
             duration={toastConfig.duration}
           />
         )}
-
-        {/* Loading Overlay for Pinning */}
 
         {/* Unpin Confirmation Modal */}
         <UnpinCommentModal
@@ -984,83 +1059,28 @@ const styles = StyleSheet.create({
   commentBlock: {
     marginBottom: 12,
   },
-  commentPostingWrapper: {
-    backgroundColor: '#F5F8FF',
-    padding: 8,
-    borderRadius: 8,
-    marginHorizontal: -8,
+  footerWrapper: {
+    width: '100%',
+    zIndex: 1000,
   },
-  commentItem: {
-    flexDirection: 'row',
+  footerContainer: {
+    position: 'relative',
+    width: '100%',
   },
-  replyContainer: {
-    marginLeft: 48,
-  },
-  avatar: {
-    backgroundColor: '#f0f0f0',
-    marginRight: 12,
-  },
-  commentContent: {
-    flex: 1,
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  username: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#000',
-    marginRight: 8,
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  commentText: {
-    fontSize: 14,
-    color: '#000',
-    lineHeight: 20,
-  },
-  mentionText: {
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  postingText: {
-    fontSize: 12,
-    marginTop: 4,
-    color: '#70747D',
-    fontStyle: 'italic',
-    fontWeight: '600',
-  },
-  commentActions: {
-    flexDirection: 'row',
-    marginTop: 4,
-    gap: 16,
-  },
-  actionText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  viewRepliesText: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '500',
-  },
-  viewRepliesButton: {
-    marginTop: 8,
-    marginLeft: 0,
-  },
-  likeButton: {
-    alignItems: 'center',
-    paddingLeft: 8,
-    paddingTop: 4,
-  },
-  likeCount: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 2,
+  mentionSuggestions: {
+    position: 'absolute',
+    bottom: '100%', // Position above the input
+    left: 0,
+    right: 0,
+    maxHeight: SCREEN_HEIGHT * 0.5,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    elevation: 10,
+    zIndex: 2000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
 });

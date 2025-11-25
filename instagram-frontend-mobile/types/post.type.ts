@@ -1,6 +1,7 @@
 import { PostType } from './enum.type';
 import { MediaFileResponse } from './media.type';
 import { UserSummaryResponse } from './user';
+import { HashtagResponse } from './hashtag.type';
 
 export interface CreatePostRequest {
   caption?: string;
@@ -18,7 +19,7 @@ export interface PostResponse {
   media: MediaFileResponse[];
   totalLike: number;
   totalComment: number;
-  tags: string[];
+  tags: HashtagResponse[];
   location: string | null;
   likedByCurrentUser: boolean;
   createdAt: string;

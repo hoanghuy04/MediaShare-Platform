@@ -28,6 +28,7 @@ import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
 import { useAuth } from '@/context/AuthContext';
+import { followEventManager } from '../../utils/followEventManager';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
@@ -188,7 +189,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         prevTotal,
         nextTotal,
       });
-      
+
       if (response?.liked !== undefined) {
         setIsLiked(response.liked);
         if (response.liked !== nextLiked) {
@@ -212,6 +213,24 @@ export const PostCard: React.FC<PostCardProps> = ({
   const uiAnimatedStyle = useAnimatedStyle(() => ({
     opacity: uiOpacity.value,
   }));
+
+  const renderCaption = (caption: string) => {
+    const parts = caption.split(/((?:#|@)\w+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('#') || part.startsWith('@')) {
+        return (
+          <Text key={index} style={styles.hashtagText}>
+            {part}
+          </Text>
+        );
+      }
+      return (
+        <Text key={index} style={styles.captionText}>
+          {part}
+        </Text>
+      );
+    });
+  };
 
   const handleVideoPress = async () => {
     if (isVideoPlaying) {
@@ -300,8 +319,28 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
-  const authorData = post.author as UserSummaryResponse;
-  const initiallyFollowing = authorData.followingByCurrentUser || false;
+  const [isFollowing, setIsFollowing] = useState(() => {
+    const cached = followEventManager.getStatus(post.author.id);
+    return cached !== undefined ? cached : (post.author.followingByCurrentUser || false);
+  });
+
+  useEffect(() => {
+    const cached = followEventManager.getStatus(post.author.id);
+    if (cached !== undefined) {
+      setIsFollowing(cached);
+    } else {
+      setIsFollowing(post.author.followingByCurrentUser || false);
+    }
+  }, [post.author.followingByCurrentUser, post.author.id]);
+
+  useEffect(() => {
+    const unsubscribe = followEventManager.subscribe((userId, status) => {
+      if (userId === post.author.id) {
+        setIsFollowing(status);
+      }
+    });
+    return unsubscribe;
+  }, [post.author.id]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -314,9 +353,9 @@ export const PostCard: React.FC<PostCardProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {!initiallyFollowing && post.author.id !== user?.id && (
+          {!isFollowing && post.author.id !== user?.id && (
             <FollowButton
-              userId={authorData.id}
+              userId={post.author.id}
               initialIsFollowing={false}
               variant="grey"
               size="small"
@@ -458,24 +497,24 @@ export const PostCard: React.FC<PostCardProps> = ({
       {/* Likes Info */}
       {totalLike > 0 && (
         <Animated.View style={uiAnimatedStyle}>
-        <TouchableOpacity 
-          style={styles.likesInfo}
-          onPress={() => setShowLikesModal(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.likesText, { color: theme.colors.text }]}>
-            {firstLiker ? (
-              <>
-                <Text style={styles.boldText}>{firstLiker.username}</Text>
-                {totalLike > 1 && (
-                  <Text> và {formatNumber(totalLike - 1)} người khác đã thích</Text>
-                )}
-              </>
-            ) : (
-              <Text style={styles.boldText}>{formatNumber(totalLike)} lượt thích</Text>
-            )}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.likesInfo}
+            onPress={() => setShowLikesModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.likesText, { color: theme.colors.text }]}>
+              {firstLiker ? (
+                <>
+                  <Text style={styles.boldText}>{firstLiker.username}</Text>
+                  {totalLike > 1 && (
+                    <Text> và {formatNumber(totalLike - 1)} người khác đã thích</Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.boldText}>{formatNumber(totalLike)} lượt thích</Text>
+              )}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -484,7 +523,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         <Animated.View style={[styles.captionContainer, uiAnimatedStyle]}>
           <Text style={{ color: theme.colors.text }} numberOfLines={2}>
             <Text style={styles.usernameText}>{post.author.username} </Text>
-            <Text style={styles.captionText}>{post.caption}</Text>
+            {renderCaption(post.caption)}
           </Text>
         </Animated.View>
       )}
@@ -641,6 +680,11 @@ const styles = StyleSheet.create({
   captionText: {
     fontSize: 14,
     lineHeight: 18,
+  },
+  hashtagText: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#4D5DF7',
   },
   seeMore: {
     fontSize: 14,

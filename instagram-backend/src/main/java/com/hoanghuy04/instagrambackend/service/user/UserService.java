@@ -98,4 +98,6 @@ public interface UserService {
      */
     @Transactional(readOnly = true)
     List<UserResponse> getMutualFollows(String userId, String query, int page, int size);
+
+    String normalizeUsername(String username);
 }

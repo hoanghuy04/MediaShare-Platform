@@ -66,7 +66,6 @@ export default function UserReelsScreen() {
 
   useEffect(() => {
     if (userId && !hasInitialized.current) {
-      console.log('[UserReels] Initial mount: Loading reels for userId:', userId);
       hasInitialized.current = true;
       fetchReels(0);
     }

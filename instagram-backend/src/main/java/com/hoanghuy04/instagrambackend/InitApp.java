@@ -6,6 +6,7 @@ import com.hoanghuy04.instagrambackend.enums.MediaUsage;
 import com.hoanghuy04.instagrambackend.enums.NotificationType;
 import com.hoanghuy04.instagrambackend.enums.UserRole;
 import com.hoanghuy04.instagrambackend.repository.*;
+import com.hoanghuy04.instagrambackend.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -34,8 +35,10 @@ public class InitApp implements CommandLineRunner {
     private final FollowRepository followRepository;
     private final NotificationRepository notificationRepository;
     private final MediaFileRepository mediaFileRepository;
+    private final HashtagRepository hashtagRepository;
     private final PasswordEncoder passwordEncoder;
-    
+    private final UserService userService;
+
     @Override
     public void run(String... args) throws Exception {
         log.info("Starting application initialization...");
@@ -52,6 +55,7 @@ public class InitApp implements CommandLineRunner {
             
             initializeUsers();
             initializeMediaFiles();
+            initializeHashtags();
             initializePosts();
             initializeComments();
             initializeFollows();
@@ -75,6 +79,7 @@ public class InitApp implements CommandLineRunner {
         followRepository.deleteAll();
         postRepository.deleteAll();
         mediaFileRepository.deleteAll();
+        hashtagRepository.deleteAll();
         userRepository.deleteAll();
         
         log.info("Existing data cleared");
@@ -123,8 +128,8 @@ public class InitApp implements CommandLineRunner {
         List<User> users = new ArrayList<>();
         
         String[][] userData = {
-            {"john_doe", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
-            {"jane_smith", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
+            {"tnh", "john@example.com", "John", "Doe", "Photography enthusiast 📸", "J", "New York, NY"},
+            {"tnhxinhdep", "jane@example.com", "Jane", "Smith", "Travel blogger ✈️", "", "Los Angeles, CA"},
             {"mike_wilson", "mike@example.com", "Mike", "Wilson", "Fitness coach 💪", "", "Miami, FL"},
             {"sarah_jones", "sarah@example.com", "Sarah", "Jones", "Food lover 🍕", "", "Chicago, IL"},
             {"alex_brown", "alex@example.com", "Alex", "Brown", "Tech enthusiast 💻", "", "Seattle, WA"},
@@ -146,13 +151,14 @@ public class InitApp implements CommandLineRunner {
             User user = User.builder()
                     .username(data[0])
                     .email(data[1])
-                    .password(passwordEncoder.encode("password123"))
+                    .password(passwordEncoder.encode("123"))
                     .profile(profile)
                     .roles(Set.of(UserRole.USER))
                     .isPrivate(Math.random() < 0.3) // 30% chance of private account
                     .isVerified(Math.random() < 0.2) // 20% chance of verified account
                     .isActive(true)
                     .createdAt(LocalDateTime.now().minusDays((long) (Math.random() * 365)))
+                    .usernameSearch(userService.normalizeUsername(data[0]))
                     .build();
             
             users.add(user);
@@ -194,6 +200,43 @@ public class InitApp implements CommandLineRunner {
         
         mediaFileRepository.save(aiAssistantMedia);
         log.info("Created AI assistant media file for user: {}", targetUser.getUsername());
+    }
+    
+    /**
+     * Initialize sample hashtags
+     */
+    private void initializeHashtags() {
+        log.info("Initializing hashtags...");
+        
+        List<Hashtag> hashtags = Arrays.asList(
+            Hashtag.builder().tag("love").usageCount(500).build(),
+            Hashtag.builder().tag("instagood").usageCount(450).build(),
+            Hashtag.builder().tag("photooftheday").usageCount(420).build(),
+            Hashtag.builder().tag("fashion").usageCount(410).build(),
+            Hashtag.builder().tag("beautiful").usageCount(400).build(),
+            Hashtag.builder().tag("travel").usageCount(380).build(),
+            Hashtag.builder().tag("photography").usageCount(350).build(),
+            Hashtag.builder().tag("nature").usageCount(330).build(),
+            Hashtag.builder().tag("food").usageCount(320).build(),
+            Hashtag.builder().tag("art").usageCount(310).build(),
+            Hashtag.builder().tag("happy").usageCount(290).build(),
+            Hashtag.builder().tag("style").usageCount(280).build(),
+            Hashtag.builder().tag("summer").usageCount(270).build(),
+            Hashtag.builder().tag("beach").usageCount(260).build(),
+            Hashtag.builder().tag("sunset").usageCount(250).build(),
+            Hashtag.builder().tag("fitness").usageCount(240).build(),
+            Hashtag.builder().tag("lifestyle").usageCount(230).build(),
+            Hashtag.builder().tag("motivation").usageCount(220).build(),
+            Hashtag.builder().tag("selfie").usageCount(210).build(),
+            Hashtag.builder().tag("model").usageCount(200).build(),
+            Hashtag.builder().tag("hello").usageCount(180).build(),
+            Hashtag.builder().tag("haha").usageCount(150).build(),
+            Hashtag.builder().tag("handmade").usageCount(100).build(),
+            Hashtag.builder().tag("haircut").usageCount(90).build()
+        );
+        
+        hashtagRepository.saveAll(hashtags);
+        log.info("Created {} sample hashtags", hashtags.size());
     }
     
     /**

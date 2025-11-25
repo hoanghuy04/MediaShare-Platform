@@ -8,8 +8,7 @@ import {
     Animated as RNAnimated,
 } from 'react-native';
 import { AntDesign, Ionicons } from '@expo/vector-icons';
-import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { formatDate } from '../../../utils/formatters';
 import { colors } from '../../../styles/colors';
 
 type CommentAuthor = {
@@ -134,10 +133,7 @@ export const CommentRow = ({
                             {!comment.isPosting && (
                                 <>
                                     <Text style={styles.timeText}>
-                                        {formatDistanceToNow(new Date(comment.createdAt), {
-                                            addSuffix: true,
-                                            locale: vi,
-                                        })}
+                                        {formatDate(comment.createdAt)}
                                     </Text>
                                     {comment.authorCommentedPost && (
                                         <Text style={styles.authorLabel}> · Tác giả</Text>

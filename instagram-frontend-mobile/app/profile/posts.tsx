@@ -45,11 +45,7 @@ export default function UserPostsScreen() {
 
   useEffect(() => {
     if (userId && !hasInitialized.current) {
-      console.log('[Posts] Initial mount: Loading posts for userId:', userId);
-      console.log('[Posts] Current authenticated user:', user?.id, user?.username);
       hasInitialized.current = true;
-      console.log("HEHEAWHEAAHEHEHAHEHEHEH")
-      console.log(posts);
       refresh();
       
     }
@@ -58,8 +54,6 @@ export default function UserPostsScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (hasInitialized.current) {
-        console.log('[Posts] useFocusEffect: Refreshing posts for userId:', userId);
-        console.log('[Posts] Current authenticated user:', user?.id, user?.username);
         refresh();
       }
     }, [refresh, userId])

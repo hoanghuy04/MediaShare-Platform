@@ -46,7 +46,7 @@ export default function MediaViewerScreen() {
   // Format timestamp for display
   const formattedTime = React.useMemo(() => {
     if (!createdAt) return '';
-    
+
     try {
       const date = new Date(createdAt);
       const now = new Date();
@@ -118,7 +118,7 @@ export default function MediaViewerScreen() {
 
       // Request media library permissions
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      
+
       if (status !== 'granted') {
         showAlert(
           'Quyền truy cập',
@@ -130,7 +130,7 @@ export default function MediaViewerScreen() {
       // Determine file extension based on type
       const fileExtension = type === MessageType.VIDEO ? 'mp4' : 'jpg';
       const fileName = `instagram_media_${Date.now()}.${fileExtension}`;
-      
+
       // Download file to cache directory
       const downloadedFile = await File.downloadFileAsync(
         url,
@@ -140,14 +140,14 @@ export default function MediaViewerScreen() {
 
       // Save to media library
       const asset = await MediaLibrary.createAssetAsync(downloadedFile.uri);
-      
+
       // Try to add to album
       try {
-        const album = await MediaLibrary.getAlbumAsync('Instagram');
+        const album = await MediaLibrary.getAlbumAsync('Sudo');
         if (album) {
           await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
         } else {
-          await MediaLibrary.createAlbumAsync('Instagram', asset, false);
+          await MediaLibrary.createAlbumAsync('Sudo', asset, false);
         }
       } catch (albumError) {
         console.log('Album operation failed, file saved to gallery:', albumError);
@@ -162,7 +162,7 @@ export default function MediaViewerScreen() {
 
       showAlert(
         'Thành công',
-        type === MessageType.VIDEO 
+        type === MessageType.VIDEO
           ? 'Video đã được lưu vào thư viện'
           : 'Ảnh đã được lưu vào thư viện'
       );

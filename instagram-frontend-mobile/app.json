@@ -14,14 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.instagram.mobile"
+      "bundleIdentifier": "com.Sudo.mobile"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.instagram.mobile",
+      "package": "com.Sudo.mobile",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -82,7 +82,6 @@
       "eas": {
         "projectId": "6e0ce76f-9177-46da-a1cf-402394f657e0"
       }
-    },
-    "owner": "hgjyhm"
+    }
   }
 }

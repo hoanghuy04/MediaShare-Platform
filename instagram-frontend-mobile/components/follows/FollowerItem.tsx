@@ -7,6 +7,7 @@ import { Avatar } from '../common/Avatar';
 import { Theme } from '../../styles/theme';
 import { FollowButton } from '../common/FollowButton';
 import { MessageButton } from '../common/MessageButton';
+import { followEventManager } from '../../utils/followEventManager';
 
 interface FollowerItemProps {
   item: FollowerUserResponse;
@@ -29,11 +30,28 @@ export const FollowerItem: React.FC<FollowerItemProps> = ({
   const isCurrentUser = currentUserId === item.id;
   const isMyProfile = currentUserId === profileId;
 
-  const [isFollowing, setIsFollowing] = useState(item.followingByCurrentUser);
+  const [isFollowing, setIsFollowing] = useState(() => {
+    const cached = followEventManager.getStatus(item.id);
+    return cached !== undefined ? cached : item.followingByCurrentUser;
+  });
 
   useEffect(() => {
-    setIsFollowing(item.followingByCurrentUser);
-  }, [item.followingByCurrentUser]);
+    const cached = followEventManager.getStatus(item.id);
+    if (cached !== undefined) {
+      setIsFollowing(cached);
+    } else {
+      setIsFollowing(item.followingByCurrentUser);
+    }
+  }, [item.followingByCurrentUser, item.id]);
+
+  useEffect(() => {
+    const unsubscribe = followEventManager.subscribe((userId, status) => {
+      if (userId === item.id) {
+        setIsFollowing(status);
+      }
+    });
+    return unsubscribe;
+  }, [item.id]);
 
   const handleFollowChange = (newState: boolean) => {
     setIsFollowing(newState);
@@ -56,7 +74,7 @@ export const FollowerItem: React.FC<FollowerItemProps> = ({
             {isMyProfile ? (
               // Đang xem follower/following của chính mình
               isFollowing ? (
-                <MessageButton size="small" onPress={() => {}} />
+                <MessageButton userId={item.id} size="small" onPress={() => { }} />
               ) : (
                 <FollowButton
                   userId={item.id}
@@ -83,7 +101,7 @@ export const FollowerItem: React.FC<FollowerItemProps> = ({
                       size="small"
                       onFollowChange={handleFollowChange}
                     />
-                    <MessageButton size="small" onPress={() => {}} />
+                    <MessageButton userId={item.id} size="small" onPress={() => { }} />
                   </>
                 ) : (
                   // CHƯA theo dõi -> chỉ hiện nút theo dõi primary, KHÔNG hiện nhắn tin

@@ -146,6 +146,8 @@ public class UserServiceImpl implements UserService {
             profile.setAvatar(request.getAvatar());
         }
 
+        user.setUsernameSearch(normalizeUsername(user.getUsername()));
+
         user.setProfile(profile);
 
         user.setPrivate(request.isPrivate());
@@ -261,4 +263,12 @@ public class UserServiceImpl implements UserService {
                 .map(userMapper::toUserResponse)
                 .collect(Collectors.toList());
     }
+
+    public String normalizeUsername(String username) {
+        if (username == null) return null;
+        String lower = username.toLowerCase();
+        return java.text.Normalizer.normalize(lower, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+    }
+
 }
