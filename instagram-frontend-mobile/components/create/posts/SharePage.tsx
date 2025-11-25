@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LocationSearchScreen } from '../reels/LocationSearchScreen';
+import CaptionInputScreen from '../../common/CaptionInputScreen';
 import { useUpload } from '../../../context/UploadContext';
 import { useAuth } from '../../../context/AuthContext';
 import { extractHashtags } from '../../../utils/hashtag';
@@ -67,7 +68,9 @@ export function SharePage({
   const router = useRouter();
   const { startUpload } = useUpload();
   const [caption, setCaption] = useState('');
+  const [hashtags, setHashtags] = useState<string[]>([]);
   const [showLocationSearch, setShowLocationSearch] = useState(false);
+  const [showCaptionInput, setShowCaptionInput] = useState(false);
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
   const [aiTagEnabled, setAiTagEnabled] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -80,6 +83,12 @@ export function SharePage({
   const handleLocationSelect = (location: PickedLocation) => {
     setPickedLocation(location);
     setShowLocationSearch(false);
+  };
+
+  const handleCaptionSave = (newCaption: string, extractedHashtags: string[]) => {
+    setCaption(newCaption);
+    setHashtags(extractedHashtags);
+    setShowCaptionInput(false);
   };
 
   const validateVideoFormat = (asset: GalleryAsset): boolean => {
@@ -110,12 +119,11 @@ export function SharePage({
       const mediaUris = selectedAssets.map(asset => asset.uri);
       const mediaType = selectedAssets[0].mediaType === 'video' ? 'video' : 'photo';
       
-      console.log('Starting upload for', selectedAssets.length, 'files');
-      
       startUpload({
         mediaUris: mediaUris,
         mediaType: mediaType,
         caption: caption,
+        hashtags: hashtags,
         location: pickedLocation?.name,
         userId: user.id,
         postType: 'FEED',
@@ -192,15 +200,33 @@ export function SharePage({
         )}
 
         <View style={styles.captionSection}>
-          <TextInput
-            style={styles.captionInput}
-            placeholder="Thêm chú thích..."
-            placeholderTextColor="#999"
-            value={caption}
-            onChangeText={setCaption}
-            multiline
-            textAlignVertical="top"
-          />
+          <TouchableOpacity
+            style={styles.captionButton}
+            onPress={() => setShowCaptionInput(true)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.captionText,
+                !caption && styles.captionPlaceholder,
+              ]}
+              numberOfLines={2}
+            >
+              {caption || 'Thêm chú thích...'}
+            </Text>
+            {hashtags.length > 0 && (
+              <View style={styles.hashtagsPreview}>
+                {hashtags.slice(0, 3).map((tag, index) => (
+                  <View key={index} style={styles.hashtagChip}>
+                    <Text style={styles.hashtagChipText}>#{tag}</Text>
+                  </View>
+                ))}
+                {hashtags.length > 3 && (
+                  <Text style={styles.moreHashtags}>+{hashtags.length - 3}</Text>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.optionsSection}>
@@ -331,6 +357,13 @@ export function SharePage({
           <Text style={styles.shareButtonText}>Chia sẻ</Text>
         </TouchableOpacity>
       </View>
+
+      <CaptionInputScreen
+        visible={showCaptionInput}
+        initialCaption={caption}
+        onSave={handleCaptionSave}
+        onClose={() => setShowCaptionInput(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -400,12 +433,42 @@ const styles = StyleSheet.create({
   captionSection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  captionInput: {
+  captionButton: {
+    minHeight: 60,
+  },
+  captionText: {
     color: '#000',
     fontSize: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
+    lineHeight: 20,
+  },
+  captionPlaceholder: {
+    color: '#999',
+  },
+  hashtagsPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  hashtagChip: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  hashtagChipText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  moreHashtags: {
+    fontSize: 14,
+    color: '#666',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   optionsSection: {
     paddingHorizontal: 16,
@@ -512,3 +575,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default SharePage;

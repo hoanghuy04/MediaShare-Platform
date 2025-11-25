@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Reference;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.DocumentReference;
@@ -46,8 +47,8 @@ public class Post {
     @Builder.Default
     private List<String> mediaFileIds = new ArrayList<>();
 
-    @Builder.Default
-    private List<String> tags = new ArrayList<>();
+    @DocumentReference
+    private List<Hashtag> tags = new ArrayList<>();
 
     @Builder.Default
     private List<String> mentions = new ArrayList<>();

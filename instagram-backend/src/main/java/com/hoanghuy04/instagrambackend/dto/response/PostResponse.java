@@ -33,7 +33,7 @@ public class PostResponse {
 
     private Long totalComment;
 
-    private List<String> tags;
+    private List<HashtagResponse> tags;
 
     private String location;
 

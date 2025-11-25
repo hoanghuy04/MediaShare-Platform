@@ -11,6 +11,7 @@ interface UploadParams {
   mediaUris: string[]; // Changed to array
   mediaType: string;
   caption: string;
+  hashtags?: string[];
   location?: string;
   userId: string;
   postType?: 'FEED' | 'REEL';
@@ -42,7 +43,7 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const startUpload = async (params: UploadParams) => {
-    const { mediaUris, mediaType, caption, location, userId, postType = 'REEL' } = params;
+    const { mediaUris, mediaType, caption, hashtags, location, userId, postType = 'REEL' } = params;
 
     setUploadState({
       status: 'uploading',
@@ -100,12 +101,12 @@ export const UploadProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Create post with all uploaded files
-      const hashtags = extractHashtags(caption);
+      const tagsToUse = hashtags && hashtags.length > 0 ? hashtags : extractHashtags(caption);
       const postData = {
         mediaFileIds: uploadedFileIds,
         type: postType === 'FEED' ? PostType.FEED : PostType.REEL,
         caption: caption.trim(),
-        tags: hashtags,
+        tags: tagsToUse,
         location: location,
       };
 

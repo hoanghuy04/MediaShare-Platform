@@ -5,6 +5,8 @@ import com.hoanghuy04.instagrambackend.dto.response.MediaFileResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PageResponse;
 import com.hoanghuy04.instagrambackend.dto.response.PostResponse;
 import com.hoanghuy04.instagrambackend.dto.response.UserSummaryResponse;
+import com.hoanghuy04.instagrambackend.dto.response.*;
+import com.hoanghuy04.instagrambackend.mapper.UserMapper;
 import com.hoanghuy04.instagrambackend.entity.*;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
 import com.hoanghuy04.instagrambackend.enums.MentionTargetType;
@@ -14,6 +16,7 @@ import com.hoanghuy04.instagrambackend.exception.UnauthorizedException;
 import com.hoanghuy04.instagrambackend.mapper.UserMapper;
 import com.hoanghuy04.instagrambackend.repository.*;
 import com.hoanghuy04.instagrambackend.service.FileService;
+import com.hoanghuy04.instagrambackend.service.hashtag.HashtagService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.util.MentionUtil;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
@@ -27,6 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -45,18 +52,30 @@ public class PostServiceImpl implements PostService {
     private final MentionRepository mentionRepository;
     private final SecurityUtil securityUtil;
     private final MentionUtil mentionUtil;
+    private final HashtagService hashtagService;
+    private final HashtagRepository hashtagRepository;
 
     @Transactional
     @Override
     public PostResponse createPost(CreatePostRequest request) {
         User author = securityUtil.getCurrentUser();
 
+        List<Hashtag> tags = new ArrayList<>();
+        for (String rawTag : request.getTags()) {
+            String tag = rawTag.trim().toLowerCase();
+            if (tag.isEmpty()) continue;
+            hashtagService.increaseUsage(tag);
+            Hashtag hashtag = hashtagRepository.findByTag(tag)
+                    .orElseThrow(() -> new RuntimeException("Failed to load hashtag"));
+            tags.add(hashtag);
+        }
+
         Post post = Post.builder()
                 .author(author)
                 .caption(request.getCaption())
                 .type(request.getType())
                 .mediaFileIds(request.getMediaFileIds())
-                .tags(request.getTags())
+                .tags(tags)
                 .location(request.getLocation())
                 .totalLikes(0)
                 .totalComments(0)
@@ -137,10 +156,22 @@ public class PostServiceImpl implements PostService {
             throw new UnauthorizedException("You are not authorized to update this post");
         }
 
+        List<Hashtag> newTags = new ArrayList<>();
+
+        for (String rawTag : request.getTags()) {
+            String cleanTag = rawTag.trim().toLowerCase();
+            if (cleanTag.isEmpty()) continue;
+            hashtagService.increaseUsage(cleanTag);
+            Hashtag tagEntity = hashtagRepository.findByTag(cleanTag)
+                    .orElseThrow(() -> new RuntimeException("Failed to load hashtag: " + cleanTag));
+
+            newTags.add(tagEntity);
+        }
+
         post.setCaption(request.getCaption());
         post.setType(request.getType());
         post.setMediaFileIds(request.getMediaFileIds());
-        post.setTags(request.getTags());
+        post.setTags(newTags);
         post.setLocation(request.getLocation());
 
         post = postRepository.save(post);
@@ -149,6 +180,7 @@ public class PostServiceImpl implements PostService {
 
         return convertToPostResponse(post);
     }
+
 
     @Transactional
     @Override
@@ -217,6 +249,15 @@ public class PostServiceImpl implements PostService {
 
         } catch (Exception ignored) {}
 
+        List<HashtagResponse> hashtagResponses = post.getTags()
+                .stream()
+                .map(tag -> HashtagResponse.builder()
+                        .id(tag.getId())
+                        .tag(tag.getTag())
+                        .usageCount(tag.getUsageCount())
+                        .build()
+                ).toList();
+
         UserSummaryResponse authorSummary = userMapper.toUserSummary(author, following);
         List<MediaFileResponse> media = fileService.getMediaFileResponses(post.getMediaFileIds());
 
@@ -228,7 +269,7 @@ public class PostServiceImpl implements PostService {
                 .media(media)
                 .totalComment(post.getTotalComments())
                 .totalLike(post.getTotalLikes())
-                .tags(post.getTags())
+                .tags(hashtagResponses)
                 .location(post.getLocation())
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())

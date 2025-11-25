@@ -213,6 +213,24 @@ export const PostCard: React.FC<PostCardProps> = ({
     opacity: uiOpacity.value,
   }));
 
+  const renderCaption = (caption: string) => {
+    const parts = caption.split(/(#\w+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('#')) {
+        return (
+          <Text key={index} style={styles.hashtagText}>
+            {part}
+          </Text>
+        );
+      }
+      return (
+        <Text key={index} style={styles.captionText}>
+          {part}
+        </Text>
+      );
+    });
+  };
+
   const handleVideoPress = async () => {
     if (isVideoPlaying) {
       await videoRef.current?.pauseAsync();
@@ -484,7 +502,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         <Animated.View style={[styles.captionContainer, uiAnimatedStyle]}>
           <Text style={{ color: theme.colors.text }} numberOfLines={2}>
             <Text style={styles.usernameText}>{post.author.username} </Text>
-            <Text style={styles.captionText}>{post.caption}</Text>
+            {renderCaption(post.caption)}
           </Text>
         </Animated.View>
       )}
@@ -641,6 +659,12 @@ const styles = StyleSheet.create({
   captionText: {
     fontSize: 14,
     lineHeight: 18,
+  },
+  hashtagText: {
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#0095F6',
+    fontWeight: '500',
   },
   seeMore: {
     fontSize: 14,
