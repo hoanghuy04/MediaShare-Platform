@@ -89,6 +89,9 @@ public class User {
     @Builder.Default
     private long followingCount = 0L;
 
+    @Indexed
+    private String usernameSearch;
+
     /**
      * Timestamp when the user was created
      */

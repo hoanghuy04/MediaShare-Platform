@@ -35,7 +35,6 @@ export default function ReelPostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user } = useAuth();
-
   const { startUpload } = useUpload();
 
   const rawUri = params.mediaUri as string;
@@ -49,9 +48,7 @@ export default function ReelPostScreen() {
   const [pickedLocation, setPickedLocation] = useState<PickedLocation>(null);
 
   const isSubmittingRef = useRef(false);
-
   const scrollRef = useRef<ScrollView | null>(null);
-  const captionInputRef = useRef<TextInput | null>(null);
 
   const player = useVideoPlayer(mediaType === 'video' && mediaUri ? mediaUri : null, player => {
     if (mediaType === 'video') {
@@ -84,7 +81,6 @@ export default function ReelPostScreen() {
     }
 
     isSubmittingRef.current = true;
-
     router.replace('/(tabs)/feed');
 
     setTimeout(() => {
@@ -368,6 +364,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
+    flex: 1,
   },
   rowMainText: {
     fontSize: 16,
@@ -410,6 +407,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
   },
+  // Bottom bar
   bottomBar: {
     position: 'absolute',
     left: 0,

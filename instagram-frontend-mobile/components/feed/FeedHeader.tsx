@@ -31,7 +31,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
       >
         <View style={styles.content}>
           {/* Instagram Wordmark */}
-          <Text style={[styles.logoText, { color: theme.colors.text }]}>Social Trio</Text>
+          <Text style={[styles.logoText, { color: theme.colors.text }]}>Sudo</Text>
 
           {/* Right Icons */}
           <View style={styles.rightIcons}>

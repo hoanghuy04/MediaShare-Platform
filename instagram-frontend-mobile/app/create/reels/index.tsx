@@ -8,6 +8,8 @@ import {
   NativeSyntheticEvent,
   Alert,
   Dimensions,
+  TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -41,6 +43,7 @@ export default function ReelsCreationScreen() {
   const galleryDragStartYRef = useRef<number>(0);
   const galleryScrollYRef = useRef<number>(0);
   const isProgrammaticRef = useRef<boolean>(false);
+  const hasRequestedPermissions = useRef<boolean>(false);
 
   const [camPermission, requestCamPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -60,6 +63,9 @@ export default function ReelsCreationScreen() {
   const [isOnCameraPage, setIsOnCameraPage] = useState(true);
 
   useEffect(() => {
+    if (hasRequestedPermissions.current) return;
+    hasRequestedPermissions.current = true;
+
     (async () => {
       if (!camPermission?.granted) await requestCamPermission();
       if (!micPermission?.granted) await requestMicPermission();
@@ -67,7 +73,7 @@ export default function ReelsCreationScreen() {
       const mediaStatus = await MediaLibrary.requestPermissionsAsync();
       setHasMediaPermission(mediaStatus.status === 'granted');
     })();
-  }, [camPermission, micPermission, requestMicPermission, requestCamPermission]);
+  }, []);
 
   useEffect(() => {
     if (!hasMediaPermission) return;
@@ -131,6 +137,35 @@ export default function ReelsCreationScreen() {
       }
     })();
   }, [hasMediaPermission]);
+
+  const handleRequestPermissions = useCallback(async () => {
+    // Check if we can ask again
+    const canAskCam = camPermission?.canAskAgain ?? true;
+    const canAskMic = micPermission?.canAskAgain ?? true;
+
+    if (!canAskCam || !canAskMic) {
+      // Permissions are permanently denied, need to open settings
+      Alert.alert(
+        'Cần cấp quyền',
+        'Bạn đã từ chối quyền truy cập. Vui lòng vào Cài đặt để bật quyền Camera và Microphone.',
+        [
+          {
+            text: 'Hủy',
+            style: 'cancel',
+          },
+          {
+            text: 'Mở Cài đặt',
+            onPress: () => Linking.openSettings(),
+          },
+        ]
+      );
+    } else {
+      // Can still request permissions
+      hasRequestedPermissions.current = false; // Reset flag to allow retry
+      await requestCamPermission();
+      await requestMicPermission();
+    }
+  }, [camPermission, micPermission, requestCamPermission, requestMicPermission]);
 
   const handleRecordPress = useCallback(async () => {
     const cam = cameraRef.current;
@@ -297,7 +332,10 @@ export default function ReelsCreationScreen() {
     return (
       <View style={styles.centerScreen}>
         <StatusBar hidden style="light" />
-        <Text style={styles.permText}>Bạn cần bật quyền Camera + Micro để quay Reels.</Text>
+        <Text style={styles.permTitle}>Bạn cần bật quyền Camera + Micro để quay Reels.</Text>
+        <TouchableOpacity style={styles.permButton} onPress={handleRequestPermissions}>
+          <Text style={styles.permButtonText}>Cấp quyền</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -374,5 +412,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     lineHeight: 22,
+  },
+  permTitle: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  permButton: {
+    backgroundColor: '#0095F6',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  permButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

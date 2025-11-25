@@ -51,6 +51,9 @@ public class Post {
     private List<Hashtag> tags = new ArrayList<>();
 
     @Builder.Default
+    private List<String> mentions = new ArrayList<>();
+
+    @Builder.Default
     private long totalLikes = 0;
 
     @Builder.Default
