@@ -232,9 +232,19 @@ export default function ReelsCreationScreen() {
   }, []);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // Don't update state while recording to prevent lag
+    if (recordState === 'recording') return;
+
     const offsetY = event.nativeEvent.contentOffset.y;
-    setLastOffsetY(offsetY);
-    setIsOnCameraPage(offsetY < FULL_HEIGHT / 2);
+    const newIsOnCameraPage = offsetY < FULL_HEIGHT / 2;
+
+    // Only update if values actually changed
+    if (offsetY !== lastOffsetY) {
+      setLastOffsetY(offsetY);
+    }
+    if (newIsOnCameraPage !== isOnCameraPage) {
+      setIsOnCameraPage(newIsOnCameraPage);
+    }
   };
 
   const handleScrollBeginDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

@@ -10,6 +10,7 @@ import { Avatar } from '../common/Avatar';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { PostLikesModal } from './PostLikesModal';
 import { PostCommentsModal } from './PostCommentsModal';
+import { ShareModal } from './ShareModal';
 import { useAuth } from '../../context/AuthContext';
 
 import { MediaCategory } from '../../types/enum.type';
@@ -28,6 +29,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
   const [isLiked, setIsLiked] = useState(post.likedByCurrentUser);
   const [totalLike, setTotalLike] = useState(post.totalLike);
@@ -333,7 +335,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
             />
             <Text style={styles.actionCount}>{post.totalComment > 999 ? `${(post.totalComment / 1000).toFixed(1)}K` : post.totalComment}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIcon}>
+          <TouchableOpacity style={styles.actionIcon} onPress={() => setShowShareModal(true)}>
             <Feather name="send" size={26} color="#000" />
             <Text style={styles.actionCount}>0</Text>
           </TouchableOpacity>
@@ -382,6 +384,12 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
         postId={post.id}
         postAuthorId={post.author.id}
         onClose={() => setShowCommentsModal(false)}
+      />
+
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        postId={post.id}
       />
     </View>
   );

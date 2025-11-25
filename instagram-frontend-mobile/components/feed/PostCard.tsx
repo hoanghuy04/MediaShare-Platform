@@ -24,6 +24,7 @@ import { UserSummaryResponse } from '../../types/user';
 import { FollowButton } from '../common/FollowButton';
 import { PostLikesModal } from './PostLikesModal';
 import { PostCommentsModal } from './PostCommentsModal';
+import { ShareModal } from './ShareModal';
 import { postLikeService } from '@/services/post-like.service';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, SharedValue } from 'react-native-reanimated';
@@ -66,6 +67,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [videoError, setVideoError] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [firstLiker, setFirstLiker] = useState<PostLikeUserResponse | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isLiked, setIsLiked] = useState(post.likedByCurrentUser);
@@ -464,7 +466,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => onShare?.(post.id)}
+            onPress={() => setShowShareModal(true)}
             style={styles.actionButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -554,6 +556,13 @@ export const PostCard: React.FC<PostCardProps> = ({
         postId={post.id}
         postAuthorId={post.author.id}
         onClose={() => setShowCommentsModal(false)}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        postId={post.id}
       />
     </View>
   );
