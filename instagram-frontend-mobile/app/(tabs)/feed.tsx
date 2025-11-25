@@ -183,7 +183,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 100,
     elevation: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(0,0,0,0.05)',
+    
   },
 });

@@ -76,13 +76,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   // Sync state when post changes (from API refresh)
   useEffect(() => {
-    console.log('[PostCard] Syncing state from props:', {
-      postId: post.id,
-      likedByCurrentUser: post.likedByCurrentUser,
-      totalLike: post.totalLike,
-      currentIsLiked: isLiked,
-      currentTotalLike: totalLike,
-    });
+    
     setIsLiked(post.likedByCurrentUser);
     setTotalLike(post.totalLike);
   }, [post.id, post.likedByCurrentUser, post.totalLike]);
@@ -180,19 +174,11 @@ export const PostCard: React.FC<PostCardProps> = ({
 
     try {
       const response = await postLikeService.toggleLikePost(post.id);
-      console.log('[PostCard] Toggle like response:', {
-        postId: post.id,
-        response,
-        prevLiked,
-        nextLiked,
-        prevTotal,
-        nextTotal,
-      });
-      
+     
       if (response?.liked !== undefined) {
         setIsLiked(response.liked);
         if (response.liked !== nextLiked) {
-          console.log('[PostCard] Response.liked mismatch! Adjusting totalLike');
+          
           setTotalLike(prev => response.liked ? prev + 1 : Math.max(0, prev - 1));
         }
       }
@@ -291,7 +277,6 @@ export const PostCard: React.FC<PostCardProps> = ({
               setVideoError(true);
             }}
             onLoad={() => {
-              console.log('Video loaded successfully:', videoUrl);
               setVideoError(false);
             }}
           />

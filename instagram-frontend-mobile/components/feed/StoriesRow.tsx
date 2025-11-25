@@ -77,7 +77,7 @@ export const StoriesRow: React.FC<StoriesRowProps> = ({
   );
 
   return (
-    <View style={[styles.container, { borderBottomColor: theme.colors.border }]}>
+    <View style={[styles.container, {  }]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -95,7 +95,6 @@ const STORY_SIZE = 72;
 const styles = StyleSheet.create({
   container: {
     paddingVertical: 12,
-    borderBottomWidth: 0.5,
   },
   scrollContent: {
     paddingHorizontal: 8,
