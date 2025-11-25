@@ -86,6 +86,14 @@ export const API_ENDPOINTS = {
   PROMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/promote`,
   DEMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/demote`,
   LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
+  CONVERSATION_NICKNAME: (id: string) => `/api/conversations/${id}/nickname`,
+  
+  // Invite Links
+  CREATE_INVITE_LINK: (conversationId: string) => `/api/conversations/${conversationId}/invite-link`,
+  GET_INVITE_LINK: (conversationId: string) => `/api/conversations/${conversationId}/invite-link`,
+  REVOKE_INVITE_LINK: (conversationId: string) => `/api/conversations/${conversationId}/invite-link`,
+  UPDATE_INVITE_LINK_ACTIVE: (conversationId: string) => `/api/conversations/${conversationId}/invite-link/active`,
+  JOIN_BY_INVITE_TOKEN: (token: string) => `/api/conversations/join/${token}`,
 
   // Message Requests
   MESSAGE_REQUESTS: '/api/message-requests',

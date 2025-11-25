@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useTheme } from '../hooks/useTheme';
 import { useDebounce } from '../hooks/useDebounce';
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll';
@@ -43,6 +44,7 @@ export default function SearchScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [apiUnavailable, setApiUnavailable] = useState(false);
+  const [videoThumbnails, setVideoThumbnails] = useState<{ [key: string]: string }>({});
   const [searchResults, setSearchResults] = useState<{
     users: UserResponse[];
     posts: Post[];
@@ -57,6 +59,15 @@ export default function SearchScreen() {
   useEffect(() => {
     loadRecentSearches();
   }, []);
+
+  // Generate thumbnails for reels in posts when search results change
+  useEffect(() => {
+    searchResults.posts.forEach(post => {
+      if (post.type === 'REEL') {
+        generateThumbnail(post);
+      }
+    });
+  }, [searchResults.posts]);
 
   // Filter recent searches when query changes
   useEffect(() => {
@@ -139,7 +150,7 @@ export default function SearchScreen() {
             users: [],
             posts: exploreResponse.content || [],
             reels: exploreResponse.content?.filter(post =>
-              post.media.some(media => media.type === 'VIDEO' || media.type === 'video')
+              post.type === 'REEL' || post.media.some((media: any) => media.category === 'VIDEO' || media.category === 'video')
             ) || [],
           });
         } catch (fallbackError) {
@@ -171,12 +182,63 @@ export default function SearchScreen() {
     router.push(`/users/${userId}`);
   };
 
-  const handlePostPress = (postId: string) => {
-    router.push(
-      {
-        pathname: `/profile/posts`,
-        params: { postId }
+  const handlePostPress = (post: Post) => {
+    router.push({
+      pathname: '/profile/posts',
+      params: { userId: post.author.id, postId: post.id }
+    });
+  };
+
+  const handleReelPress = (reel: Post) => {
+    router.push({
+      pathname: '/profile/reels',
+      params: { userId: reel.author.id, reelId: reel.id }
+    });
+  };
+
+  const generateThumbnail = async (item: Post) => {
+    const videoMedia = item.media?.find((m: any) => m.category === 'VIDEO' || m.category === 'video');
+    const imageMedia = item.media?.find((m: any) => m.category === 'IMAGE' || m.category === 'image');
+    
+    if (videoMedia && !videoThumbnails[item.id] && !imageMedia) {
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(videoMedia.url, { time: 0 });
+        setVideoThumbnails(prev => ({ ...prev, [item.id]: uri }));
+      } catch (error) {
+        console.log('[Search] Error generating thumbnail for', item.id, error);
       }
+    }
+  };
+
+  const ReelGridItem = ({ item }: { item: Post }) => {
+    const videoMedia = item.media?.find((m: any) => m.category === 'VIDEO' || m.category === 'video');
+    const imageMedia = item.media?.find((m: any) => m.category === 'IMAGE' || m.category === 'image');
+    
+    // Use cached thumbnail, image thumbnail, or video URL - match ReelGrid exactly
+    const thumbnailUri = videoThumbnails[item.id] || imageMedia?.url || videoMedia?.url || item.media?.[0]?.url;
+
+    React.useEffect(() => {
+      generateThumbnail(item);
+    }, [item.id]);
+
+    return (
+      <TouchableOpacity
+        style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+        onPress={() => handleReelPress(item)}
+      >
+        <Image
+          source={{ uri: thumbnailUri }}
+          style={styles.gridImage}
+          resizeMode="cover"
+        />
+        <View style={styles.videoIndicator}>
+          <Ionicons name="play" size={16} color="white" />
+        </View>
+        <View style={styles.viewCountOverlay}>
+          <Ionicons name="play" size={12} color="white" />
+          <Text style={styles.viewCountText}>{(item as any).totalLike || 0}</Text>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -287,24 +349,42 @@ export default function SearchScreen() {
                 ) : (
                   // Render posts grid
                   <View style={styles.postsGrid}>
-                    {item.data.map((post: any, index: number) => (
-                      <TouchableOpacity
-                        key={post.id}
-                        style={[styles.gridItem, { width: itemSize, height: itemSize }]}
-                        onPress={() => handlePostPress(post.id)}
-                      >
-                        <Image
-                          source={{ uri: post.media[0]?.url }}
-                          style={styles.gridImage}
-                          resizeMode="cover"
-                        />
-                        {post.media.length > 1 && (
-                          <View style={styles.multipleIndicator}>
-                            <Ionicons name="albums" size={16} color="white" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                    {item.data.map((post: any, index: number) => {
+                      const isReel = post.type === 'REEL';
+                      const videoMedia = post.media?.find((m: any) => m.category === 'VIDEO' || m.category === 'video');
+                      const imageMedia = post.media?.find((m: any) => m.category === 'IMAGE' || m.category === 'image');
+                      const thumbnailUri = videoThumbnails[post.id] || imageMedia?.url || videoMedia?.url || post.media?.[0]?.url;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={post.id}
+                          style={[styles.gridItem, { width: itemSize, height: itemSize }]}
+                          onPress={() => {
+                            if (isReel) {
+                              handleReelPress(post);
+                            } else {
+                              handlePostPress(post);
+                            }
+                          }}
+                        >
+                          <Image
+                            source={{ uri: thumbnailUri }}
+                            style={styles.gridImage}
+                            resizeMode="cover"
+                          />
+                          {isReel && (
+                            <View style={styles.videoIndicator}>
+                              <Ionicons name="play" size={14} color="white" />
+                            </View>
+                          )}
+                          {!isReel && post.media.length > 1 && (
+                            <View style={styles.multipleIndicator}>
+                              <Ionicons name="copy-outline" size={14} color="white" />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -384,21 +464,7 @@ export default function SearchScreen() {
     return (
       <FlatList
         data={searchResults.reels}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.gridItem, { width: itemSize, height: itemSize }]}
-            onPress={() => handlePostPress(item.id)}
-          >
-            <Image
-              source={{ uri: item.media[0]?.url }}
-              style={styles.gridImage}
-              resizeMode="cover"
-            />
-            <View style={styles.videoIndicator}>
-              <Ionicons name="play" size={16} color="white" />
-            </View>
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => <ReelGridItem item={item} />}
         keyExtractor={item => item.id}
         numColumns={3}
         columnWrapperStyle={styles.row}
@@ -625,14 +691,18 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     paddingTop: 8,
+    paddingHorizontal: 4,
   },
   row: {
     justifyContent: 'space-between',
-    marginBottom: 2,
+    marginBottom: 4,
+    gap: 4,
   },
   gridItem: {
     backgroundColor: '#f0f0f0',
     position: 'relative',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   gridImage: {
     width: '100%',
@@ -645,6 +715,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 12,
     padding: 4,
+  },
+  viewCountOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   multipleIndicator: {
     position: 'absolute',

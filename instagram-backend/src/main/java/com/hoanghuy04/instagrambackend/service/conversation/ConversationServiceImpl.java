@@ -283,6 +283,50 @@ public class ConversationServiceImpl implements ConversationService {
         return messageMapper.toConversationDTO(conversationRepository.save(conversation));
     }
 
+    @Transactional
+    @Override
+    public ConversationMember updateNickname(String conversationId, String requesterId, com.hoanghuy04.instagrambackend.dto.request.conversation.UpdateNicknameRequest request) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+
+        // Validate requester is a member
+        boolean isRequesterMember = conversation.getParticipants().stream()
+                .anyMatch(p -> p.getUserId().equals(requesterId));
+        if (!isRequesterMember) {
+            throw new BadRequestException("You are not a member of this conversation");
+        }
+
+        // Validate targetUserId is a participant
+        ConversationMember targetMember = conversation.getParticipants().stream()
+                .filter(p -> p.getUserId().equals(request.getTargetUserId()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Target user is not a participant in this conversation"));
+
+        // Validate and process nickname
+        String nickname = request.getNickname();
+        if (nickname != null) {
+            nickname = nickname.trim();
+            if (nickname.isEmpty()) {
+                nickname = null; // Reset nickname if empty
+            } else {
+                // Validate length (1-50 characters)
+                if (nickname.length() > 50) {
+                    throw new BadRequestException("Nickname must be 1-50 characters long");
+                }
+            }
+        }
+
+        // Update nickname
+        targetMember.setNickname(nickname);
+        conversation.setUpdatedAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+
+        log.info("Nickname updated for user {} in conversation {} by {}", 
+                request.getTargetUserId(), conversationId, requesterId);
+
+        return targetMember;
+    }
+
     // ===============================
     // Misc
     // ===============================

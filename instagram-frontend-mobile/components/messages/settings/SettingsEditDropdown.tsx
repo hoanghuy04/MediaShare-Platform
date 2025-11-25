@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
   visible: boolean;
@@ -44,6 +45,7 @@ export const SettingsEditDropdown: React.FC<Props> = ({
               onRemove();
             }}
           >
+            <Ionicons name="trash-outline" size={20} color="#ef4444" style={styles.icon} />
             <Text style={[styles.itemText, styles.danger]}>Gỡ</Text>
           </TouchableOpacity>
           <View style={styles.divider} />
@@ -54,6 +56,7 @@ export const SettingsEditDropdown: React.FC<Props> = ({
               onRename();
             }}
           >
+            <Ionicons name="create-outline" size={20} color={themeColors.text} style={styles.icon} />
             <Text style={[styles.itemText, { color: themeColors.text }]}>Đổi tên</Text>
           </TouchableOpacity>
           <View style={styles.divider} />
@@ -64,6 +67,7 @@ export const SettingsEditDropdown: React.FC<Props> = ({
               onChangeAvatar();
             }}
           >
+            <Ionicons name="image-outline" size={20} color={themeColors.text} style={styles.icon} />
             <Text style={[styles.itemText, { color: themeColors.text }]}>Đổi avatar</Text>
           </TouchableOpacity>
         </View>
@@ -94,8 +98,13 @@ const styles = StyleSheet.create({
     }),
   },
   item: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  icon: {
+    marginRight: 12,
   },
   itemText: {
     fontSize: 15,

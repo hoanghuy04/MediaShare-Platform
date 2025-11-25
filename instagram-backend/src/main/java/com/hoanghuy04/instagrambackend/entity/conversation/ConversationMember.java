@@ -33,6 +33,12 @@ public class ConversationMember {
     LocalDateTime leftAt;
 
     MemberRole role;
+
+    /**
+     * Optional per-conversation nickname for this member.
+     * If null or empty, falls back to username.
+     */
+    String nickname;
 }
 
 

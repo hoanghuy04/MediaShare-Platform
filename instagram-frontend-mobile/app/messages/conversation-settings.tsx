@@ -160,6 +160,10 @@ export default function ConversationSettingsScreen() {
           refreshConversation();
           break;
 
+        case 'NICKNAME_UPDATED':
+          refreshConversation();
+          break;
+
         default:
           break;
       }
@@ -431,6 +435,20 @@ export default function ConversationSettingsScreen() {
             onOpenPrivacy={() => {
               router.push({
                 pathname: '/messages/privacy-security',
+                params: { conversationId: routeConversationId },
+              });
+            }}
+            onOpenNicknames={() => {
+              if (!routeConversationId) return;
+              router.push({
+                pathname: '/messages/nicknames',
+                params: { conversationId: routeConversationId },
+              });
+            }}
+            onOpenInviteLink={() => {
+              if (!routeConversationId) return;
+              router.push({
+                pathname: '/messages/invite-link',
                 params: { conversationId: routeConversationId },
               });
             }}

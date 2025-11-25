@@ -98,7 +98,6 @@ export const userService = {
         sort: `createdAt,${sortDirection}`,
       },
     });
-    console.log(response.data.data)
     return response.data.data;
   },
 

@@ -111,6 +111,7 @@ export default function ConversationScreen() {
   // ConversationContext
   const {
     conversation: conversationDetails,
+    refresh: refreshConversation,
   } = useConversation(actualConversationId || routeConversationId);
   const [pendingMembers, setPendingMembers] = useState<
     Record<string, MutualUserOption>
@@ -444,6 +445,13 @@ export default function ConversationScreen() {
           }
           break;
 
+        case 'NICKNAME_UPDATED':
+          // Refresh conversation to get updated participant data with nicknames
+          if (actualConversationId) {
+            refreshConversation();
+          }
+          break;
+
         default:
           break;
       }
@@ -452,7 +460,7 @@ export default function ConversationScreen() {
     return () => {
       unsubscribe();
     };
-  }, [actualConversationId, onConversationUpdate, loadExistingThread, user?.id, router]);
+  }, [actualConversationId, onConversationUpdate, loadExistingThread, refreshConversation, user?.id, router]);
 
   // WebSocket events (đã xử lý cho group)
   useEffect(() => {
@@ -1012,10 +1020,25 @@ export default function ConversationScreen() {
       peerUserId &&
       item.readBy?.some(id => id === peerUserId);
 
+    // Get display name from participant map (nickname > username)
+    const participant = participantMap.get(item.sender.id);
+    const displayName = participant ? getDisplayName(participant) : item.sender.username;
+    
+    // Create modified message with display name for group conversations
+    const messageWithDisplayName = isGroupConversation && participant
+      ? {
+          ...item,
+          sender: {
+            ...item.sender,
+            username: displayName,
+          },
+        }
+      : item;
+
     return (
       <View>
         <ChatMessage
-          message={item}
+          message={messageWithDisplayName}
           isOwn={isOwn}
           isClusterStart={isClusterStart}
           isClusterMiddle={isClusterMiddle}
@@ -1031,6 +1054,11 @@ export default function ConversationScreen() {
     );
   };
 
+  // Helper to get display name (nickname > username)
+  const getDisplayName = useCallback((member: Conversation['participants'][number]): string => {
+    return member.nickname?.trim() || member.username;
+  }, []);
+
   const title = useMemo(() => {
     if (isGroupConversation) {
       if (conversationDetails?.name) {
@@ -1038,14 +1066,22 @@ export default function ConversationScreen() {
       }
       const members = conversationDetails?.participants || [];
       if (members.length <= 2) {
-        return members.map(m => m.username).join(', ');
+        return members.map(m => getDisplayName(m)).join(', ');
       }
       return (
         members
           .slice(0, 2)
-          .map(m => m.username)
+          .map(m => getDisplayName(m))
           .join(', ') + '...'
       );
+    }
+    // For direct conversation, use nickname if available
+    if (conversationDetails?.participants) {
+      const other = conversationDetails.participants.find(p => p.userId !== user?.id);
+      if (other) {
+        const displayName = getDisplayName(other);
+        return displayName;
+      }
     }
     return (
       otherUser?.profile?.firstName ||
@@ -1053,7 +1089,7 @@ export default function ConversationScreen() {
       conversationDetails?.name ||
       'Cuộc trò chuyện'
     );
-  }, [isGroupConversation, conversationDetails, otherUser]);
+  }, [isGroupConversation, conversationDetails, otherUser, user?.id, getDisplayName]);
 
   const subtitle = useMemo(() => {
     if (isGroupConversation) {
