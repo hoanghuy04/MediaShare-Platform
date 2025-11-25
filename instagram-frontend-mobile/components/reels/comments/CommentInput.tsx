@@ -25,6 +25,7 @@ type CommentInputProps = {
     replyingTo?: CommentData | null;
     onCancelReply?: () => void;
     submitting?: boolean;
+    onSelectionChange?: (event: any) => void;
 };
 
 export const CommentInput = ({
@@ -37,6 +38,7 @@ export const CommentInput = ({
     replyingTo,
     onCancelReply,
     submitting = false,
+    onSelectionChange,
 }: CommentInputProps) => {
     const isSendButtonActive = commentText.trim().length > 0;
 
@@ -96,6 +98,7 @@ export const CommentInput = ({
                     onChangeText={onChangeText}
                     multiline
                     onFocus={onFocus}
+                    onSelectionChange={onSelectionChange}
                 />
                 <TouchableOpacity
                     onPress={handleSend}

@@ -139,14 +139,14 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
 
     try {
       const response = await postLikeService.toggleLikePost(post.id);
-      
+
       if (response?.liked !== undefined) {
         setIsLiked(response.liked);
         if (response.liked !== nextLiked) {
           setTotalLike(prev => response.liked ? prev + 1 : Math.max(0, prev - 1));
         }
       }
-      
+
       await onLike?.(post.id);
     } catch (error) {
       console.error('Failed to toggle like:', error);
@@ -171,11 +171,17 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
     const isLongCaption = words.length > 30;
     const contentToRender = !isExpanded && isLongCaption ? words.slice(0, 30).join(' ') : caption;
 
-    const styledContent = contentToRender.split(' ').map((word, index) => {
-      const isHashtag = word.startsWith('#');
+    const styledContent = contentToRender.split(/((?:#|@)\w+)/g).map((part, index) => {
+      if (part.startsWith('#') || part.startsWith('@')) {
+        return (
+          <Text key={index} style={styles.hashtagText}>
+            {part}
+          </Text>
+        );
+      }
       return (
-        <Text key={index} style={isHashtag ? styles.hashtagText : styles.captionText}>
-          {word}{' '}
+        <Text key={index} style={styles.captionText}>
+          {part}
         </Text>
       );
     });
@@ -486,7 +492,7 @@ const styles = StyleSheet.create({
   boldText: { fontWeight: '600' },
   captionContainer: { marginBottom: 4 },
   captionText: { fontSize: 14, color: '#000', lineHeight: 20 },
-  hashtagText: { fontSize: 14, color: '#00376b', lineHeight: 20 },
+  hashtagText: { fontSize: 14, color: '#4D5DF7', lineHeight: 20 },
   captionUsername: { fontWeight: '700', color: '#000' },
   moreText: { color: '#8e8e8e', fontWeight: '500' },
   dateText: { fontSize: 12, color: '#8e8e8e', marginTop: 2 },

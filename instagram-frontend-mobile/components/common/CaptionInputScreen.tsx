@@ -16,6 +16,8 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import HashtagSuggestions from './HashtagSuggestions';
+import MentionSuggestions from './MentionSuggestions';
+import { MentionUserResponse } from '../../types/mention.type';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -35,6 +37,8 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
   const [caption, setCaption] = useState(initialCaption);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [currentHashtagQuery, setCurrentHashtagQuery] = useState('');
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [currentMentionQuery, setCurrentMentionQuery] = useState('');
   const [cursorPosition, setCursorPosition] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [inputHeight, setInputHeight] = useState(0);
@@ -46,6 +50,8 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
       setCaption(initialCaption);
       setShowSuggestions(false);
       setCurrentHashtagQuery('');
+      setShowMentionSuggestions(false);
+      setCurrentMentionQuery('');
       setTimeout(() => {
         inputRef.current?.focus();
       }, 300);
@@ -53,25 +59,44 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
   }, [visible, initialCaption]);
 
   // Detect hashtag when caption or cursor changes
+  // Detect hashtag or mention when caption or cursor changes
+  // Detect hashtag or mention when caption or cursor changes
   useEffect(() => {
     const textBeforeCursor = caption.substring(0, cursorPosition);
+
+    // Check for Hashtag
     const lastHashIndex = textBeforeCursor.lastIndexOf('#');
-    
-    if (lastHashIndex !== -1) {
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    // Determine which one is closer to the cursor
+    const isHashtag = lastHashIndex > lastAtIndex;
+
+    if (isHashtag && lastHashIndex !== -1) {
       const textAfterHash = textBeforeCursor.substring(lastHashIndex + 1);
       const hasSpace = textAfterHash.includes(' ') || textAfterHash.includes('\n');
-      
+
       if (!hasSpace) {
         setCurrentHashtagQuery(textAfterHash);
         setShowSuggestions(true);
-        console.log('[CaptionInput] useEffect - Showing suggestions with query:', textAfterHash);
+        setShowMentionSuggestions(false);
       } else {
         setShowSuggestions(false);
-        setCurrentHashtagQuery('');
+      }
+    } else if (!isHashtag && lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      const hasSpace = textAfterAt.includes(' ') || textAfterAt.includes('\n');
+
+      // Only show suggestions if there is at least one character after @
+      if (!hasSpace && textAfterAt.length > 0) {
+        setCurrentMentionQuery(textAfterAt);
+        setShowMentionSuggestions(true);
+        setShowSuggestions(false);
+      } else {
+        setShowMentionSuggestions(false);
       }
     } else {
       setShowSuggestions(false);
-      setCurrentHashtagQuery('');
+      setShowMentionSuggestions(false);
     }
   }, [caption, cursorPosition]);
 
@@ -97,16 +122,16 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
     const textBeforeCursor = caption.substring(0, cursorPosition);
     const textAfterCursor = caption.substring(cursorPosition);
     const lastHashIndex = textBeforeCursor.lastIndexOf('#');
-    
+
     if (lastHashIndex !== -1) {
       const beforeHash = caption.substring(0, lastHashIndex);
       const newCaption = `${beforeHash}#${tag} ${textAfterCursor}`;
       setCaption(newCaption);
-      
+
       // Move cursor after inserted hashtag
       const newCursorPos = lastHashIndex + tag.length + 2; // +2 for # and space
       setCursorPosition(newCursorPos);
-      
+
       // Update cursor position in TextInput
       setTimeout(() => {
         inputRef.current?.setNativeProps({
@@ -114,9 +139,35 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
         });
       }, 0);
     }
-    
+
     setShowSuggestions(false);
     setCurrentHashtagQuery('');
+  };
+
+  const handleMentionSelect = (user: MentionUserResponse) => {
+    const textBeforeCursor = caption.substring(0, cursorPosition);
+    const textAfterCursor = caption.substring(cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const beforeAt = caption.substring(0, lastAtIndex);
+      const newCaption = `${beforeAt}@${user.username} ${textAfterCursor}`;
+      setCaption(newCaption);
+
+      // Move cursor after inserted mention
+      const newCursorPos = lastAtIndex + user.username.length + 2; // +2 for @ and space
+      setCursorPosition(newCursorPos);
+
+      // Update cursor position in TextInput
+      setTimeout(() => {
+        inputRef.current?.setNativeProps({
+          selection: { start: newCursorPos, end: newCursorPos },
+        });
+      }, 0);
+    }
+
+    setShowMentionSuggestions(false);
+    setCurrentMentionQuery('');
   };
 
   const handleSave = () => {
@@ -124,11 +175,11 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
     onSave(caption, hashtags);
   };
 
-  console.log('[CaptionInput] Render state:', { 
-    showSuggestions, 
-    currentHashtagQuery, 
+  console.log('[CaptionInput] Render state:', {
+    showSuggestions,
+    currentHashtagQuery,
     caption,
-    cursorPosition 
+    cursorPosition
   });
 
   return (
@@ -140,22 +191,22 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
     >
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <BlurView 
-          intensity={30} 
-          tint="light" 
+        <BlurView
+          intensity={30}
+          tint="light"
           style={[styles.blurContainer, { paddingTop: insets.top }]}
         >
           <View style={styles.modalInner}>
-            <View 
+            <View
               style={styles.header}
               onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
             >
               <TouchableOpacity onPress={onClose} style={styles.headerButton}>
                 <Ionicons name="close" size={28} color="#000" />
               </TouchableOpacity>
-              
+
               <Text style={styles.headerTitle}>Chú thích</Text>
-              
+
               <TouchableOpacity onPress={handleSave} style={styles.headerButton}>
                 <Text style={styles.okText}>OK</Text>
               </TouchableOpacity>
@@ -176,13 +227,26 @@ const CaptionInputScreen: React.FC<CaptionInputScreenProps> = ({
 
             {showSuggestions && (
               <View style={[
-                styles.suggestionsOverlay, 
+                styles.suggestionsOverlay,
                 { top: headerHeight + inputHeight }
               ]}>
                 <HashtagSuggestions
                   query={currentHashtagQuery}
                   onSelect={handleHashtagSelect}
                   onClose={() => setShowSuggestions(false)}
+                />
+              </View>
+            )}
+
+            {showMentionSuggestions && (
+              <View style={[
+                styles.suggestionsOverlay,
+                { top: headerHeight + inputHeight }
+              ]}>
+                <MentionSuggestions
+                  query={currentMentionQuery}
+                  onSelect={handleMentionSelect}
+                  onClose={() => setShowMentionSuggestions(false)}
                 />
               </View>
             )}

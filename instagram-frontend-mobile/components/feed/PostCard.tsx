@@ -188,7 +188,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         prevTotal,
         nextTotal,
       });
-      
+
       if (response?.liked !== undefined) {
         setIsLiked(response.liked);
         if (response.liked !== nextLiked) {
@@ -214,9 +214,9 @@ export const PostCard: React.FC<PostCardProps> = ({
   }));
 
   const renderCaption = (caption: string) => {
-    const parts = caption.split(/(#\w+)/g);
+    const parts = caption.split(/((?:#|@)\w+)/g);
     return parts.map((part, index) => {
-      if (part.startsWith('#')) {
+      if (part.startsWith('#') || part.startsWith('@')) {
         return (
           <Text key={index} style={styles.hashtagText}>
             {part}
@@ -476,24 +476,24 @@ export const PostCard: React.FC<PostCardProps> = ({
       {/* Likes Info */}
       {totalLike > 0 && (
         <Animated.View style={uiAnimatedStyle}>
-        <TouchableOpacity 
-          style={styles.likesInfo}
-          onPress={() => setShowLikesModal(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.likesText, { color: theme.colors.text }]}>
-            {firstLiker ? (
-              <>
-                <Text style={styles.boldText}>{firstLiker.username}</Text>
-                {totalLike > 1 && (
-                  <Text> và {formatNumber(totalLike - 1)} người khác đã thích</Text>
-                )}
-              </>
-            ) : (
-              <Text style={styles.boldText}>{formatNumber(totalLike)} lượt thích</Text>
-            )}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.likesInfo}
+            onPress={() => setShowLikesModal(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.likesText, { color: theme.colors.text }]}>
+              {firstLiker ? (
+                <>
+                  <Text style={styles.boldText}>{firstLiker.username}</Text>
+                  {totalLike > 1 && (
+                    <Text> và {formatNumber(totalLike - 1)} người khác đã thích</Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.boldText}>{formatNumber(totalLike)} lượt thích</Text>
+              )}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -663,8 +663,7 @@ const styles = StyleSheet.create({
   hashtagText: {
     fontSize: 14,
     lineHeight: 18,
-    color: '#0095F6',
-    fontWeight: '500',
+    color: '#4D5DF7',
   },
   seeMore: {
     fontSize: 14,
