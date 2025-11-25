@@ -13,10 +13,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useConversation } from '../../context/ConversationContext';
+import { useWebSocket } from '../../context/WebSocketContext';
 import { messageAPI } from '../../services/message.service';
 import { Avatar } from '../../components/common/Avatar';
 import { MessageButton } from '../../components/common/MessageButton';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { Input } from '../../components/common/Input';
 import { showAlert } from '../../utils/helpers';
 import type { Conversation } from '../../types';
 import { AddMembersModal } from '../../components/messages/AddMembersModal';
@@ -54,6 +56,13 @@ export default function GroupMembersScreen() {
   >({});
   const [isAddingMembers, setIsAddingMembers] = useState(false);
 
+  // state cho nickname modal
+  const [isNicknameModalVisible, setNicknameModalVisible] = useState(false);
+  const [nicknameValue, setNicknameValue] = useState('');
+  const [isUpdatingNickname, setIsUpdatingNickname] = useState(false);
+
+  const { onConversationUpdate } = useWebSocket();
+
   const isCurrentAdmin = useMemo(() => {
     const me = conversation?.participants?.find(
       p => p.userId === currentUser?.id
@@ -72,6 +81,70 @@ export default function GroupMembersScreen() {
     () => conversation?.participants?.map(p => p.userId) ?? [],
     [conversation?.participants]
   );
+
+  // Helper function to get display name (nickname > username)
+  const getDisplayName = useCallback((member: Participant): string => {
+    return member.nickname?.trim() || member.username;
+  }, []);
+
+  // Handle WebSocket NICKNAME_UPDATED event
+  useEffect(() => {
+    if (!onConversationUpdate || !conversationId) return;
+
+    const unsubscribe = onConversationUpdate((update) => {
+      if (update.conversationId !== conversationId) return;
+      if (update.updateType === 'NICKNAME_UPDATED') {
+        refreshConversation();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [onConversationUpdate, conversationId, refreshConversation]);
+
+  const handleUpdateNickname = async () => {
+    if (!conversationId || !menuTarget) return;
+
+    const trimmed = nicknameValue.trim();
+    const finalNickname = trimmed === '' ? null : trimmed;
+
+    if (finalNickname && finalNickname.length > 50) {
+      showAlert('Lỗi', 'Biệt danh không được vượt quá 50 ký tự');
+      return;
+    }
+
+    try {
+      setIsUpdatingNickname(true);
+      await messageAPI.updateNickname(conversationId, menuTarget.userId, finalNickname);
+      setNicknameModalVisible(false);
+      setNicknameValue('');
+      await refreshConversation();
+    } catch (e: any) {
+      showAlert('Lỗi', e?.response?.data?.message || 'Không thể cập nhật biệt danh');
+    } finally {
+      setIsUpdatingNickname(false);
+    }
+  };
+
+  const openNicknameModal = (member: Participant) => {
+    setMenuTarget(member);
+    setNicknameValue(member.nickname || '');
+    setNicknameModalVisible(true);
+    closeMenu();
+  };
+
+  const openRemoveNickname = async (member: Participant) => {
+    if (!conversationId) return;
+    try {
+      await messageAPI.updateNickname(conversationId, member.userId, null);
+      showAlert('Thành công', 'Đã xóa biệt danh');
+      closeMenu();
+      await refreshConversation();
+    } catch (e: any) {
+      showAlert('Lỗi', e?.response?.data?.message || 'Không thể xóa biệt danh');
+    }
+  };
 
   const openMenu = (p: Participant) => {
     setMenuTarget(p);
@@ -192,27 +265,30 @@ export default function GroupMembersScreen() {
       </Text>
     ) : null;
 
-  const UserRow = ({ p, isMe = false }: { p: Participant; isMe?: boolean }) => (
-    <View style={styles.row}>
-      <View style={styles.rowLeft}>
-        <Avatar uri={p.avatar} name={p.username} size={44} />
-        <View style={{ marginLeft: 12, flex: 1 }}>
-          <Text
-            style={[styles.rowName, { color: theme.colors.text }]}
-            numberOfLines={1}
-          >
-            {p.username}
-          </Text>
-          <Text
-            style={[styles.rowSub, { color: theme.colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            <RoleBadge role={p.role} />
-            {p.role === 'ADMIN' ? ' • ' : ''}
-            @{p.username}
-          </Text>
+  const UserRow = ({ p, isMe = false }: { p: Participant; isMe?: boolean }) => {
+    const displayName = getDisplayName(p);
+    const hasNickname = !!p.nickname?.trim();
+    return (
+      <View style={styles.row}>
+        <View style={styles.rowLeft}>
+          <Avatar uri={p.avatar} name={p.username} size={44} />
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <Text
+              style={[styles.rowName, { color: theme.colors.text }]}
+              numberOfLines={1}
+            >
+              {displayName}
+            </Text>
+            <Text
+              style={[styles.rowSub, { color: theme.colors.textSecondary }]}
+              numberOfLines={1}
+            >
+              <RoleBadge role={p.role} />
+              {p.role === 'ADMIN' ? ' • ' : ''}
+              {hasNickname ? `@${p.username}` : `@${p.username}`}
+            </Text>
+          </View>
         </View>
-      </View>
 
       {!isMe && (
         <>
@@ -236,7 +312,8 @@ export default function GroupMembersScreen() {
         </>
       )}
     </View>
-  );
+    );
+  };
 
   const renderMenu = () => {
     if (!menuTarget) return null;
@@ -245,7 +322,17 @@ export default function GroupMembersScreen() {
 
     const NonAdminViewer = (
       <>
-        <MenuTitle label={menuTarget.username} />
+        <MenuTitle label={getDisplayName(menuTarget)} />
+        <MenuItem
+          label={menuTarget.nickname ? "Đổi biệt danh" : "Đặt biệt danh"}
+          onPress={() => openNicknameModal(menuTarget)}
+        />
+        {menuTarget.nickname && (
+          <MenuItem
+            label="Xóa biệt danh"
+            onPress={() => openRemoveNickname(menuTarget)}
+          />
+        )}
         <MenuItem
           label="Hạn chế"
           danger
@@ -275,7 +362,17 @@ export default function GroupMembersScreen() {
 
     const AdminViewer_TargetNonAdmin = (
       <>
-        <MenuTitle label={menuTarget.username} />
+        <MenuTitle label={getDisplayName(menuTarget)} />
+        <MenuItem
+          label={menuTarget.nickname ? "Đổi biệt danh" : "Đặt biệt danh"}
+          onPress={() => openNicknameModal(menuTarget)}
+        />
+        {menuTarget.nickname && (
+          <MenuItem
+            label="Xóa biệt danh"
+            onPress={() => openRemoveNickname(menuTarget)}
+          />
+        )}
         <MenuItem
           label="Xóa người dùng"
           danger
@@ -314,7 +411,17 @@ export default function GroupMembersScreen() {
 
     const AdminViewer_TargetAdmin = (
       <>
-        <MenuTitle label={menuTarget.username} />
+        <MenuTitle label={getDisplayName(menuTarget)} />
+        <MenuItem
+          label={menuTarget.nickname ? "Đổi biệt danh" : "Đặt biệt danh"}
+          onPress={() => openNicknameModal(menuTarget)}
+        />
+        {menuTarget.nickname && (
+          <MenuItem
+            label="Xóa biệt danh"
+            onPress={() => openRemoveNickname(menuTarget)}
+          />
+        )}
         <MenuItem
           label="Xóa người dùng"
           danger
@@ -443,6 +550,118 @@ export default function GroupMembersScreen() {
         onClose={() => setAddMembersVisible(false)}
         onConfirm={handleAddMembersConfirm}
       />
+
+      {/* Nickname Modal */}
+      <Modal
+        visible={isNicknameModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNicknameModalVisible(false)}
+      >
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity
+            style={[StyleSheet.absoluteFill as any, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
+            onPress={() => setNicknameModalVisible(false)}
+            activeOpacity={1}
+          />
+          <View
+            style={[styles.sheet, { backgroundColor: theme.colors.background }]}
+          >
+            <View style={styles.sheetHandle} />
+            
+            {/* Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.textSecondary + '20' }]}>
+              <TouchableOpacity
+                onPress={() => {
+                  setNicknameModalVisible(false);
+                  setNicknameValue('');
+                }}
+                style={styles.modalHeaderButton}
+              >
+                <Text
+                  style={[
+                    styles.modalHeaderButtonText,
+                    { color: theme.colors.text },
+                  ]}
+                >
+                  Hủy
+                </Text>
+              </TouchableOpacity>
+              <Text
+                style={[
+                  styles.modalHeaderTitle,
+                  { color: theme.colors.text },
+                ]}
+              >
+                Chỉnh sửa biệt danh
+              </Text>
+              <TouchableOpacity
+                onPress={handleUpdateNickname}
+                disabled={isUpdatingNickname}
+                style={styles.modalHeaderButton}
+              >
+                <Text
+                  style={[
+                    styles.modalHeaderButtonText,
+                    {
+                      color: isUpdatingNickname
+                        ? theme.colors.textSecondary
+                        : theme.colors.primary,
+                      fontWeight: '700',
+                      opacity: isUpdatingNickname ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  {isUpdatingNickname ? 'Đang lưu...' : 'Xong'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Content */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}>
+              {/* Avatar */}
+              <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                <Avatar
+                  uri={menuTarget?.avatar}
+                  name={menuTarget?.username || ''}
+                  size={80}
+                />
+              </View>
+              
+              <Input
+                value={nicknameValue}
+                onChangeText={setNicknameValue}
+                placeholder="Nhập biệt danh"
+                maxLength={50}
+                autoFocus
+                style={{ marginBottom: 8 }}
+              />
+              <Text
+                style={[
+                  {
+                    fontSize: 12,
+                    color: theme.colors.textSecondary,
+                    marginBottom: 24,
+                  },
+                ]}
+              >
+                Tối đa 50 ký tự. Để trống để xóa biệt danh.
+              </Text>
+              <Text
+                style={[
+                  {
+                    fontSize: 12,
+                    color: theme.colors.textSecondary,
+                    textAlign: 'center',
+                  },
+                ]}
+              >
+                Mọi người trong đoạn chat đều sẽ nhìn thấy biệt danh này
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -566,5 +785,39 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#cbd5e1',
     marginVertical: 10,
+  },
+  modalButton: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalHeaderButton: {
+    minWidth: 60,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
   },
 });

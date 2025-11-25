@@ -5,6 +5,7 @@ import {
   InboxItem,
   PaginatedResponse,
   Conversation,
+  ConversationMember,
 } from '../types';
 
 // Message API
@@ -134,5 +135,17 @@ export const messageAPI = {
       API_ENDPOINTS.DEMOTE_ADMIN(conversationId, userId),
       null,
     );
+  },
+
+  updateNickname: async (
+    conversationId: string,
+    targetUserId: string,
+    nickname: string | null
+  ): Promise<ConversationMember> => {
+    const response = await axiosInstance.patch(
+      API_ENDPOINTS.CONVERSATION_NICKNAME(conversationId),
+      { targetUserId, nickname }
+    );
+    return response.data.data;
   },
 };

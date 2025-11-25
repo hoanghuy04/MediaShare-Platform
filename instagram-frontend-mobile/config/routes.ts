@@ -86,6 +86,7 @@ export const API_ENDPOINTS = {
   PROMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/promote`,
   DEMOTE_ADMIN: (conversationId: string, userId: string) => `/api/conversations/${conversationId}/members/${userId}/demote`,
   LEAVE_GROUP: (id: string) => `/api/conversations/${id}/leave`,
+  CONVERSATION_NICKNAME: (id: string) => `/api/conversations/${id}/nickname`,
 
   // Message Requests
   MESSAGE_REQUESTS: '/api/message-requests',
