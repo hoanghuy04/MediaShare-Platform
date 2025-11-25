@@ -67,12 +67,12 @@
     },
     "extra": {
       "dev": {
-        "apiUrl": "http://192.168.100.2:8080",
-        "wsUrl": "http://192.168.100.2:8080"
+        "apiUrl": "https://mediashare-platform.onrender.com",
+        "wsUrl": "https://mediashare-platform.onrender.com"
       },
       "prod": {
-        "apiUrl": "https://your-production-api.com",
-        "wsUrl": "https://your-production-api.com"
+        "apiUrl": "https://mediashare-platform.onrender.com",
+        "wsUrl": "https://mediashare-platform.onrender.com"
       }
     }
   }
