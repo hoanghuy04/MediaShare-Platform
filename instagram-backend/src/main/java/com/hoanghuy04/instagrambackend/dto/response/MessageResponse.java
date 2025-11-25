@@ -79,6 +79,8 @@ public class MessageResponse {
      * Whether this message was deleted by the current user
      */
     private boolean isDeleted;
+
+    private PostResponse postResponse;
 }
 
 

@@ -1,4 +1,5 @@
 import { MessageType } from './enum.type';
+import { PostResponse } from './post.type';
 
 // User summary for message sender (lightweight)
 export interface UserSummary {
@@ -34,9 +35,9 @@ export interface LastMessage {
 export interface Conversation {
   id: string;
   type: 'DIRECT' | 'GROUP';
-  name?: string; 
-  avatar?: string; 
-  participants: ConversationMember[]; 
+  name?: string;
+  avatar?: string;
+  participants: ConversationMember[];
   admins?: string[];
   lastMessage?: LastMessage;
   createdAt: string;
@@ -64,6 +65,7 @@ export interface Message {
   kind?: MessageKind; // UI-level type for rendering (TEXT, STICKER, IMAGE, AUDIO, SYSTEM)
   createdAt: string;
   isDeleted: boolean;
+  postResponse?: PostResponse;
 }
 
 // Send message request
