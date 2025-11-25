@@ -30,7 +30,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Sha
 import { useAuth } from '@/context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const MEDIA_ASPECT_RATIO = 1; // Square aspect ratio (1:1) like Instagram
+const MEDIA_ASPECT_RATIO = 1; 
 
 interface PostCardProps {
   post: PostResponse;
