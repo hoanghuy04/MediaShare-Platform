@@ -13,9 +13,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { Message, MessageRef } from '../../types/message';
-import { MessageType } from '../../types/enum.type';
+import { MessageType, PostType, MediaCategory } from '../../types/enum.type';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import { useTheme } from '../../hooks/useTheme';
 import { LinkableText } from './LinkableText';
+import { Avatar } from '../common/Avatar';
 
 type BubblePalette = {
   bubbleIn: string;
@@ -47,6 +49,143 @@ const hexToRgba = (hex: string, alpha: number) => {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r},${g},${b},alpha)`.replace('alpha', String(alpha));
+};
+
+/* -------- POST SHARE UI -------- */
+const PostShareBubble = ({ message }: { message: Message }) => {
+  const { theme } = useTheme();
+  const router = useRouter();
+  const [generatedThumbnail, setGeneratedThumbnail] = useState<string | null>(null);
+
+  const post = message.postResponse;
+
+  const handlePress = () => {
+    if (!post) return;
+    router.push({
+      pathname: '/profile/reels',
+      params: { userId: post.author?.id, postId: post.id }
+    });
+  };
+
+  if (!post) {
+    return (
+      <View style={[styles.postShareContainer, { backgroundColor: theme.colors.card, padding: 12, justifyContent: 'center', alignItems: 'center' }]}>
+        <Ionicons name="alert-circle-outline" size={24} color={theme.colors.textSecondary} />
+        <Text style={{ color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+          Bài viết không tồn tại
+        </Text>
+      </View>
+    );
+  }
+
+  const isReel = post.type === PostType.REEL;
+  const videoMedia = post.media?.find(m => m.category === MediaCategory.VIDEO);
+  const imageMedia = post.media?.find(m => m.category === MediaCategory.IMAGE);
+
+  useEffect(() => {
+    let mounted = true;
+    if (isReel && videoMedia && !imageMedia && !generatedThumbnail) {
+      VideoThumbnails.getThumbnailAsync(videoMedia.url, { time: 0 })
+        .then(({ uri }) => {
+          if (mounted) setGeneratedThumbnail(uri);
+        })
+        .catch(e => console.log('Thumbnail error', e));
+    }
+    return () => { mounted = false; };
+  }, [isReel, videoMedia, imageMedia]);
+
+  const displayUrl = generatedThumbnail || imageMedia?.url || videoMedia?.url || post.media?.[0]?.url;
+  const isMultiple = (post.media?.length || 0) > 1;
+
+  // REEL LAYOUT
+  if (isReel) {
+    return (
+      <TouchableOpacity
+        style={[styles.postShareContainer, { width: 180 }]}
+        activeOpacity={0.9}
+        onPress={handlePress}
+      >
+        <View style={styles.postShareHeader}>
+          <Avatar
+            uri={post.author?.profile?.avatar}
+            name={post.author?.username}
+            size={24}
+            style={{ marginRight: 8 }}
+          />
+          <Text style={[styles.postShareUsername, { color: theme.colors.text }]} numberOfLines={1}>
+            {post.author?.username}
+          </Text>
+        </View>
+
+        <View style={styles.reelImageWrapper}>
+          {displayUrl ? (
+            <Image source={{ uri: displayUrl }} style={styles.postShareImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.postShareImage, { backgroundColor: '#eee' }]} />
+          )}
+
+          {/* Video Indicator (Top Right) */}
+          <View style={styles.videoIndicator}>
+            <Ionicons name="play" size={16} color="white" />
+          </View>
+
+          {/* View Count Overlay (Bottom Left) */}
+          <View style={styles.viewCountOverlay}>
+            <Ionicons name="play" size={12} color="white" />
+            <Text style={styles.viewCountText}>{post.totalLike || 0}</Text>
+          </View>
+        </View>
+
+        {post.caption ? (
+          <Text style={[styles.postShareCaption, { color: theme.colors.text }]} numberOfLines={2}>
+            <Text style={{ fontWeight: '600' }}>{post.author?.username}</Text> {post.caption}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+    );
+  }
+
+  // FEED LAYOUT (Default)
+  return (
+    <TouchableOpacity
+      style={[styles.postShareContainer, { backgroundColor: theme.colors.card }]}
+      activeOpacity={0.9}
+      onPress={handlePress}
+    >
+      <View style={styles.postShareHeader}>
+        <Avatar
+          uri={post.author?.profile?.avatar}
+          name={post.author?.username}
+          size={24}
+          style={{ marginRight: 8 }}
+        />
+        <Text style={[styles.postShareUsername, { color: theme.colors.text }]} numberOfLines={1}>
+          {post.author?.username}
+        </Text>
+      </View>
+
+      <View style={styles.postShareImageWrapper}>
+        {displayUrl ? (
+          <Image source={{ uri: displayUrl }} style={styles.postShareImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.postShareImage, { backgroundColor: '#eee' }]} />
+        )}
+
+        {/* Multiple Icon */}
+        {isMultiple && (
+          <View style={styles.multipleIcon}>
+            <Ionicons name="copy-outline" size={18} color="white" />
+          </View>
+        )}
+      </View>
+
+      {post.caption ? (
+        <Text style={[styles.postShareCaption, { color: theme.colors.text }]} numberOfLines={2}>
+          <Text style={{ fontWeight: '600' }}>{post.author?.username}</Text> {post.caption}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
 };
 
 // waveform “fake” – chỉ để hiển thị giống UI Telegram
@@ -344,6 +483,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
 
   const renderBody = () => {
+    // POST SHARE
+    if (message.type === MessageType.POST_SHARE) {
+      return <PostShareBubble message={message} />;
+    }
+
     // IMAGE
     if (message.type === MessageType.IMAGE) {
       return (
@@ -475,8 +619,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         </View>
 
         {showAvatar && showAvatarAtClusterEnd && !isOwn && (
-          <Image
-            source={avatarUrl ? { uri: avatarUrl } : undefined}
+          <Avatar
+            uri={avatarUrl}
+            name={message.sender?.username}
+            size={30}
             style={styles.avatarTail}
           />
         )}
@@ -670,6 +816,72 @@ const styles = StyleSheet.create({
     width: 4,
     borderRadius: 999,
     marginRight: 3,
+  },
+
+  /* ---- POST SHARE UI ---- */
+  postShareContainer: {
+    width: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  postShareHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: '#EFEFEF',
+  },
+
+  postShareUsername: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  postShareImageWrapper: {
+    width: '100%',
+    height: 220, // Square
+    position: 'relative',
+  },
+  reelImageWrapper: {
+    width: '100%',
+    height: 320, // Vertical 9:16 approx
+    position: 'relative',
+  },
+  postShareImage: {
+    width: '100%',
+    height: '100%',
+  },
+  postShareCaption: {
+    fontSize: 12,
+    padding: 8,
+    lineHeight: 16,
+  },
+  multipleIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  videoIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  viewCountOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });
 

@@ -110,7 +110,7 @@ export const postService = {
       return response.data.data;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        console.log('Search reels endpoint not found, using explore posts as fallback');
+        
         const exploreResponse = await postService.getExplorePosts(page, limit);
         // Filter for video posts (reels)
         const videoPosts = exploreResponse.content.filter(post =>

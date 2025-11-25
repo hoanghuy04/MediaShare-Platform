@@ -98,7 +98,6 @@ export const userService = {
         sort: `createdAt,${sortDirection}`,
       },
     });
-    console.log(response.data.data)
     return response.data.data;
   },
 
@@ -132,10 +131,14 @@ export const userService = {
       return response.data.data;
     } catch (error) {
       console.warn('Mutual follows endpoint not available, falling back to client-side intersection');
-      const [followers, following]: [UserResponse[], UserResponse[]] = await Promise.all([
-        userAPI.getFollowers(userId, 0, 100),
-        userAPI.getFollowing(userId, 0, 100),
+
+      const [followersPage, followingPage] = await Promise.all([
+        userService.getUserFollowers(userId),
+        userService.getUserFollowing(userId),
       ]);
+
+      const followers = followersPage.content || [];
+      const following = followingPage.content || [];
 
       const followerIds = new Set(followers.map(u => u.id));
       let mutuals = following.filter(u => followerIds.has(u.id));

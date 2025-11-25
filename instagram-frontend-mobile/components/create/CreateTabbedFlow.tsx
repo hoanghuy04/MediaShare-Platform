@@ -36,9 +36,9 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
     setActiveTab(tab);
   };
 
-  const handlePostStepChange = (step: number) => {
+  const handlePostStepChange = React.useCallback((step: number) => {
     setPostStep(step);
-  };
+  }, []);
 
   useEffect(() => {
     let targetIndex = 0;
@@ -97,26 +97,26 @@ export const CreateTabbedFlow: React.FC<CreateTabbedFlowProps> = ({ onPostCreate
           </Text>
         </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
-        onPress={() => handleTabPress('story')}
-      >
-        <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
-          TIN
-        </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.bottomTab, activeTab === 'story' && styles.activeBottomTab]}
+          onPress={() => handleTabPress('story')}
+        >
+          <Text style={[styles.bottomTabText, activeTab === 'story' && styles.activeBottomTabText]}>
+            TIN
+          </Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
-        onPress={() => handleTabPress('reels')}
-      >
-        <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
-          THƯỚC PHIM
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
+        <TouchableOpacity
+          style={[styles.bottomTab, activeTab === 'reels' && styles.activeBottomTab]}
+          onPress={() => handleTabPress('reels')}
+        >
+          <Text style={[styles.bottomTabText, activeTab === 'reels' && styles.activeBottomTabText]}>
+            THƯỚC PHIM
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const shouldHideBottomTabs =
     tabsHidden || (activeTab === 'post' && (postStep === 2 || postStep === 3));

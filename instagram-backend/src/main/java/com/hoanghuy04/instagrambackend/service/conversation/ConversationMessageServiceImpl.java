@@ -24,6 +24,7 @@ import com.hoanghuy04.instagrambackend.service.FileService;
 import com.hoanghuy04.instagrambackend.service.messagerequest.MessageRequestService;
 import com.hoanghuy04.instagrambackend.service.user.UserService;
 import com.hoanghuy04.instagrambackend.service.websocket.WebSocketMessageService;
+import com.hoanghuy04.instagrambackend.service.post.PostService;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -56,6 +57,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
     ConversationService conversationService;
     UserService userService;
     WebSocketMessageService webSocketMessageService;
+    PostService postService;
 
     MessageRepository messageRepository;
     MessageRequestRepository messageRequestRepository;
@@ -105,6 +107,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
 
         message = messageRepository.save(message);
         MessageResponse messageResponse = messageMapper.toMessageDTO(message);
+        enrichMessageResponse(messageResponse);
         conversationService.updateLastMessage(conversationId, messageResponse);
 
         log.info("Message sent successfully: {}", message.getId());
@@ -201,6 +204,7 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
         messageRequestService.createMessageRequest(senderId, receiverId, message);
 
         MessageResponse dto = messageMapper.toMessageDTO(message);
+        enrichMessageResponse(dto);
         webSocketMessageService.pushMessage(dto);
 
 
@@ -236,7 +240,11 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
                 );
 
         List<MessageResponse> messageResponses = messages.stream()
-                .map((Message message) -> messageMapper.toMessageDTO(message))
+                .map((Message message) -> {
+                    MessageResponse dto = messageMapper.toMessageDTO(message);
+                    enrichMessageResponse(dto);
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         Page<MessageResponse> page = new org.springframework.data.domain.PageImpl<>(messageResponses, pageable, messageResponses.size());
@@ -596,6 +604,17 @@ public class ConversationMessageServiceImpl implements ConversationMessageServic
             case AUDIO -> "Đã gửi một tin nhắn thoại";
             case POST_SHARE -> "Đã chia sẻ một bài viết";
         };
+    }
+
+    private void enrichMessageResponse(MessageResponse dto) {
+        if (dto.getType() == MessageType.POST_SHARE && dto.getContent() != null) {
+            try {
+                PostResponse post = postService.getPost(dto.getContent());
+                dto.setPostResponse(post);
+            } catch (Exception e) {
+                log.warn("Failed to fetch post details for message {}: {}", dto.getId(), e.getMessage());
+            }
+        }
     }
 
 }

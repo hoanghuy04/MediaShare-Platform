@@ -1,11 +1,11 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { Message } from '../types';
+import { Message, PostResponse } from '../types';
 
 export interface ChatMessage {
   id?: string;
   type: 'CHAT' | 'JOIN' | 'LEAVE' | 'TYPING' | 'STOP_TYPING' | 'READ';
-  contentType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'POST_SHARE' | 'STICKER'; 
+  contentType?: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'POST_SHARE' | 'STICKER';
   senderId: string;
   senderUsername?: string;
   senderProfileImage?: string;
@@ -13,6 +13,7 @@ export interface ChatMessage {
   conversationId?: string;
   content?: string;
   mediaUrl?: string;
+  postResponse?: PostResponse;
   timestamp: string;
   status?: 'SENT' | 'DELIVERED' | 'READ';
 }

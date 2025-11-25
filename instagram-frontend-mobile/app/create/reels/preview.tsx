@@ -13,11 +13,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function PreviewScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
 
   const params = useLocalSearchParams();
 
@@ -97,12 +99,14 @@ export default function PreviewScreen() {
 
       <View style={styles.mediaArea}>
         {mediaType === 'video' ? (
-          <VideoView
-            style={styles.mediaImage}
-            player={player}
-            contentFit="contain"
-            nativeControls={false}
-          />
+          isFocused && (
+            <VideoView
+              style={styles.mediaImage}
+              player={player}
+              contentFit="contain"
+              nativeControls={false}
+            />
+          )
         ) : (
           <Image source={{ uri: uri }} style={styles.mediaImage} resizeMode="contain" />
         )}

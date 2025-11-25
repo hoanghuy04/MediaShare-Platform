@@ -143,7 +143,7 @@ public class InitApp implements CommandLineRunner {
                     .firstName(data[2])
                     .lastName(data[3])
                     .bio(data[4])
-                    .avatar("https://picsum.photos/200/300?random=" + System.currentTimeMillis() + "_" + data[0])
+                    .avatar("")
                     .location(data[6])
                     .build();
 

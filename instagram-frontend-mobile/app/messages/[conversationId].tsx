@@ -406,7 +406,7 @@ export default function ConversationScreen() {
   useEffect(() => {
     const unsubscribe = onConversationUpdate((update) => {
       console.log('📡 [ConversationScreen] Conversation update received:', update);
-      
+
       // Only process updates for current conversation
       if (update.conversationId !== actualConversationId) return;
 
@@ -496,6 +496,7 @@ export default function ConversationScreen() {
         conversationId: packet.conversationId || actualConversationId || undefined,
         content: packet.content || '',
         type: packet.contentType || MessageType.TEXT,
+        postResponse: packet.postResponse,
         readBy: packet.status === 'READ' ? [user?.id || ''] : [],
         createdAt: packet.timestamp,
         isDeleted: false,
@@ -1023,16 +1024,16 @@ export default function ConversationScreen() {
     // Get display name from participant map (nickname > username)
     const participant = participantMap.get(item.sender.id);
     const displayName = participant ? getDisplayName(participant) : item.sender.username;
-    
+
     // Create modified message with display name for group conversations
     const messageWithDisplayName = isGroupConversation && participant
       ? {
-          ...item,
-          sender: {
-            ...item.sender,
-            username: displayName,
-          },
-        }
+        ...item,
+        sender: {
+          ...item.sender,
+          username: displayName,
+        },
+      }
       : item;
 
     return (
