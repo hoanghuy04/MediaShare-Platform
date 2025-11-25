@@ -16,6 +16,7 @@ type Props = {
   onOpenMembers: () => void;
   onOpenPrivacy: () => void;
   onOpenNicknames: () => void;
+  onOpenInviteLink: () => void;
   onCreateGroupFromDirect: () => void;
   onCreateGroupFromGroup: () => void;
 };
@@ -29,6 +30,7 @@ export const SettingsList: React.FC<Props> = ({
   onOpenMembers,
   onOpenPrivacy,
   onOpenNicknames,
+  onOpenInviteLink,
   onCreateGroupFromDirect,
   onCreateGroupFromGroup,
 }) => {
@@ -73,6 +75,7 @@ export const SettingsList: React.FC<Props> = ({
           left={<Ionicons name="link-outline" size={24} color={themeColors.text} />}
           title="Liên kết mời"
           subtitle={(conversation as any)?.inviteLink || 'Tạo liên kết mời'}
+          onPress={onOpenInviteLink}
           textColor={themeColors.text}
           textSecondaryColor={themeColors.textSecondary}
         />

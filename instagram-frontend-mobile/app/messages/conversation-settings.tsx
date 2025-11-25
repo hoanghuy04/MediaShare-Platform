@@ -445,6 +445,13 @@ export default function ConversationSettingsScreen() {
                 params: { conversationId: routeConversationId },
               });
             }}
+            onOpenInviteLink={() => {
+              if (!routeConversationId) return;
+              router.push({
+                pathname: '/messages/invite-link',
+                params: { conversationId: routeConversationId },
+              });
+            }}
             onCreateGroupFromDirect={() => {
               router.push({
                 pathname: '/messages/create-group',

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 type Props = {
   visible: boolean;
@@ -21,9 +22,11 @@ export const SettingsEditGroup: React.FC<Props> = ({
           <Text style={styles.title}>Đổi ảnh nhóm</Text>
           <View style={styles.actions}>
             <TouchableOpacity style={styles.button} onPress={onTakePhoto}>
+              <Ionicons name="camera-outline" size={22} color="#333" style={styles.icon} />
               <Text style={styles.buttonText}>Chụp ảnh</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={onPickFromLibrary}>
+              <Ionicons name="images-outline" size={22} color="#333" style={styles.icon} />
               <Text style={styles.buttonText}>Chọn ảnh</Text>
             </TouchableOpacity>
           </View>
@@ -62,11 +65,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    alignItems: 'center',
+  },
+  icon: {
+    marginRight: 10,
   },
   buttonText: {
     fontSize: 15,

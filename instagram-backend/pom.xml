@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.hoanghuy04</groupId>
-    <artifactId>instagram-backend</artifactId>
+    <artifactId>sudo-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>instagram-backend</name>
-    <description>instagram-backend</description>
+    <name>sudo-backend</name>
+    <description>sudo-backend</description>
     <url/>
     <licenses>
         <license/>
