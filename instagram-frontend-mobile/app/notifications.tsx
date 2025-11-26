@@ -9,6 +9,7 @@ import { useWebSocket } from '../context/WebSocketContext';
 import { NotificationMessage } from '../services/websocket';
 import { NotificationResponse } from '../types/notification';
 import { useNotificationContext } from '../context/NotificationContext';
+import { useAuth } from '../hooks/useAuth';
 
 interface Section {
     title: string;
@@ -20,6 +21,7 @@ const NotificationScreen = () => {
     const insets = useSafeAreaInsets();
     const { onNotification } = useWebSocket();
     const { decrementUnread } = useNotificationContext();
+    const { user } = useAuth();
     const [sections, setSections] = useState<Section[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -158,8 +160,8 @@ const NotificationScreen = () => {
         }
     }, [isLoading, hasMore, page, fetchNotifications]);
 
-    const handlePressItem = useCallback((item: NotificationResponse) => {
-        console.log('Click item:', item.id);
+    const handlePressItem = useCallback((item: NotificationResponse, shouldNavigate: boolean = true) => {
+        console.log('Click item:', item.id, 'Navigate:', shouldNavigate);
 
         // Mark as read
         if (!item.read) {
@@ -176,13 +178,32 @@ const NotificationScreen = () => {
             );
         }
 
-        // Navigate based on notification type
+        if (!shouldNavigate) return;
+
         if (item.type === 'FOLLOW' && item.senderId) {
             router.push(`/users/${item.senderId}` as any);
-        } else if (item.postId && (item.type === 'LIKE_POST' || item.type === 'COMMENT_POST')) {
-            router.push(`/posts/${item.postId}` as any);
+        } else if (item.postId && (item.type === 'LIKE_POST' || item.type === 'COMMENT_POST' || item.type === 'TAG_IN_POST' || item.type === 'TAG_IN_COMMENT')) {
+
+            // Determine post owner ID to navigate to correct profile posts list
+            let postOwnerId = user?.id; // Default to current user (me) for LIKE/COMMENT
+
+            if (item.type === 'TAG_IN_POST' || item.type === 'TAG_IN_COMMENT') {
+                // For tags, the post belongs to the sender
+                postOwnerId = item.senderId;
+            } else {
+                // For LIKE/COMMENT, the post belongs to me (receiver)
+                // We use user?.id from useAuth()
+            }
+
+            router.push({
+                pathname: '/profile/posts',
+                params: {
+                    userId: postOwnerId,
+                    postId: item.postId
+                }
+            });
         }
-    }, [router]);
+    }, [router, user]);
 
     const renderFooter = () => {
         if (!hasMore) return null;
