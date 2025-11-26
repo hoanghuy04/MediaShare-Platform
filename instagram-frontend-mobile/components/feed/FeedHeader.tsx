@@ -159,8 +159,8 @@ const styles = StyleSheet.create({
   },
   simpleDot: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 2,
+    right: 2,
     width: 10,
     height: 10,
     borderRadius: 5,
