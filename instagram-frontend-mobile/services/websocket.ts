@@ -1,6 +1,9 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { Message, PostResponse } from '../types';
+import { NotificationResponse as NotificationMessage } from '../types/notification';
+
+export { NotificationMessage };
 
 export interface ChatMessage {
   id?: string;
@@ -32,6 +35,7 @@ export interface MessageCallbacks {
   onUserOnline?: (userId: string) => void;
   onUserOffline?: (userId: string) => void;
   onConversationUpdate?: (update: { conversationId: string; updateType: string; data: any }) => void;
+  onNotification?: (notification: NotificationMessage) => void;
   onError?: (error: string) => void;
   onConnected?: () => void;
   onDisconnected?: () => void;
@@ -123,6 +127,9 @@ class WebSocketService {
 
     // Subscribe to conversation updates
     this.subscribeToConversationUpdates();
+
+    // Subscribe to notifications
+    this.subscribeToNotifications();
 
     // Subscribe to errors
     this.subscribeToErrors();
@@ -307,7 +314,29 @@ class WebSocketService {
       }
     );
 
-    this.subscriptions.set('presence', subscription);
+    this.subscriptions.set('conversation-updates', subscription);
+  }
+
+  /**
+   * Subscribe to notifications
+   */
+  private subscribeToNotifications(): void {
+    if (!this.client || !this.config) return;
+
+    const subscription = this.client.subscribe(
+      `/user/${this.config.userId}/queue/notifications`,
+      (message: IMessage) => {
+        try {
+          console.log('📥 Notification received:', message.body);
+          const notification: NotificationMessage = JSON.parse(message.body);
+          this.callbacks.onNotification?.(notification);
+        } catch (error) {
+          console.error('Error parsing notification:', error);
+        }
+      }
+    );
+
+    this.subscriptions.set('notifications', subscription);
   }
 
   /**

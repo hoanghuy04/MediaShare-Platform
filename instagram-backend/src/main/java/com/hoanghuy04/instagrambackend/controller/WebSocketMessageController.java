@@ -62,8 +62,8 @@ public class WebSocketMessageController {
                 return;
             }
             
-            User sender = userService.getUserEntityById(chatMessage.getSenderId());
-            User receiver = userService.getUserEntityById(chatMessage.getReceiverId());
+//            User sender = userService.getUserEntityById(chatMessage.getSenderId());
+//            User receiver = userService.getUserEntityById(chatMessage.getReceiverId());
             
             MessageResponse message;
             try {

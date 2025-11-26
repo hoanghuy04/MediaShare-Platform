@@ -8,15 +8,19 @@ import com.hoanghuy04.instagrambackend.entity.Like;
 import com.hoanghuy04.instagrambackend.entity.Post;
 import com.hoanghuy04.instagrambackend.entity.User;
 import com.hoanghuy04.instagrambackend.enums.LikeTargetType;
+import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.CommentRepository;
 import com.hoanghuy04.instagrambackend.repository.LikeRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
+import com.hoanghuy04.instagrambackend.service.notification.NotificationService;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
 
 
 @Service
@@ -27,24 +31,24 @@ public class PostLikeServiceImpl implements PostLikeService {
     private final LikeRepository likeRepository;
     private final SecurityUtil securityUtil;
     private final CommentRepository commentRepository;
+    private final NotificationService notificationService;
     private final com.hoanghuy04.instagrambackend.repository.UserRepository userRepository;
 
     @Transactional
     @Override
     public PostLikeToggleResponse toggleLikePost(String postId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new RuntimeException("Post not found"));
-
         User currentUser = securityUtil.getCurrentUser();
 
-        var existing = likeRepository.findByUserAndTargetTypeAndTargetId(
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found"));
+
+        Optional<Like> existing = likeRepository.findByUserAndTargetTypeAndTargetId(
                 currentUser,
                 LikeTargetType.POST,
                 postId
         );
 
         boolean liked;
-
         if (existing.isPresent()) {
             likeRepository.delete(existing.get());
             post.setTotalLikes(Math.max(0, post.getTotalLikes() - 1));
@@ -55,18 +59,27 @@ public class PostLikeServiceImpl implements PostLikeService {
                     .targetType(LikeTargetType.POST)
                     .targetId(postId)
                     .build();
-            likeRepository.save(like);
 
+            likeRepository.save(like);
             post.setTotalLikes(post.getTotalLikes() + 1);
             liked = true;
+
+            // 🔔 noti cho chủ bài viết khi được like (trừ tự like)
+            User postAuthor = post.getAuthor();
+            if (postAuthor != null && !postAuthor.getId().equals(currentUser.getId())) {
+                notificationService.createLikePostNotification(
+                        postAuthor.getId(),
+                        post.getId()
+                );
+            }
         }
 
         postRepository.save(post);
 
-        PostLikeToggleResponse response = new PostLikeToggleResponse();
-        response.setPostId(postId);
-        response.setLiked(liked);
-        return response;
+        return PostLikeToggleResponse.builder()
+                .postId(postId)
+                .liked(liked)
+                .build();
     }
 
     @Transactional

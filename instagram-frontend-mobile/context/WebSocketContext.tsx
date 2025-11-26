@@ -12,6 +12,7 @@ import {
   WebSocketConfig,
   MessageCallbacks,
   ChatMessage,
+  NotificationMessage,
 } from '../services/websocket';
 import { useAuth } from '../hooks/useAuth';
 import apiConfig from '../config/apiConfig';
@@ -38,6 +39,7 @@ interface WebSocketContextType {
   onConversationUpdate: (
     callback: (update: { conversationId: string; updateType: string; data: any }) => void
   ) => () => void;
+  onNotification: (callback: (notification: NotificationMessage) => void) => () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -54,6 +56,7 @@ type Subscribers = {
   onUserOffline: Set<(userId: string) => void>;
   onConnectionStatusChange: Set<(status: string) => void>;
   onConversationUpdate: Set<(update: { conversationId: string; updateType: string; data: any }) => void>;
+  onNotification: Set<(notification: NotificationMessage) => void>;
 };
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
@@ -72,6 +75,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     onUserOffline: new Set(),
     onConnectionStatusChange: new Set(),
     onConversationUpdate: new Set(),
+    onNotification: new Set(),
   });
 
   const connectWebSocket = useCallback(async () => {
@@ -110,6 +114,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       },
       onConversationUpdate: (update: { conversationId: string; updateType: string; data: any }) => {
         subscribersRef.current.onConversationUpdate.forEach(cb => cb(update));
+      },
+      onNotification: (notification: NotificationMessage) => {
+        subscribersRef.current.onNotification.forEach(cb => cb(notification));
       },
       onConnected: () => {
         setIsConnected(true);
@@ -231,6 +238,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     };
   }, []);
 
+
   const onConnectionStatusChange = useCallback((callback: (status: string) => void) => {
     subscribersRef.current.onConnectionStatusChange.add(callback);
     return () => {
@@ -243,6 +251,16 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
       subscribersRef.current.onConversationUpdate.add(callback);
       return () => {
         subscribersRef.current.onConversationUpdate.delete(callback);
+      };
+    },
+    []
+  );
+
+  const onNotification = useCallback(
+    (callback: (notification: NotificationMessage) => void) => {
+      subscribersRef.current.onNotification.add(callback);
+      return () => {
+        subscribersRef.current.onNotification.delete(callback);
       };
     },
     []
@@ -262,6 +280,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     onUserOffline,
     onConnectionStatusChange,
     onConversationUpdate,
+    onNotification,
   };
 
   return (

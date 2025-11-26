@@ -19,19 +19,24 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NotificationResponse {
-    
+
     private String id;
-    
     private NotificationType type;
     
-    private UserResponse relatedUser;
-    
-    private String relatedPostId;
-    
-    private String message;
-    
-    private boolean isRead;
-    
-    private LocalDateTime createdAt;
+    // Navigation fields
+    private String senderId;
+    private String postId;
+
+    private UserSummaryResponse author;
+
+    private String content;
+    private String postThumbnail;
+
+    private String createdAt;
+    private boolean read;
+
+    private boolean isFollowingBack;
+    private boolean isLikeComment;
 }
+
 

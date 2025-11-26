@@ -10,6 +10,7 @@ import com.hoanghuy04.instagrambackend.exception.ResourceNotFoundException;
 import com.hoanghuy04.instagrambackend.repository.FollowRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
 import com.hoanghuy04.instagrambackend.service.FileService;
+import com.hoanghuy04.instagrambackend.service.notification.NotificationService;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,9 @@ public class FollowServiceImpl implements FollowService {
     private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final FileService fileService;
+
+    // 👇 THÊM VÀO: dùng để tạo notification FOLLOW
+    private final NotificationService notificationService;
 
     @Transactional
     @Override
@@ -48,6 +52,7 @@ public class FollowServiceImpl implements FollowService {
         boolean following;
 
         if (existing.isPresent()) {
+            // UNFOLLOW
             followRepository.delete(existing.get());
 
             long newFollowingCount = currentUser.getFollowingCount() - 1;
@@ -58,6 +63,7 @@ public class FollowServiceImpl implements FollowService {
 
             following = false;
         } else {
+            // FOLLOW
             Follow follow = Follow.builder()
                     .followerId(currentUser.getId())
                     .followingId(target.getId())
@@ -71,6 +77,11 @@ public class FollowServiceImpl implements FollowService {
             target.setFollowersCount(target.getFollowersCount() + 1);
 
             following = true;
+
+            // 👇 CHỈ TẠO NOTI KHI BẮT ĐẦU THEO DÕI
+            // senderId = currentUser (lấy trong NotificationService bằng SecurityUtil),
+            // receiverId = target.getId()
+            notificationService.createFollowNotification(target.getId());
         }
 
         userRepository.save(currentUser);
