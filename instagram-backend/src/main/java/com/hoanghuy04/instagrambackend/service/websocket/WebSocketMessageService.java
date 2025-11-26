@@ -69,4 +69,6 @@ public interface WebSocketMessageService {
      * @param data additional data for the update
      */
     void pushConversationUpdate(String conversationId, List<String> participantIds, String updateType, Object data);
+
+
 }

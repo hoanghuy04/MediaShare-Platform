@@ -8,24 +8,13 @@ package com.hoanghuy04.instagrambackend.enums;
  * @version 1.0.0
  */
 public enum NotificationType {
-    /**
-     * Notification for post or comment likes
-     */
-    LIKE,
-    
-    /**
-     * Notification for new comments
-     */
-    COMMENT,
-    
-    /**
-     * Notification for new followers
-     */
     FOLLOW,
-    
-    /**
-     * Notification for new messages
-     */
-    MESSAGE
+    LIKE_POST,
+    COMMENT_POST,
+    LIKE_COMMENT,
+    TAG_IN_POST,
+    TAG_IN_COMMENT,
+    NEW_MESSAGE,
+    SYSTEM
 }
 

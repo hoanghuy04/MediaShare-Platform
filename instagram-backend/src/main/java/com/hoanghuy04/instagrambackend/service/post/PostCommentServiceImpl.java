@@ -19,6 +19,7 @@ import com.hoanghuy04.instagrambackend.repository.LikeRepository;
 import com.hoanghuy04.instagrambackend.repository.MentionRepository;
 import com.hoanghuy04.instagrambackend.repository.PostRepository;
 import com.hoanghuy04.instagrambackend.repository.UserRepository;
+import com.hoanghuy04.instagrambackend.service.notification.NotificationService; // 👈
 import com.hoanghuy04.instagrambackend.util.MentionUtil;
 import com.hoanghuy04.instagrambackend.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +44,11 @@ public class PostCommentServiceImpl implements PostCommentService {
     private final UserRepository userRepository;
     private final SecurityUtil securityUtil;
     private final MentionUtil mentionUtil;
+    private final NotificationService notificationService; // 👈
 
+    // ==============================
+    // CREATE COMMENT
+    // ==============================
     @Transactional
     @Override
     public CommentResponse createComment(String postId, CommentCreateRequest request) {
@@ -82,7 +87,18 @@ public class PostCommentServiceImpl implements PostCommentService {
         post.setTotalComments(post.getTotalComments() + 1);
         postRepository.save(post);
 
-        syncMentionsForComment(saved.getId(), rawText, currentUser.getId());
+        // 🔔 noti cho chủ bài viết khi có comment (trừ tự cmt bài mình)
+        User postAuthor = post.getAuthor();
+        if (postAuthor != null && !postAuthor.getId().equals(currentUser.getId())) {
+            notificationService.createCommentPostNotification(
+                    postAuthor.getId(),
+                    post.getId(),
+                    rawText
+            );
+        }
+
+        // 🔔 sync mention + noti TAG_IN_COMMENT
+        syncMentionsForComment(saved, rawText, currentUser.getId());
 
         return mapToCommentResponse(saved, false);
     }
@@ -162,6 +178,16 @@ public class PostCommentServiceImpl implements PostCommentService {
             likeRepository.save(like);
             comment.setTotalLikes(comment.getTotalLikes() + 1);
             liked = true;
+
+            // 🔔 noti cho chủ comment khi được like (trừ tự like)
+            User commentAuthor = comment.getAuthor();
+            if (commentAuthor != null && !commentAuthor.getId().equals(currentUser.getId())) {
+                notificationService.createLikeCommentNotification(
+                        commentAuthor.getId(),
+                        postId,
+                        commentId
+                );
+            }
         }
 
         commentRepository.save(comment);
@@ -250,19 +276,16 @@ public class PostCommentServiceImpl implements PostCommentService {
 
         long decrement = 1L;
 
-        // Nếu là comment cha -> xoá cả replies + likes + mentions của replies
         if (comment.getParentComment() == null) {
             List<Comment> replies = commentRepository.findByParentComment_Id(commentId);
 
             if (!replies.isEmpty()) {
                 List<String> replyIds = replies.stream().map(Comment::getId).toList();
 
-                // xoá like của replies
                 replyIds.forEach(id ->
                         likeRepository.deleteByTargetTypeAndTargetId(LikeTargetType.COMMENT, id)
                 );
 
-                // xoá mentions của replies
                 replyIds.forEach(id ->
                         mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, id)
                 );
@@ -276,15 +299,12 @@ public class PostCommentServiceImpl implements PostCommentService {
             commentRepository.save(parent);
         }
 
-        // update totalComments
         post.setTotalComments(Math.max(0, post.getTotalComments() - decrement));
         postRepository.save(post);
 
-        // xoá likes + mentions của chính comment
         likeRepository.deleteByTargetTypeAndTargetId(LikeTargetType.COMMENT, commentId);
         mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, commentId);
 
-        // xoá comment
         commentRepository.delete(comment);
     }
 
@@ -340,10 +360,6 @@ public class PostCommentServiceImpl implements PostCommentService {
                 ? comment.getParentComment().getId()
                 : null;
 
-        // mentions hiện tại ta không lấy từ entity nữa,
-        // FE có thể tự parse từ text, hoặc sau này có thể query MentionRepository nếu cần.
-        List<String> mentions = Collections.emptyList();
-
         return CommentResponse.builder()
                 .id(comment.getId())
                 .postId(comment.getPost().getId())
@@ -354,19 +370,24 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .createdAt(comment.getCreatedAt())
                 .updatedAt(comment.getUpdatedAt())
                 .parentCommentId(parentId)
-                .mentions(mentions)
+                .mentions(Collections.emptyList())
                 .isLikedByCurrentUser(likedByCurrentUser)
                 .pinned(comment.isPinned())
                 .isAuthorCommentedPost(comment.getAuthor().getId().equals(comment.getPost().getAuthor().getId()))
                 .build();
     }
 
+    // ==============================
+    // SYNC MENTIONS + NOTI TAG
+    // ==============================
     private void syncMentionsForComment(
-            String commentId,
+            Comment comment,
             String text,
             String createdByUserId
     ) {
-        // Xoá mentions cũ của comment
+        String commentId = comment.getId();
+
+        // Xoá mentions cũ
         mentionRepository.deleteByTargetTypeAndTargetId(MentionTargetType.COMMENT, commentId);
 
         List<String> usernames = mentionUtil.extractMentionUsernames(text);
@@ -389,5 +410,18 @@ public class PostCommentServiceImpl implements PostCommentService {
                 .toList();
 
         mentionRepository.saveAll(mentions);
+
+        Post post = comment.getPost();
+        if (post == null) return;
+
+        for (User u : users) {
+            if (!u.getId().equals(createdByUserId)) {
+                notificationService.createTagInCommentNotification(
+                        u.getId(),
+                        post.getId(),
+                        commentId
+                );
+            }
+        }
     }
 }

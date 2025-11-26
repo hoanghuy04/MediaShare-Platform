@@ -123,7 +123,7 @@ export default function FeedScreen() {
       showAlert('Error', e.message);
     }
   };
-  const handleActivityPress = () => showAlert('Activity', 'Coming soon');
+
 
   const suggestedAccount = {
     id: 'suggested_1',
@@ -141,7 +141,7 @@ export default function FeedScreen() {
           headerAnimatedStyle,
         ]}
       >
-        <FeedHeader onActivityPress={handleActivityPress} hasNotifications={false} />
+        <FeedHeader hasNotifications={false} />
         <UploadProgressWidget onRefreshFeed={handleUploadFinished} />
       </Animated.View>
 
@@ -183,6 +183,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 100,
     elevation: 3,
-    
+
   },
 });

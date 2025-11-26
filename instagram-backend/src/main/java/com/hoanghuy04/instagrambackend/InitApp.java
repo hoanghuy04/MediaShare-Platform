@@ -59,7 +59,7 @@ public class InitApp implements CommandLineRunner {
             initializePosts();
             initializeComments();
             initializeFollows();
-            initializeNotifications();
+//            initializeNotifications();
             
             log.info("Application initialization completed successfully");
         } catch (Exception e) {
@@ -459,27 +459,28 @@ public class InitApp implements CommandLineRunner {
      * Create a sample notification
      */
     private Notification createSampleNotification(User user) {
-        NotificationType[] types = {NotificationType.LIKE, NotificationType.COMMENT, NotificationType.FOLLOW, NotificationType.MESSAGE};
-        String[] messages = {
-            "liked your post",
-            "commented on your post", 
-            "started following you",
-            "sent you a message"
-        };
-        
-        List<User> allUsers = userRepository.findAll();
-        User otherUser = allUsers.get((int) (Math.random() * allUsers.size()));
-        
-        NotificationType type = types[(int) (Math.random() * types.length)];
-        String message = messages[(int) (Math.random() * messages.length)];
-        
-        return Notification.builder()
-                .user(user)
-                .type(type)
-                .relatedUser(otherUser)
-                .message(message)
-                .isRead(Math.random() < 0.7) // 70% chance of being read
-                .createdAt(LocalDateTime.now().minusHours((long) (Math.random() * 48)))
-                .build();
+//        NotificationType[] types = {NotificationType.LIKE_COMMENT, NotificationType.COMMENT_POST, NotificationType.FOLLOW, NotificationType.LIKE_COMMENT};
+//        String[] messages = {
+//            "liked your post",
+//            "commented on your post",
+//            "started following you",
+//            "sent you a message"
+//        };
+//
+//        List<User> allUsers = userRepository.findAll();
+//        User otherUser = allUsers.get((int) (Math.random() * allUsers.size()));
+//
+//        NotificationType type = types[(int) (Math.random() * types.length)];
+//        String message = messages[(int) (Math.random() * messages.length)];
+//
+//        return Notification.builder()
+//                .user(user)
+//                .type(type)
+//                .relatedUser(otherUser)
+//                .message(message)
+//                .isRead(Math.random() < 0.7) // 70% chance of being read
+//                .createdAt(LocalDateTime.now().minusHours((long) (Math.random() * 48)))
+//                .build();
+        return null;
     }
 }

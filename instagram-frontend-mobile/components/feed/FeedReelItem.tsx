@@ -370,7 +370,7 @@ export const FeedReelItem = ({ post, isVisible, onLike }: { post: PostResponse; 
           </TouchableOpacity>
         )}
         <View style={styles.captionContainer}>{renderCaption()}</View>
-        <Text style={styles.dateText}>6 ngày trước</Text>
+        <Text style={styles.dateText}>{formatDate(post.createdAt)}</Text>
       </View>
 
       <PostLikesModal

@@ -11,6 +11,7 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class PostLikeToggleResponse {
     private String postId;
     private boolean liked;

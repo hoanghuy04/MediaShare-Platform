@@ -1,78 +1,38 @@
 package com.hoanghuy04.instagrambackend.entity;
 
 import com.hoanghuy04.instagrambackend.enums.NotificationType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
+import lombok.*;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.DocumentReference;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
-/**
- * Entity representing a notification for user activities.
- * Tracks likes, comments, follows, and messages.
- * 
- * @author Instagram Backend Team
- * @version 1.0.0
- */
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "notifications")
 public class Notification {
-    
-    /**
-     * Unique identifier for the notification
-     */
+
     @Id
     private String id;
-    
-    /**
-     * Reference to the user receiving the notification
-     */
-    @DocumentReference
-    @Indexed
-    private User user;
-    
-    /**
-     * Type of notification (LIKE, COMMENT, FOLLOW, MESSAGE)
-     */
-    private NotificationType type;
-    
-    /**
-     * Reference to the user who triggered this notification
-     */
-    @DocumentReference
-    private User relatedUser;
-    
-    /**
-     * Optional reference to related post
-     */
-    @DocumentReference
-    private Post relatedPost;
-    
-    /**
-     * Notification message text
-     */
-    private String message;
-    
-    /**
-     * Flag indicating if the notification has been read
-     */
-    @Builder.Default
-    private boolean isRead = false;
-    
-    /**
-     * Timestamp when the notification was created
-     */
-    @CreatedDate
-    @Indexed
-    private LocalDateTime createdAt;
-}
 
+    private String receiverId;
+
+    private String senderId;
+
+    private NotificationType type;
+
+    private String postId;         // LIKE_POST, COMMENT_POST, LIKE_COMMENT, TAG_IN_POST, TAG_IN_COMMENT
+    private String commentId;      // COMMENT_POST, LIKE_COMMENT, TAG_IN_COMMENT
+    private String conversationId; // NEW_MESSAGE
+    private String messageId;      // NEW_MESSAGE
+
+    private String title;
+    private String message;
+
+    private boolean read;
+
+    private Instant createdAt;
+}
