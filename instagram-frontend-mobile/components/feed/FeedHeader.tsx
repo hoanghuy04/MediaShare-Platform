@@ -73,10 +73,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           <View style={styles.rightIcons}>
             {/* Activity/Notifications Icon */}
             <TouchableOpacity
-              onPress={() => {
+              onPress={async () => {
                 if (onActivityPress) {
                   onActivityPress();
                 } else {
+                  await markAllAsRead();
                   router.push('/notifications' as any);
                 }
               }}
